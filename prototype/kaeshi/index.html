@@ -170,7 +170,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.7</p>
+    <p class="kicker">Kaeshi · 試作 0.8</p>
     <h1>返し</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -598,7 +598,17 @@
   })();
   const INK = new THREE.MeshBasicMaterial({ color: 0x03050a, side: THREE.BackSide });
   // 色は見た目どおりの色（sRGB）で指定し、描画用に変換する
-  const toon = (color, extra) => { const m = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: TOON }, extra || {})); m.color.convertSRGBToLinear(); return m; };
+  const RIM = new THREE.Color(0x9fb4e8).convertSRGBToLinear();
+  // 縁取りの光（リムライト）：視線に対して横を向いた面ほど、月の色で縁が光る。夜の雪の上で人物を背景から浮かせる。
+  const toon = (color, extra) => {
+    const m = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: TOON }, extra || {}));
+    m.color.convertSRGBToLinear();
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uRim = { value: RIM };
+      sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', 'float rimF = 1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0);\n  gl_FragColor.rgb += uRim * pow(rimF, 3.0) * 0.6;\n#include <dithering_fragment>');
+    };
+    return m;
+  };
   function inked(geo, mat, thick) {
     const m = new THREE.Mesh(geo, mat);
     const o = new THREE.Mesh(geo, INK);
@@ -667,91 +677,180 @@
   }
   const CHANNELS = ['hx', 'hy', 'hz', 'sx', 'sy', 'sz', 'hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift'];
 
+  // 一続きの皮膚：関節の位置に沿って、輪を連ねた管を毎フレーム作り直す。継ぎ目がなく、肘や膝が滑らかに曲がる。
+  // 輪ごとに太さ（筋肉の膨らみ）と色（袖口や脚絆の切り替え）を変えられる。
+  function makeLoft(nr, ns, parent, thick) {
+    const n = nr * ns;
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), opos = new Float32Array(n * 3);
+    const idx = [];
+    for (let r = 0; r < nr - 1; r++) for (let s = 0; s < ns; s++) {
+      const a = r * ns + s, b = r * ns + (s + 1) % ns, c = (r + 1) * ns + s, d = (r + 1) * ns + (s + 1) % ns;
+      idx.push(a, b, c, b, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(idx);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const geoO = new THREE.BufferGeometry();
+    geoO.setIndex(idx);
+    geoO.setAttribute('position', new THREE.BufferAttribute(opos, 3));
+    const mat = toon(0xffffff, { vertexColors: true });
+    const mesh = new THREE.Mesh(geo, mat), outline = new THREE.Mesh(geoO, INK);
+    mesh.frustumCulled = false; outline.frustumCulled = false;
+    parent.add(mesh); parent.add(outline);
+    const w = V(0, 0, 0), dir = V(0, 0, 0), nn = V(0, 0, 0);
+    return {
+      mat,
+      update(rings) {
+        for (let r = 0; r < nr; r++) {
+          const R = rings[r];
+          w.copy(R.t).cross(R.u).normalize();
+          for (let s = 0; s < ns; s++) {
+            const a = s / ns * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a);
+            const m = R.pleat ? 1 + R.pleat * Math.abs(Math.sin(a * 5)) : 1;
+            dir.copy(R.u).multiplyScalar(cs * R.rx * m).addScaledVector(w, sn * R.rz * m);
+            nn.copy(R.u).multiplyScalar(cs / R.rx).addScaledVector(w, sn / R.rz).normalize();
+            const o = (r * ns + s) * 3;
+            pos[o] = R.c.x + dir.x; pos[o + 1] = R.c.y + dir.y; pos[o + 2] = R.c.z + dir.z;
+            nor[o] = nn.x; nor[o + 1] = nn.y; nor[o + 2] = nn.z;
+            opos[o] = pos[o] + nn.x * thick; opos[o + 1] = pos[o + 1] + nn.y * thick; opos[o + 2] = pos[o + 2] + nn.z * thick;
+            col[o] = R.col.r; col[o + 1] = R.col.g; col[o + 2] = R.col.b;
+          }
+        }
+        geo.attributes.position.needsUpdate = true; geo.attributes.normal.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+        geoO.attributes.position.needsUpdate = true;
+      },
+    };
+  }
+  const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  function ringList(n) { return Array.from({ length: n }, () => ({ c: V(0, 0, 0), t: V(0, 1, 0), u: V(1, 0, 0), rx: 0.1, rz: 0.1, col: new THREE.Color(1, 1, 1), pleat: 0 })); }
+
+  // 肩→肘→手首、股関節→膝→足首を、関節で丸めた一本の曲線にする
+  const _m1 = V(0, 0, 0), _m2 = V(0, 0, 0), _q0 = V(0, 0, 0), _q1 = V(0, 0, 0);
+  function limbPoint(A, B, C, t, out) {
+    _m1.copy(A).lerp(B, 0.5); _m2.copy(B).lerp(C, 0.5);
+    if (t < 0.25) return out.copy(A).lerp(_m1, t / 0.25);
+    if (t > 0.75) return out.copy(_m2).lerp(C, (t - 0.75) / 0.25);
+    const u = (t - 0.25) / 0.5;
+    _q0.copy(_m1).lerp(B, u); _q1.copy(B).lerp(_m2, u);
+    return out.copy(_q0).lerp(_q1, u);
+  }
+  const _pa = V(0, 0, 0), _pb = V(0, 0, 0);
+  function fillLimb(rings, A, B, C, hint, profile) {
+    const n = rings.length;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1), R = rings[i];
+      limbPoint(A, B, C, t, R.c);
+      limbPoint(A, B, C, Math.max(0, t - 0.02), _pa); limbPoint(A, B, C, Math.min(1, t + 0.02), _pb);
+      R.t.copy(_pb).sub(_pa).normalize();
+      R.u.copy(hint).addScaledVector(R.t, -hint.dot(R.t)).normalize();
+      profile(t, R);
+    }
+  }
+
+  // 体の比率（英雄的に：脚は長く、肩は広く、腰は細く、頭は小さく）
+  const BODY = { hip: 1.02, thigh: 0.5, shin: 0.49, ankle: 0.075, upper: 0.31, fore: 0.29 };
+
   function makeFigure({ scale, kimono, hakamaColor, skin, blade, sash, wrap, tasuki, kind, bladeLen, tsukaLen }) {
+    const big = kind === 'enemy';
     const root = new THREE.Group();
     root.scale.setScalar(scale);
     scene.add(root);
     const mK = toon(kimono), mH = toon(hakamaColor, { side: THREE.DoubleSide }), mS = toon(skin);
     const mSash = toon(sash), mWrap = toon(wrap), mTabi = toon(0xe4e6ec), mDark = toon(0x16141c), mTasuki = toon(tasuki);
     const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.95, roughness: 0.16, emissive: 0x1a2230, side: THREE.DoubleSide });
+    const cK = lin(kimono), cH = lin(hakamaColor), cS = lin(skin), cW = lin(wrap);
 
     let hat = null, hatFall = null;
-    const hatPieces = [], chips = [], cracks = [];
+    const tears = [], hatPieces = [], chips = [], cracks = [];
     let hitGlow = 0;
-    const tears = [];
-    // 骨盤 → 腰 → 胸 → 首 → 頭
+
+    // 骨格：骨盤 → 腰 → 胸 → 首 → 頭（形は一続きの胴で作り、ここは位置と向きだけを持つ）
     const hips = new THREE.Group(); root.add(hips);
-    hips.add(sphere(mH, 0.175, 0.125, 0.135));
-    const obi = inked(new THREE.CylinderGeometry(0.2, 0.205, 0.085, 18), mSash, 0.05); obi.position.y = 0.07; obi.scale.z = 0.8; hips.add(obi);
-    const skirt = inked(pleatGeometry(0.19, 0.28, 0.28, 7, 0.12), mH, 0.04); skirt.position.y = -0.09; skirt.scale.z = 0.86; hips.add(skirt);
-    // 帯の結び目（背中）
-    [-1, 1].forEach((sx) => { const lobe = sphere(mSash, 0.06, 0.04, 0.03, 0.08); lobe.position.set(sx * 0.055, 0.07, -0.18); lobe.rotation.z = sx * 0.5; hips.add(lobe); });
     const waist = new THREE.Group(); waist.position.y = 0.1; hips.add(waist);
-    const abd = inked(new THREE.CylinderGeometry(0.165, 0.155, 0.26, 16), mK, 0.05); abd.position.y = 0.11; abd.scale.z = 0.78; waist.add(abd);
     const chestG = new THREE.Group(); chestG.position.y = 0.24; waist.add(chestG);
-    const prof = [[0.0, 0.0], [0.165, 0.0], [0.19, 0.08], [0.23, 0.19], [0.255, 0.27], [0.21, 0.33], [0.1, 0.37], [0.0, 0.38]].map(([r, y]) => new THREE.Vector2(r, y));
-    const chest = inked(new THREE.LatheGeometry(prof, 20), mK, 0.045); chest.scale.z = 0.72; chestG.add(chest);
-    // 襟（前）とたすき（背中で交差）
-    const lapel = new THREE.BoxGeometry(0.045, 0.34, 0.02);
-    [-1, 1].forEach((s) => { const l = new THREE.Mesh(lapel, mSash); l.position.set(s * 0.055, 0.2, 0.17); l.rotation.z = s * 0.45; l.rotation.x = -0.18; chestG.add(l); });
-    const inner = new THREE.BoxGeometry(0.03, 0.3, 0.02), mWhite = toon(0xe8e6e0);
-    [-1, 1].forEach((s) => { const l = new THREE.Mesh(inner, mWhite); l.position.set(s * 0.03, 0.23, 0.175); l.rotation.z = s * 0.45; l.rotation.x = -0.18; chestG.add(l); });
-    [-1, 1].forEach((s) => { const tr = sphere(mK, 0.11, 0.05, 0.09, 0.05); tr.position.set(s * 0.1, 0.35, -0.01); tr.rotation.z = -s * 0.35; chestG.add(tr); });
-    const cord = new THREE.BoxGeometry(0.035, 0.52, 0.02);
-    [-1, 1].forEach((s) => { const c = new THREE.Mesh(cord, mTasuki); c.position.set(0, 0.17, -0.18); c.rotation.z = s * 0.62; c.rotation.x = 0.12; chestG.add(c); });
-    const neckG = new THREE.Group(); neckG.position.y = 0.37; chestG.add(neckG);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.058, 0.11, 10), mS); neck.position.y = 0.04; neckG.add(neck);
-    const headG = new THREE.Group(); headG.position.y = 0.155; neckG.add(headG);
-    headG.add(sphere(mS, 0.105, 0.125, 0.115, 0.05));
-    if (kind === 'enemy') {
-      const menpo = sphere(toon(0x5a1a1c), 0.095, 0.075, 0.06, 0.06); menpo.position.set(0, -0.035, 0.07); headG.add(menpo);
-      // 面頬のひび（後半、傷の節目で一筋ずつ入る）
+    const neckG = new THREE.Group(); neckG.position.y = 0.39; chestG.add(neckG);
+    const headG = new THREE.Group(); headG.position.y = 0.15; neckG.add(headG);
+    const chest = { scale: { set() {} } };   // 呼吸は胴の輪の太さで表す
+
+    // 帯、袴の上部（ひだ）、帯の結び目
+    const obi = inked(new THREE.CylinderGeometry(0.185, 0.19, 0.085, 20), mSash, 0.05); obi.position.y = 0.07; obi.scale.z = 0.74; hips.add(obi);
+    const skirt = inked(pleatGeometry(0.18, big ? 0.3 : 0.24, big ? 0.34 : 0.26, 7, 0.14), mH, 0.04); skirt.position.y = big ? -0.12 : -0.08; skirt.scale.z = 0.86; hips.add(skirt);
+    [-1, 1].forEach((sx) => { const lobe = sphere(mSash, 0.06, 0.04, 0.03, 0.08); lobe.position.set(sx * 0.05, 0.07, -0.15); lobe.rotation.z = sx * 0.5; hips.add(lobe); });
+    // 襟（前）、白い内襟、たすき（背中で交差）
+    const mWhite = toon(0xe8e6e0);
+    const lapel = new THREE.BoxGeometry(0.04, 0.3, 0.018), inner = new THREE.BoxGeometry(0.026, 0.26, 0.018);
+    [-1, 1].forEach((sx) => {
+      const l = new THREE.Mesh(lapel, mSash); l.position.set(sx * 0.05, 0.22, 0.137); l.rotation.set(-0.2, 0, sx * 0.42); chestG.add(l);
+      const i2 = new THREE.Mesh(inner, mWhite); i2.position.set(sx * 0.027, 0.25, 0.135); i2.rotation.set(-0.2, 0, sx * 0.42); chestG.add(i2);
+    });
+    if (!big) { const cord = new THREE.BoxGeometry(0.03, 0.48, 0.016); [-1, 1].forEach((sx) => { const c = new THREE.Mesh(cord, mTasuki); c.position.set(0, 0.18, -0.142); c.rotation.set(0.1, 0, sx * 0.62); chestG.add(c); }); }
+    // 相手の肩衣：肩から横に張り出した硬い布。シルエットを横に広い三角にして、重さと脅威を見せる
+    if (big) {
+      const wing = new THREE.BoxGeometry(0.3, 0.016, 0.24), mWing = toon(0x231e2b);
+      [-1, 1].forEach((sx) => { const wg = inked(wing, mWing, 0.06); wg.position.set(sx * 0.3, 0.33, 0); wg.rotation.set(0, 0, sx * 0.2); chestG.add(wg); });
+      const edge = new THREE.BoxGeometry(0.3, 0.02, 0.02);
+      [-1, 1].forEach((sx) => { const e = new THREE.Mesh(edge, mSash); e.position.set(sx * 0.3, 0.335, 0.12); e.rotation.set(0, 0, sx * 0.2); chestG.add(e); });
+    }
+
+    // 頭：頭蓋、顎、鼻、耳
+    const head = new THREE.Group(); headG.add(head);
+    const cranium = sphere(mS, 0.095, 0.108, 0.104, 0.05); cranium.position.set(0, 0.012, -0.006); head.add(cranium);
+    const jaw = sphere(mS, 0.07, 0.058, 0.074, 0.05); jaw.position.set(0, -0.052, 0.028); head.add(jaw);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.032, 0.026), mS); nose.position.set(0, -0.012, 0.098); head.add(nose);
+    [-1, 1].forEach((sx) => { const ear = sphere(mS, 0.014, 0.024, 0.012, 0.1); ear.position.set(sx * 0.094, -0.008, -0.004); head.add(ear); });
+    if (big) {
+      // 面頬（顔の防具）と、笠
+      const menpo = sphere(toon(0x5a1a1c), 0.082, 0.066, 0.06, 0.06); menpo.position.set(0, -0.04, 0.062); head.add(menpo);
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.03), toon(0x6e2224)); ridge.position.set(0, -0.012, 0.115); head.add(ridge);
+      const brow = sphere(toon(0x0d0f14), 0.104, 0.06, 0.108, 0.05); brow.position.set(0, 0.058, -0.012); head.add(brow);
       const crackMat = toon(0xe8d8c8), crackGeo = new THREE.BoxGeometry(0.006, 0.05, 0.004);
-      for (let i = 0; i < 3; i++) {
-        const c = new THREE.Mesh(crackGeo, crackMat);
-        c.position.set(-0.03 + i * 0.03, -0.03 + (i % 2) * 0.012, 0.128); c.rotation.z = 0.5 - i * 0.45; c.visible = false;
-        headG.add(c); cracks.push(c);
-      }
-      const brow = sphere(toon(0x0d0f14), 0.11, 0.06, 0.11, 0.05); brow.position.set(0, 0.06, -0.01); headG.add(brow);
+      for (let i = 0; i < 3; i++) { const c = new THREE.Mesh(crackGeo, crackMat); c.position.set(-0.03 + i * 0.03, -0.035 + (i % 2) * 0.012, 0.121); c.rotation.z = 0.5 - i * 0.45; c.visible = false; head.add(c); cracks.push(c); }
       hat = new THREE.Group(); hat.position.y = 0.11; headG.add(hat);
       const mKasa = toon(0x9c8a5f, { side: THREE.DoubleSide }), mUnder = new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide });
       for (let i = 0; i < 6; i++) {
         const th = i / 6 * Math.PI * 2, tl = Math.PI * 2 / 6;
         const piece = new THREE.Group();
-        piece.add(inked(new THREE.ConeGeometry(0.5, 0.2, 5, 1, true, th, tl), mKasa, 0.03));
-        const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 5, Math.PI / 2 - th - tl, tl), mUnder); under.rotation.x = Math.PI / 2; under.position.y = -0.095; piece.add(under);
+        piece.add(inked(new THREE.ConeGeometry(0.52, 0.21, 5, 1, true, th, tl), mKasa, 0.03));
+        const under = new THREE.Mesh(new THREE.CircleGeometry(0.51, 5, Math.PI / 2 - th - tl, tl), mUnder); under.rotation.x = Math.PI / 2; under.position.y = -0.1; piece.add(under);
         hat.add(piece); hatPieces.push(piece);
       }
     } else {
-      const hair = sphere(toon(0x0d0f14), 0.112, 0.105, 0.12, 0.05); hair.position.set(0, 0.035, -0.015); headG.add(hair);
-      const knot = sphere(toon(0x0d0f14), 0.045, 0.045, 0.06, 0.1); knot.position.set(0, 0.11, -0.08); headG.add(knot);
+      // 髷と、引き締めた髪
+      const mHair = toon(0x0d0f14);
+      const cap = sphere(mHair, 0.1, 0.094, 0.108, 0.05); cap.position.set(0, 0.04, -0.016); head.add(cap);
+      const knotBase = inked(new THREE.CylinderGeometry(0.017, 0.022, 0.09, 8), mHair, 0.1); knotBase.position.set(0, 0.128, -0.04); knotBase.rotation.x = -0.9; head.add(knotBase);
+      const knot = sphere(mHair, 0.026, 0.024, 0.03, 0.1); knot.position.set(0, 0.15, -0.075); head.add(knot);
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 6, 12), mTasuki); tie.position.set(0, 0.132, -0.052); tie.rotation.x = 0.7; head.add(tie);
     }
 
-    // 脚：太もも（袴）→ 膝 → 脛（脚絆）→ 足首 → 足
-    const legs = [0, 1].map(() => {
-      const thigh = inked(pleatGeometry(0.1, 0.085, 1, 5, 0.18), mH, 0.04);
-      const kneeB = sphere(mH, 0.075, 0.075, 0.075, 0.05);
-      const shin = inked(new THREE.CylinderGeometry(0.066, 0.046, 1, 10), mWrap, 0.06);
-      const ankle = sphere(mWrap, 0.045, 0.045, 0.045, 0.06);
+    // 胴：骨盤から首の付け根まで、楕円の輪を連ねる。[骨, 高さ, 横幅, 奥行き, 色]
+    const sw = big ? 1.14 : 1.0;
+    const TORSO = [
+      [hips, -0.06, 0.16, 0.115, cH], [hips, 0.03, 0.165, 0.118, cK], [waist, 0.05, 0.148, 0.106, cK], [waist, 0.17, 0.16, 0.114, cK],
+      [chestG, 0.05, 0.19 * sw, 0.126, cK], [chestG, 0.17, 0.215 * sw, 0.136, cK], [chestG, 0.27, 0.218 * sw, 0.126, cK],
+      [chestG, 0.335, 0.13 * sw, 0.092, cK], [chestG, 0.385, 0.052, 0.048, cS],
+    ];
+    const torsoRings = ringList(TORSO.length), torso = makeLoft(TORSO.length, 16, root, 0.008);
+    const armRings = [ringList(14), ringList(14)], arms = [makeLoft(14, 10, root, 0.007), makeLoft(14, 10, root, 0.007)];
+    const legRings = [ringList(14), ringList(14)], legs = [makeLoft(14, 12, root, 0.008), makeLoft(14, 12, root, 0.008)];
+    const lofts = [torso, ...arms, ...legs];
+
+    // 手（親指つき）、肩の膨らみ、足（足袋と草鞋）、相手の広い袖
+    const hands = [0, 1].map(() => {
+      const hnd = inked(new THREE.BoxGeometry(0.072, 0.09, 0.048), mS, 0.1);
+      const thumb = sphere(mS, 0.022, 0.034, 0.022, 0.12); thumb.position.set(0.03, 0.03, 0.035); hnd.add(thumb);
+      root.add(hnd); return hnd;
+    });
+    const feetM = [0, 1].map(() => {
       const foot = sphere(mTabi, 0.048, 0.034, 0.12, 0.1);
       const sole = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.35, 1.05), toon(0x6e5f45)); sole.position.y = -0.85; foot.add(sole);
       const strap = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.3, 0.12), toon(0x3a2f24)); strap.position.set(0, 0.6, 0.2); foot.add(strap);
-      [thigh, kneeB, shin, ankle, foot].forEach((m) => root.add(m));
-      return { thigh, kneeB, shin, ankle, foot };
+      root.add(foot); return foot;
     });
-    // 腕：鎖骨と肩 → 上腕（縛った袖）→ 肘 → 前腕 → 手首 → 手
-    const arms = [0, 1].map(() => {
-      const shoulder = sphere(mK, 0.075, 0.075, 0.075, 0.06);
-      const puff = sphere(mK, 0.085, 0.11, 0.085, 0.05);
-      const upper = inked(new THREE.CylinderGeometry(0.056, 0.047, 1, 10), mS, 0.07);
-      const elbow = sphere(mS, 0.047, 0.047, 0.047, 0.07);
-      const fore = inked(new THREE.CylinderGeometry(0.046, 0.034, 1, 10), mS, 0.08);
-      const wrist = sphere(mS, 0.034, 0.034, 0.034, 0.08);
-      const hand = inked(new THREE.BoxGeometry(0.075, 0.09, 0.05), mS, 0.1);
-      const thumb = sphere(mS, 0.022, 0.035, 0.022, 0.12); thumb.position.set(0.03, 0.03, 0.035); hand.add(thumb);
-      [shoulder, puff, upper, elbow, fore, wrist, hand].forEach((m) => root.add(m));
-      return { shoulder, puff, upper, elbow, fore, wrist, hand };
-    });
+    const sleeves = big ? [0, 1].map(() => { const sl = inked(new THREE.CylinderGeometry(0.085, 0.19, 1, 14, 1, true), toon(kimono, { side: THREE.DoubleSide }), 0.03); root.add(sl); return { m: sl, dir: V(0, -1, 0) }; }) : null;
+
     // 大太刀
     const BL = bladeLen, SORI = 0.06, TK = tsukaLen;
     const sword = new THREE.Group(); root.add(sword);
@@ -765,28 +864,28 @@
     scene.add(shadow);
 
     const chains = [];
-    if (kind === 'enemy') {
-      for (let i = 0; i < 5; i++) chains.push({ c: makeChain(6, 0.18, 0.15, 0x1c1f2b, 1), anchor: V(-0.22 + i * 0.11, 0.3, -0.15), at: 'chest' });
+    if (big) {
+      for (let i = 0; i < 6; i++) chains.push({ c: makeChain(7, 0.18, 0.16, 0x1c1f2b, 1), anchor: V(-0.25 + i * 0.1, 0.3, -0.13), at: 'chest' });
     } else {
-      chains.push({ c: makeChain(11, 0.14, 0.11, 0xb02e3a, 1), anchor: V(0.04, 0.34, -0.12), at: 'chest' });
-      chains.push({ c: makeChain(4, 0.07, 0.045, 0x0d0f14, 1), anchor: V(0, 0.11, -0.11), at: 'head' });
-      // たすきの結び目の垂れ
-      chains.push({ c: makeChain(4, 0.08, 0.035, tasuki, 1), anchor: V(0, 0.18, -0.19), at: 'chest' });
+      chains.push({ c: makeChain(12, 0.14, 0.11, 0xb02e3a, 1), anchor: V(0.04, 0.34, -0.11), at: 'chest' });
+      chains.push({ c: makeChain(5, 0.075, 0.045, 0x0d0f14, 1), anchor: V(0, 0.15, -0.085), at: 'head' });
+      chains.push({ c: makeChain(4, 0.08, 0.035, tasuki, 1), anchor: V(0, 0.18, -0.15), at: 'chest' });
     }
 
     const feet = [0, 1].map(() => ({ pos: V(0, 0, 0), from: V(0, 0, 0), to: V(0, 0, 0), t: 1, stepping: false }));
     let feetReady = false, wasAir = false;
     const tip = V(0, 0, 0), mid = V(0, 0, 0), headWorld = V(0, 0, 0), hipWorld = V(0, 0, 0), chestWorld = V(0, 0, 0);
     const right = V(0, 0, 0), fwd = V(0, 0, 0);
-    const local = V(0, 0, 0), joint = V(0, 0, 0), bendL = V(0, 0, 0), sh = V(0, 0, 0), hand = V(0, 0, 0), knee = V(0, 0, 0);
+    const local = V(0, 0, 0), joint = V(0, 0, 0), bendL = V(0, 0, 0), sh = V(0, 0, 0), hand = V(0, 0, 0), knee = V(0, 0, 0), hipJ = V(0, 0, 0);
     const springs = {}; CHANNELS.forEach((c) => { springs[c] = so(); });
     const sm = pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
     let lastX = null, lastZ = 0;
     const vel = V(0, 0, 0);
+    const invRoot = new THREE.Matrix4(), mtx = new THREE.Matrix4(), ax = V(0, 0, 0), ay = V(0, 0, 0);
 
     function idealFoot(i, p, out) {
-      const sx = (i === 0 ? -1 : 1) * (0.2 + p.crouch * 0.45);
-      out.set(sx, 0, i === 0 ? 0.17 : -0.15);
+      const sx = (i === 0 ? -1 : 1) * (0.19 + p.crouch * 0.45);
+      out.set(sx, 0, i === 0 ? 0.18 : -0.16);
       return root.localToWorld(out);
     }
     function animate(p, T, fast) {
@@ -802,6 +901,24 @@
       return sm;
     }
 
+    // 腕と脚の太さ（筋肉の膨らみ）と色。t は付け根 0 → 先 1。
+    const armProfile = (t, R) => {
+      const r = t < 0.5 ? lerp(0.064, 0.046, smooth(t / 0.5)) + Math.sin(t / 0.5 * Math.PI) * 0.008 : lerp(0.046, 0.031, smooth((t - 0.5) / 0.5)) + Math.sin(clamp((t - 0.5) / 0.3, 0, 1) * Math.PI) * 0.007;
+      R.rx = r * (big ? 1.12 : 1); R.rz = r * (big ? 1.06 : 0.94); R.pleat = 0;
+      R.col.copy(t < (big ? 0.88 : 0.42) ? cK : cS);
+    };
+    const legProfile = (t, R) => {
+      if (big) {
+        // 裾の広い袴：腰から裾へ広がり、ひだが波打つ
+        const r = t < 0.5 ? lerp(0.12, 0.13, t / 0.5) : lerp(0.13, 0.21, (t - 0.5) / 0.5);
+        R.rx = r; R.rz = r * 0.95; R.pleat = 0.12; R.col.copy(cH);
+      } else {
+        // 細身の袴を脛で絞り、脚絆を巻く
+        const r = t < 0.5 ? lerp(0.1, 0.078, smooth(t / 0.5)) + Math.sin(t / 0.5 * Math.PI) * 0.01 : lerp(0.07, 0.042, smooth((t - 0.5) / 0.5)) + Math.sin(clamp((t - 0.5) / 0.35, 0, 1) * Math.PI) * 0.01;
+        R.rx = r; R.rz = r * 0.96; R.pleat = t < 0.48 ? 0.08 : 0; R.col.copy(t < 0.52 ? cH : cW);
+      }
+    };
+
     function apply(target, wx, wz, yaw, dtMs, onStep, opts) {
       const T = dtMs / 1000;
       root.position.set(wx, 0, wz);
@@ -816,16 +933,27 @@
       lean.pitch += vf * 0.045; lean.roll -= vs * 0.055; lean.crouch += Math.min(0.1, (Math.abs(vf) + Math.abs(vs)) * 0.012);
       const p = animate(lean, T, opts && opts.fast);
 
-      // 背骨：ひねりと曲げを、骨盤・腰・胸に分けて伝える
-      hips.position.set(p.hipX, 1.0 - p.crouch + p.lift, p.hipZ);
+      hips.position.set(p.hipX, BODY.hip - p.crouch + p.lift, p.hipZ);
       hips.rotation.set(p.pitch * 0.25, p.yaw * 0.3, p.roll * 0.3);
       waist.rotation.set(p.pitch * 0.35, p.yaw * 0.35, p.roll * 0.35);
       chestG.rotation.set(p.pitch * 0.4, p.yaw * 0.35, p.roll * 0.35);
-      const breathe = 1 + Math.sin(performance.now() * 0.0026) * 0.012;
-      chest.scale.set(1, breathe, 0.72);
       root.updateMatrixWorld(true);
       if (opts && opts.look) headG.lookAt(opts.look);
       root.updateMatrixWorld(true);
+      invRoot.copy(root.matrixWorld).invert();
+
+      // 胴の輪：各骨の向きに沿って置く。胸は呼吸で膨らむ。
+      const breathe = Math.sin(performance.now() * 0.0026) * 0.008;
+      TORSO.forEach(([bone, y, rx, rz, c], i) => {
+        const R = torsoRings[i];
+        mtx.multiplyMatrices(invRoot, bone.matrixWorld);
+        R.c.set(0, y, 0).applyMatrix4(mtx);
+        ay.set(0, 1, 0).transformDirection(mtx); ax.set(1, 0, 0).transformDirection(mtx);
+        R.t.copy(ay); R.u.copy(ax);
+        const b = i >= 4 && i <= 6 ? 1 + breathe : 1;
+        R.rx = rx * b; R.rz = rz * b; R.col.copy(c); R.pleat = 0;
+      });
+      torso.update(torsoRings);
 
       // 足
       const air = p.lift > 0.035;
@@ -850,42 +978,44 @@
       });
       wasAir = air;
 
-      // 脚（膝は前へ曲がる）
+      // 脚：股関節 → 膝 → 足首
       bendL.set(0, 0, 1);
       for (let i = 0; i < 2; i++) {
-        const L = legs[i];
-        tA.set(i === 0 ? -0.1 : 0.1, -0.06, 0); hips.localToWorld(tA); root.worldToLocal(tA);
-        local.copy(feet[i].pos); root.worldToLocal(local); local.y += 0.075;
-        tB.copy(local).sub(tA);
-        if (tB.length() > 0.9) local.copy(tA).addScaledVector(tB.normalize(), 0.9);
-        ik(tA, local, 0.47, 0.44, bendL, knee);
-        placeLimb(L.thigh, tA, knee);
-        L.kneeB.position.copy(knee);
-        placeLimb(L.shin, knee, local);
-        L.ankle.position.copy(local);
-        L.foot.position.set(local.x + (i === 0 ? -0.01 : 0.01), local.y - 0.045, local.z + 0.06);
-        L.foot.rotation.set(feet[i].stepping ? -0.25 : 0, (i === 0 ? 0.15 : -0.15), 0);
+        hipJ.set(i === 0 ? -0.095 : 0.095, -0.05, 0); hips.localToWorld(hipJ); root.worldToLocal(hipJ);
+        local.copy(feet[i].pos); root.worldToLocal(local); local.y += BODY.ankle;
+        tB.copy(local).sub(hipJ);
+        const maxL = (BODY.thigh + BODY.shin) * 0.995;
+        if (tB.length() > maxL) local.copy(hipJ).addScaledVector(tB.normalize(), maxL);
+        ik(hipJ, local, BODY.thigh, BODY.shin, bendL, knee);
+        tC.set(i === 0 ? -0.25 : 0.25, 0, 1).normalize();
+        fillLimb(legRings[i], hipJ, knee, local, tC, legProfile);
+        legs[i].update(legRings[i]);
+        feetM[i].position.set(local.x + (i === 0 ? -0.01 : 0.01), local.y - 0.045, local.z + 0.06);
+        feetM[i].rotation.set(feet[i].stepping ? -0.25 : 0, (i === 0 ? 0.15 : -0.15), 0);
       }
-      // 腕：右手は鍔の近く、左手は柄頭の近くを握る（両手持ち）
+      // 腕：右手は鍔の近く、左手は柄頭の近く
       const clav = clamp((p.hand.y - 1.3) * 0.12, -0.03, 0.08);
       const dt = Math.max(0, T);
       for (let i = 0; i < 2; i++) {
-        const sgn = i === 0 ? -1 : 1, A = arms[i];
-        sh.set(sgn * 0.205, 0.31 + clav, 0); chestG.localToWorld(sh); root.worldToLocal(sh);
+        const sgn = i === 0 ? -1 : 1;
+        sh.set(sgn * 0.205 * sw, 0.3 + clav, 0); chestG.localToWorld(sh); root.worldToLocal(sh);
         hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.04 : -TK * 0.72);
         bendL.set(sgn * 0.8, -0.5, -0.35);
-        ik(sh, hand, 0.3, 0.28, bendL, joint);
-        A.shoulder.position.copy(sh);
-        placeLimb(A.upper, sh, joint);
-        A.puff.position.copy(sh).lerp(joint, 0.32); A.puff.quaternion.copy(A.upper.quaternion);
-        A.elbow.position.copy(joint);
-        placeLimb(A.fore, joint, hand);
-        A.wrist.position.copy(hand);
-        A.hand.position.copy(hand);
+        ik(sh, hand, BODY.upper, BODY.fore, bendL, joint);
+        fillLimb(armRings[i], sh, joint, hand, bendL.normalize(), armProfile);
+        arms[i].update(armRings[i]);
+        hands[i].position.copy(hand);
+        if (sleeves) {
+          const S2 = sleeves[i];
+          tA.copy(joint).sub(sh).normalize().multiplyScalar(0.55).addScaledVector(DOWN, 0.5).normalize();
+          S2.dir.lerp(tA, 1 - Math.exp(-dt * 10)).normalize();
+          tB.copy(sh).addScaledVector(S2.dir, 0.46);
+          placeLimb(S2.m, sh, tB);
+        }
       }
       sword.position.copy(p.hand);
       sword.quaternion.setFromUnitVectors(UP, p.sword);
-      arms[0].hand.quaternion.copy(sword.quaternion); arms[1].hand.quaternion.copy(sword.quaternion);
+      hands[0].quaternion.copy(sword.quaternion); hands[1].quaternion.copy(sword.quaternion);
       root.updateMatrixWorld(true);
       tip.set(SORI, BL, 0); sword.localToWorld(tip);
       mid.set(SORI * 0.45, BL * 0.68, 0); sword.localToWorld(mid);
@@ -893,7 +1023,7 @@
       chestWorld.set(0, 0.18, 0); chestG.localToWorld(chestWorld);
       hipWorld.set(0, 0, 0); hips.localToWorld(hipWorld);
       shadow.position.set(hipWorld.x, 0.012, hipWorld.z);
-      const s = scale * (0.95 + p.crouch * 0.6) * (1 - Math.min(0.4, p.lift * 0.6));
+      const s = scale * (0.95 + p.crouch * 0.6) * (1 - Math.min(0.4, p.lift * 0.6)) * (big ? 1.15 : 1);
       shadow.scale.set(s, s * 0.8, 1);
       shadow.rotation.z = -yaw;
 
@@ -904,24 +1034,24 @@
         ch.c.update(tA, tC, T, wind);
       });
     }
+
     const tearMat = toon(0xb8a898), tearGeo = new THREE.BoxGeometry(0.13, 0.014, 0.012);
+    const glowMats = [mK, mH, mS, mWrap, ...lofts.map((l) => l.mat)];
     return {
       root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd,
       resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
-      // 斬られた跡：着物が裂け、その跡は残り続ける（どれだけ斬ったかが体に残る）
       addTear() {
         if (tears.length >= 16) return;
         const front = Math.random() < 0.75;
         const th = (Math.random() - 0.5) * 2.2 + (front ? 0 : Math.PI);
         const onChest = Math.random() < 0.6;
         const m = new THREE.Mesh(tearGeo, tearMat);
-        const r = onChest ? 0.225 : 0.17;
-        m.position.set(Math.sin(th) * r, onChest ? 0.06 + Math.random() * 0.24 : 0.04 + Math.random() * 0.16, Math.cos(th) * r * (onChest ? 0.74 : 0.8));
+        const r = onChest ? 0.215 * sw : 0.16;
+        m.position.set(Math.sin(th) * r, onChest ? 0.06 + Math.random() * 0.22 : 0.04 + Math.random() * 0.14, Math.cos(th) * (onChest ? 0.138 : 0.112));
         m.rotation.set(0, th, (Math.random() - 0.5) * 1.6);
         (onChest ? chestG : waist).add(m); tears.push(m);
       },
       clearTears() { tears.forEach((m) => m.parent && m.parent.remove(m)); tears.length = 0; },
-      // 前半の一閃で、笠が斬り飛ばされる
       dropHat() {
         if (!hat || hatFall) return;
         hat.updateMatrixWorld(true);
@@ -935,7 +1065,7 @@
         if (hitGlow > 0) {
           hitGlow = Math.max(0, hitGlow - dt * 5);
           const g = Math.min(1, hitGlow) * 1.1;
-          [mK, mH, mS, mWrap].forEach((m) => m.emissive.setRGB(g, g * 0.96, g * 0.9));
+          glowMats.forEach((m) => m.emissive.setRGB(g, g * 0.96, g * 0.9));
         }
         chips.forEach((c) => {
           if (c.rest || dt <= 0) return;
@@ -2271,6 +2401,7 @@
   }
 
   // ───────────────────────── ループ ─────────────────────────
+  const PERF = { logic: 0, render: 0 };
   let last = performance.now();
   function frame(now) {
     const dtReal = Math.min(64, now - last);
@@ -2287,10 +2418,13 @@
       updateAI();
       updatePositions(dtGame);
     }
+    const tl0 = performance.now();
     updateBodies(dtGame);
     updateEffects(dtReal * (scale === 0 ? 0.15 : scale));
     updateCamera(dtReal);
+    const tl1 = performance.now();
     Post.render();
+    PERF.logic = PERF.logic * 0.95 + (tl1 - tl0) * 0.05; PERF.render = PERF.render * 0.95 + (performance.now() - tl1) * 0.05;
     if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
     requestAnimationFrame(frame);
   }
@@ -2374,6 +2508,8 @@
     setB(v) { S.B = v; S.lastPressure = S.gt + 1e6; },
     addTearTest() { enemy.addTear(); },
     flashTest() { enemy.flashHit(1); },
+    perf() { return { logic: +PERF.logic.toFixed(2), render: +PERF.render.toFixed(2) }; },
+    setPost(v) { Post.enabled = v; },
   };
 })();
 </script>
