@@ -6,6 +6,7 @@
 | [02-fun-analysis.md](02-fun-analysis.md) | 面白さの分解（観点、参考ゲームの分析、共通構造） |
 | [03-pillars.md](03-pillars.md) | 設計の柱（このゲームの憲法） |
 | [04-laws-and-understanding.md](04-laws-and-understanding.md) | 「世界の法則を読む」とは何か。物理法則と理解の層 |
+| [05-vision.md](05-vision.md) | 北極星（世界のすべての法則）と、それを実現する戦略 |
 
 ## ここまでの流れ
 
