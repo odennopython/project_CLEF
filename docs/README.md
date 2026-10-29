@@ -8,7 +8,7 @@
 | [04-laws-and-understanding.md](04-laws-and-understanding.md) | 「世界の法則を読む」とは何か。物理法則と理解の層 |
 | [05-vision.md](05-vision.md) | 方針の上下関係、北極星（世界のすべての法則）と戦略 |
 | [06-emergent-world.md](06-emergent-world.md) | 創発世界の設計（①②③と洗練から導く） |
-| [07-interaction.md](07-interaction.md) | プレイヤーの操作（議論中） |
+| [07-interaction.md](07-interaction.md) | プレイヤーの操作と、操作の核 |
 
 ## ここまでの流れ
 
@@ -19,3 +19,4 @@
 5. 「世界の法則を読む」を主軸に決めた
 6. 設計の柱 v0 を作った
 7. 北極星を「世界のすべての法則」とし、少数の規則から法則が創発する世界を軸に決めた
+8. 操作の核を「最小の一触れで最大の結果を起こす」に決めた
