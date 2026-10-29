@@ -9,6 +9,7 @@
 | [05-vision.md](05-vision.md) | 方針の上下関係、北極星（世界のすべての法則）と戦略 |
 | [06-emergent-world.md](06-emergent-world.md) | 創発世界の設計（①②③と洗練から導く） |
 | [07-interaction.md](07-interaction.md) | プレイヤーの操作と、操作の核 |
+| [08-concepts.md](08-concepts.md) | ゲームデザイン案 20（オーナーが選ぶ） |
 
 ## ここまでの流れ
 
