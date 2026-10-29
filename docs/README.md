@@ -13,7 +13,8 @@
 | [09-checklist-and-concepts.md](09-checklist-and-concepts.md) | チェック項目22と20案（不採用。つまらなかった6つの原因と、進め方の変更） |
 | [10-boss-angles.md](10-boss-angles.md) | ボスを倒す達成感の新しい切り口と、弾き・見切りの本質 |
 | [11-kaeshi-system.md](11-kaeshi-system.md) | 戦闘システム「返し」の提案（評価待ち） |
-| [12-prototype-plan.md](12-prototype-plan.md) | 試作 0.1「返し」の計画と検証結果 |
+| [12-prototype-plan.md](12-prototype-plan.md) | 試作 0.1〜0.3 の計画と検証結果 |
+| [13-combat-v2.md](13-combat-v2.md) | 戦闘システム v2（試作 0.4）：上＝斬る、下＝弾く、左右＝避ける |
 
 ## ここまでの流れ
 
@@ -30,3 +31,4 @@
 11. 「返し」の試作 0.1 を作り、公開した
 12. オーナーの評価を受けて、試作 0.2 に更新した（間合い、駆け引き、魅せ）
 13. 「人がカクカク」の評価を受けて、試作 0.3 で人物の形と動きを作り直した
+14. iPhoneで試せるようにした（GitHub Pages）。オーナーの評価を受けて、試作 0.4 で操作と人体と大太刀を作り直した
