@@ -11,6 +11,7 @@
 | [07-interaction.md](07-interaction.md) | プレイヤーの操作と、操作の核 |
 | [08-concepts.md](08-concepts.md) | ゲームデザイン案 20（不採用。失敗の理由と、先に答えるべき問い） |
 | [09-checklist-and-concepts.md](09-checklist-and-concepts.md) | チェック項目22と20案（不採用。つまらなかった6つの原因と、進め方の変更） |
+| [10-boss-angles.md](10-boss-angles.md) | ボスを倒す達成感の新しい切り口（評価待ち） |
 
 ## ここまでの流れ
 
