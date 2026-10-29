@@ -1,0 +1,1269 @@
+<title>返し</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap">
+<style>
+  /* 一枚の画面：上に相手、下に親指。雪の夜に、月の冷たさと灯籠の温かさ。 */
+  :root {
+    --night: #0a0f1c;
+    --ink: #e8ecf3;
+    --mist: #9aa6ba;
+    --lantern: #ffb36b;
+    --steel: #dfe7f2;
+    --veil: rgba(10, 15, 28, 0.78);
+    --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font-family: var(--body);
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #stage { position: fixed; inset: 0; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+
+  #glyphs { position: fixed; inset: 0; pointer-events: none; }
+  .glyph {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--display);
+    font-weight: 700;
+    color: var(--steel);
+    text-shadow: 0 0 18px rgba(223, 231, 242, 0.55);
+    animation: glyph 620ms ease-out forwards;
+  }
+  .glyph.go { font-size: 26px; opacity: 0.75; }
+  .glyph.tai { font-size: 38px; }
+  .glyph.sen { font-size: 52px; color: #fff4e6; text-shadow: 0 0 26px rgba(255, 179, 107, 0.7); }
+  .glyph.miss { font-size: 22px; color: var(--mist); text-shadow: none; }
+  @keyframes glyph {
+    0% { opacity: 0; transform: translate(-50%, -30%) scale(0.85); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -95%) scale(1.04); }
+  }
+
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  #slash {
+    position: fixed; left: 50%; top: 42%;
+    width: 160vmax; height: 2px;
+    background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent);
+    transform: translate(-50%, -50%) rotate(-28deg) scaleX(0);
+    opacity: 0; pointer-events: none;
+    box-shadow: 0 0 22px rgba(255, 255, 255, 0.9);
+  }
+  #slash.on { animation: slash 900ms cubic-bezier(.2, .9, .2, 1) forwards; }
+  @keyframes slash {
+    0% { opacity: 1; transform: translate(-50%, -50%) rotate(-28deg) scaleX(0); }
+    22% { opacity: 1; transform: translate(-50%, -50%) rotate(-28deg) scaleX(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(-28deg) scaleX(1); }
+  }
+
+  #logBtn {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    font-family: var(--body); font-size: 12px; letter-spacing: 0.08em;
+    color: var(--mist); background: transparent;
+    border: 1px solid rgba(154, 166, 186, 0.35); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  #logBtn:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
+  #log {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 48px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    width: min(300px, calc(100vw - 24px));
+    background: var(--veil);
+    border: 1px solid rgba(154, 166, 186, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px; line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  #log .meta { color: var(--mist); margin-bottom: 6px; }
+  #log .row { display: grid; grid-template-columns: 3.6em 4.4em 1fr; gap: 6px; }
+  #log .row .t { font-family: var(--display); font-weight: 700; }
+
+  .veil {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    background: var(--veil);
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .card { max-width: 30em; display: grid; gap: 14px; text-align: left; }
+  .card h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(56px, 18vw, 96px); line-height: 1;
+    margin: 0; letter-spacing: 0.06em;
+  }
+  .card .kicker { font-size: 11px; letter-spacing: 0.24em; color: var(--mist); text-transform: uppercase; margin: 0; }
+  .card p { margin: 0; font-size: 15px; line-height: 1.75; color: var(--ink); }
+  .card .note { font-size: 13px; color: var(--mist); }
+  .card details { font-size: 13px; color: var(--mist); line-height: 1.7; }
+  .card summary { cursor: pointer; color: var(--ink); }
+  .card dl { display: grid; grid-template-columns: 4.5em 1fr; gap: 4px 10px; margin: 10px 0 0; }
+  .card dt { font-family: var(--display); font-weight: 700; color: var(--ink); }
+  .card dd { margin: 0; }
+  .card button {
+    justify-self: start;
+    font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.2em;
+    color: var(--night); background: var(--steel);
+    border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer;
+  }
+  .card button:focus-visible { outline: 2px solid var(--lantern); outline-offset: 3px; }
+  .end h2 { font-family: var(--display); font-size: clamp(40px, 12vw, 64px); margin: 0; letter-spacing: 0.1em; }
+  @media (prefers-reduced-motion: reduce) {
+    .glyph { animation-duration: 1ms; }
+    #slash.on { animation-duration: 1ms; }
+  }
+</style>
+
+<div id="stage" aria-label="対戦の画面"></div>
+<div id="glyphs"></div>
+<div id="flash"></div>
+<div id="slash"></div>
+<button id="logBtn" type="button" aria-pressed="false">記録</button>
+<div id="log" hidden></div>
+
+<div id="start" class="veil">
+  <div class="card">
+    <p class="kicker">Kaeshi · 試作 0.1</p>
+    <h1>返し</h1>
+    <p>相手の刃が届く瞬間に、画面をはじく。<br>はじいた向きへ、相手の力が流れる。</p>
+    <details>
+      <summary>判定の三段階</summary>
+      <dl>
+        <dt>後の先</dt><dd>刃が届く少し前。受け流す。相手の連撃は続く。</dd>
+        <dt>対の先</dt><dd>刃と完全に同時。相手の力を返し、大きく崩す。</dd>
+        <dt>先の先</dt><dd>相手が動き出した瞬間。攻撃そのものを断つ。</dd>
+      </dl>
+      <p class="note">どの向きに返すと効くか、どの動き出しが本物かは、相手の体を見て探してください。</p>
+    </details>
+    <p class="note">画面のどこをはじいてもかまいません。PCでは、マウスでドラッグするか、矢印キーとスペースキーで遊べます。音が出ます。</p>
+    <button id="startBtn" type="button">はじめる</button>
+  </div>
+</div>
+
+<div id="end" class="veil" hidden>
+  <div class="card end">
+    <h2 id="endTitle">勝負あり</h2>
+    <p id="endText" class="note"></p>
+    <button id="againBtn" type="button">もう一度</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ───────────────────────── 調整値 ─────────────────────────
+  const CFG = {
+    winTai: [-40, 40],        // 対の先：刃が届く瞬間からのずれ（ミリ秒）
+    winGo: [-185, -40],       // 後の先
+    whiffLock: 260,           // 空振りした後、入力を受け付けない時間
+    offsetInit: 25,           // 入力と表示の遅れの補正（初期値）
+    offsetRange: [-30, 90],
+    breakBase: { go: 10, tai: 22, sen: 34 },
+    dirMult: { flow: 1.0, perp: 0.6, against: 0.35, tap: 0.45 },
+    enemyRecoverDelay: 2200,  // これだけ崩しが途切れると、相手の体勢が戻り始める
+    enemyRecoverRate: 7,      // 1秒あたり
+    playerRecoverDelay: 1600,
+    playerRecoverRate: 6,
+    brokenTime: 2100,         // 膝をついている時間（一閃の機会）
+    hitDamage: (w) => 22 + 14 * w,
+  };
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const easeOut = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+  const easeIn = (t) => Math.pow(clamp(t, 0, 1), 2.4);
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ───────────────────────── 技の定義 ─────────────────────────
+  // mom：刃の流れる向き（画面上）。R 右へ / L 左へ / D 下へ / U 上へ / T 突き
+  const MOVES = {
+    cutR:   { mom: 'R', w: 1.0, name: '右薙ぎ' },
+    cutL:   { mom: 'L', w: 1.0, name: '左薙ぎ' },
+    over:   { mom: 'D', w: 1.6, name: '振り下ろし' },
+    rise:   { mom: 'U', w: 1.1, name: '斬り上げ' },
+    thrust: { mom: 'T', w: 1.2, name: '突き' },
+    quickR: { mom: 'R', w: 0.6, name: '小薙ぎ' },
+    quickL: { mom: 'L', w: 0.6, name: '小薙ぎ' },
+  };
+
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.04, pitch: 0, yaw: 0, roll: 0 }, o);
+
+  // 姿勢は「前＝+z」のローカル座標。x は相手から見た右ではなく、画面の右（相手は回転させない）。
+  const NEUTRAL = pose({ hand: V(0.05, 1.22, 0.38), sword: V(0, 0.38, 1).normalize() });
+  const KEY = {
+    R: {
+      wind: pose({ hand: V(-0.58, 1.62, 0.02), sword: V(-0.75, 0.5, -0.35).normalize(), hipX: -0.13, crouch: 0.1, yaw: 0.55, roll: 0.05 }),
+      hit:  pose({ hand: V(0.05, 1.3, 0.78), sword: V(1, 0.05, 0.3).normalize(), hipX: 0.02, crouch: 0.08, yaw: -0.05 }),
+      follow: pose({ hand: V(0.6, 1.08, 0.42), sword: V(0.8, -0.3, -0.45).normalize(), hipX: 0.12, crouch: 0.1, yaw: -0.55 }),
+    },
+    D: {
+      wind: pose({ hand: V(0.02, 2.02, -0.08), sword: V(0, 0.55, -0.83).normalize(), hipZ: -0.12, crouch: 0.03, pitch: -0.22 }),
+      hit:  pose({ hand: V(0.02, 1.42, 0.72), sword: V(0, -0.3, 1).normalize(), hipZ: 0.04, crouch: 0.12, pitch: 0.12 }),
+      follow: pose({ hand: V(0.02, 0.92, 0.62), sword: V(0, -0.92, 0.38).normalize(), hipZ: 0.12, crouch: 0.2, pitch: 0.34 }),
+    },
+    U: {
+      wind: pose({ hand: V(0.1, 0.78, 0.12), sword: V(0.15, -0.75, -0.45).normalize(), hipZ: -0.06, crouch: 0.22, pitch: 0.2 }),
+      hit:  pose({ hand: V(0.02, 1.3, 0.74), sword: V(0, 0.4, 1).normalize(), crouch: 0.1, pitch: 0.0 }),
+      follow: pose({ hand: V(-0.05, 1.92, 0.3), sword: V(0, 0.95, -0.2).normalize(), crouch: 0.02, pitch: -0.2 }),
+    },
+    T: {
+      wind: pose({ hand: V(0.16, 1.28, -0.28), sword: V(0, 0.05, 1).normalize(), hipZ: -0.16, crouch: 0.12, yaw: 0.25 }),
+      hit:  pose({ hand: V(0.02, 1.3, 1.12), sword: V(0, 0.02, 1).normalize(), hipZ: 0.2, crouch: 0.1, yaw: -0.05 }),
+      follow: pose({ hand: V(0.02, 1.26, 1.0), sword: V(0, 0.0, 1).normalize(), hipZ: 0.18, crouch: 0.1 }),
+    },
+  };
+  const mirrorX = (p) => pose({ hand: V(-p.hand.x, p.hand.y, p.hand.z), sword: V(-p.sword.x, p.sword.y, p.sword.z), hipX: -p.hipX, hipZ: p.hipZ, crouch: p.crouch, pitch: p.pitch, yaw: -p.yaw, roll: -p.roll });
+  KEY.L = { wind: mirrorX(KEY.R.wind), hit: mirrorX(KEY.R.hit), follow: mirrorX(KEY.R.follow) };
+  const KNEEL = pose({ hand: V(0.25, 0.72, 0.55), sword: V(0.3, -0.85, 0.4).normalize(), crouch: 0.42, pitch: 0.5, hipZ: -0.05 });
+
+  function blend(a, b, t, out) {
+    out = out || pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    out.hand.copy(a.hand).lerp(b.hand, t);
+    out.sword.copy(a.sword).lerp(b.sword, t).normalize();
+    out.hipX = lerp(a.hipX, b.hipX, t); out.hipZ = lerp(a.hipZ, b.hipZ, t);
+    out.crouch = lerp(a.crouch, b.crouch, t);
+    out.pitch = lerp(a.pitch, b.pitch, t); out.yaw = lerp(a.yaw, b.yaw, t); out.roll = lerp(a.roll, b.roll, t);
+    return out;
+  }
+  // 体（腰）と腕（刀）を別々の割合で混ぜる。本物の起こりは腰が先に動く。
+  function blendSplit(a, b, tBody, tArm, out) {
+    out = blend(a, b, tBody, out);
+    out.hand.copy(a.hand).lerp(b.hand, tArm);
+    out.sword.copy(a.sword).lerp(b.sword, tArm).normalize();
+    return out;
+  }
+  const clonePose = (p) => blend(p, p, 0);
+
+  // ───────────────────────── 描画の準備 ─────────────────────────
+  const stage = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const NIGHT = new THREE.Color(0x0a0f1c);
+  scene.background = NIGHT;
+  scene.fog = new THREE.Fog(0x0a0f1c, 6, 19);
+
+  const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 60);
+  const CAM_BASE = V(0.55, 3.05, 4.9);
+  const CAM_LOOK = V(-0.05, 1.15, -0.7);
+
+  scene.add(new THREE.HemisphereLight(0x8fa3c8, 0x1a1f2c, 0.55));
+  const moon = new THREE.DirectionalLight(0xbcd0f0, 0.95);
+  moon.position.set(-4, 7, 5);
+  scene.add(moon);
+  const lantern = new THREE.PointLight(0xffa860, 1.6, 12, 1.6);
+  lantern.position.set(2.6, 0.95, -6);
+  scene.add(lantern);
+  const lanternBody = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffc58a }));
+  lanternBody.position.copy(lantern.position);
+  scene.add(lanternBody);
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.82, 0.16), new THREE.MeshStandardMaterial({ color: 0x1b1a1f, roughness: 0.9 }));
+  post.position.set(2.6, 0.41, -6);
+  scene.add(post);
+  const roofStone = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.22, 4), new THREE.MeshStandardMaterial({ color: 0x1b1a1f, roughness: 0.9 }));
+  roofStone.position.set(2.6, 1.18, -6); roofStone.rotation.y = Math.PI / 4;
+  scene.add(roofStone);
+
+  function radialTexture(inner, outer, size = 128) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grd.addColorStop(0, inner); grd.addColorStop(1, outer);
+    g.fillStyle = grd; g.fillRect(0, 0, size, size);
+    const t = new THREE.CanvasTexture(c);
+    return t;
+  }
+
+  // 雪の地面
+  const groundTex = (() => {
+    const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c7d0dd'; g.fillRect(0, 0, s, s);
+    const r = rng(7);
+    for (let i = 0; i < 2600; i++) {
+      const v = 190 + Math.floor(r() * 50);
+      g.fillStyle = `rgba(${v},${v + 6},${v + 14},${0.25 + r() * 0.35})`;
+      g.fillRect(r() * s, r() * s, 1 + r() * 2, 1 + r() * 2);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 10);
+    return t;
+  })();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x5a6680, map: groundTex, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  const shadowTex = radialTexture('rgba(5,8,16,0.75)', 'rgba(5,8,16,0)');
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('rgba(255,179,107,0.9)', 'rgba(255,179,107,0)'), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+  halo.position.copy(lantern.position); halo.scale.set(1.3, 1.3, 1);
+  scene.add(halo);
+
+  // ───────────────────────── 人物 ─────────────────────────
+  const UP = V(0, 1, 0);
+  const tmpA = V(0, 0, 0), tmpB = V(0, 0, 0), tmpC = V(0, 0, 0);
+  function placeLimb(mesh, a, b) {
+    tmpC.copy(b).sub(a);
+    const len = Math.max(0.001, tmpC.length());
+    mesh.position.copy(a).add(b).multiplyScalar(0.5);
+    mesh.scale.set(1, len, 1);
+    mesh.quaternion.setFromUnitVectors(UP, tmpC.normalize());
+  }
+
+  function makeFigure({ scale, body, cloth, blade, facing, sash }) {
+    const root = new THREE.Group();
+    root.scale.setScalar(scale);
+    if (facing < 0) root.rotation.y = Math.PI;
+    const matBody = new THREE.MeshStandardMaterial({ color: body, roughness: 0.85 });
+    const matCloth = new THREE.MeshStandardMaterial({ color: cloth, roughness: 0.95 });
+    const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.9, roughness: 0.22, emissive: 0x1a2230 });
+    const matHilt = new THREE.MeshStandardMaterial({ color: 0x15131a, roughness: 0.7 });
+
+    const hips = new THREE.Group(); root.add(hips);
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.28), matCloth); hips.add(pelvis);
+    // 帯：腰の動き（重心の移動）が一目でわかるように、明るい色にする
+    const obi = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.09, 0.31), new THREE.MeshStandardMaterial({ color: sash, roughness: 0.8 }));
+    obi.position.y = 0.09; hips.add(obi);
+    const torso = new THREE.Group(); hips.add(torso);
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.21, 0.66, 10), matBody);
+    chest.position.y = 0.38; torso.add(chest);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), matBody);
+    head.position.y = 0.88; torso.add(head);
+    const legGeo = new THREE.CylinderGeometry(0.075, 0.06, 1, 8);
+    const legs = [new THREE.Mesh(legGeo, matCloth), new THREE.Mesh(legGeo, matCloth)];
+    legs.forEach((l) => root.add(l));
+    const armGeo = new THREE.CylinderGeometry(0.055, 0.045, 1, 8);
+    const arms = [new THREE.Mesh(armGeo, matBody), new THREE.Mesh(armGeo, matBody)];
+    arms.forEach((a) => root.add(a));
+    const sword = new THREE.Group(); root.add(sword);
+    const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.24, 0.035), matHilt); hilt.position.y = -0.06; sword.add(hilt);
+    const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.015, 12), matHilt); guard.position.y = 0.07; sword.add(guard);
+    const bladeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.022, 1.0, 0.05), matBlade); bladeMesh.position.y = 0.58; sword.add(bladeMesh);
+
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2;
+    scene.add(shadow);
+    scene.add(root);
+
+    const feet = [V(-0.3, 0, 0.04), V(0.3, 0, -0.04)];
+    const tip = V(0, 0, 0), mid = V(0, 0, 0), headWorld = V(0, 0, 0);
+    const swordLocalDir = V(0, 0, 1);
+
+    function apply(p) {
+      hips.position.set(p.hipX, 1.0 - p.crouch, p.hipZ);
+      torso.rotation.set(p.pitch, p.yaw, p.roll);
+      root.updateMatrixWorld(true);
+      for (let i = 0; i < 2; i++) {
+        tmpA.set(i === 0 ? -0.13 : 0.13, -0.06, 0); hips.localToWorld(tmpA); root.worldToLocal(tmpA);
+        placeLimb(legs[i], tmpA, feet[i]);
+      }
+      for (let i = 0; i < 2; i++) {
+        tmpA.set(i === 0 ? -0.26 : 0.26, 0.62, 0); torso.localToWorld(tmpA); root.worldToLocal(tmpA);
+        tmpB.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.04 : 0.06);
+        placeLimb(arms[i], tmpA, tmpB);
+      }
+      sword.position.copy(p.hand);
+      swordLocalDir.copy(p.sword);
+      sword.quaternion.setFromUnitVectors(UP, swordLocalDir);
+      root.updateMatrixWorld(true);
+      tip.set(0, 1.08, 0); bladeMesh.parent.localToWorld(tip);
+      mid.set(0, 0.45, 0); bladeMesh.parent.localToWorld(mid);
+      headWorld.set(0, 0.88, 0.12); torso.localToWorld(headWorld);
+      tmpA.set(0, 0, 0); hips.localToWorld(tmpA);
+      shadow.position.set(tmpA.x, 0.012, tmpA.z);
+      const s = scale * (0.95 + p.crouch * 0.6);
+      shadow.scale.set(s, s * 0.75, 1);
+    }
+    return { root, apply, tip, mid, headWorld, bladeMat: matBlade, shadow };
+  }
+
+  const ENEMY_Z = -0.9, PLAYER_Z = 1.7, PLAYER_X = -0.2;
+  const enemy = makeFigure({ scale: 1.28, body: 0x2b2731, cloth: 0x3a2c2a, blade: 0xdfe7f2, facing: 1, sash: 0xc9b48a });
+  enemy.root.position.set(0, 0, ENEMY_Z);
+  const player = makeFigure({ scale: 0.95, body: 0x33404f, cloth: 0x242c38, blade: 0xe8eef7, facing: -1, sash: 0x7f93ad });
+  player.root.position.set(PLAYER_X, 0, PLAYER_Z);
+
+  // 自分の構え（ローカル：前＝+z。画面の右はローカルの -x）
+  const P_GUARD = pose({ hand: V(-0.08, 1.12, 0.36), sword: V(-0.12, 0.62, 0.78).normalize(), crouch: 0.06 });
+  function playerParryPose(dir) {
+    // dir は画面上の向き。ローカルxは画面の左右が逆。
+    const sx = dir === 'R' ? -1 : dir === 'L' ? 1 : 0;
+    const sy = dir === 'U' ? 1 : dir === 'D' ? -1 : 0;
+    return pose({
+      hand: V(0.12 * sx, 1.28 + 0.12 * sy, 0.55),
+      sword: V(0.95 * sx, 0.25 + 0.7 * sy + (sx === 0 && sy === 0 ? 0.6 : 0), 0.35).normalize(),
+      crouch: 0.1, yaw: -0.35 * sx, pitch: 0.08,
+    });
+  }
+  const P_HIT = pose({ hand: V(-0.15, 1.0, 0.2), sword: V(-0.3, 0.4, 0.6).normalize(), crouch: 0.16, pitch: -0.25, hipZ: -0.12 });
+  const P_KNEEL = pose({ hand: V(-0.2, 0.62, 0.42), sword: V(-0.2, -0.9, 0.3).normalize(), crouch: 0.44, pitch: 0.45 });
+
+  // 刃の軌跡（加算合成のリボン）
+  const TRAIL_N = 18;
+  const trailGeo = new THREE.BufferGeometry();
+  const trailPos = new Float32Array(TRAIL_N * 2 * 3);
+  const trailCol = new Float32Array(TRAIL_N * 2 * 3);
+  const trailIdx = [];
+  for (let i = 0; i < TRAIL_N - 1; i++) { const a = i * 2; trailIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  trailGeo.setIndex(trailIdx);
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+  trailGeo.setAttribute('color', new THREE.BufferAttribute(trailCol, 3));
+  const trail = new THREE.Mesh(trailGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  trail.frustumCulled = false;
+  scene.add(trail);
+  const trailSamples = [];
+
+  // 火花
+  const SPARK_N = 160;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(SPARK_N * 3);
+  const sparkCol = new Float32Array(SPARK_N * 3);
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
+  const sparkTex = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 64);
+  const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 0.07, map: sparkTex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparks.frustumCulled = false;
+  scene.add(sparks);
+  const sparkState = Array.from({ length: SPARK_N }, () => ({ life: 0, max: 1, p: V(0, -10, 0), v: V(0, 0, 0), c: new THREE.Color() }));
+  let sparkCursor = 0;
+  function burst(at, count, power, warm) {
+    for (let i = 0; i < count; i++) {
+      const s = sparkState[sparkCursor]; sparkCursor = (sparkCursor + 1) % SPARK_N;
+      s.p.copy(at);
+      const a = Math.random() * Math.PI * 2, b = (Math.random() - 0.3) * Math.PI;
+      const sp = power * (0.6 + Math.random() * 0.9);
+      s.v.set(Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 0.8, Math.sin(a) * Math.cos(b) * sp);
+      s.max = s.life = 0.25 + Math.random() * 0.45;
+      s.c.setRGB(1, warm ? 0.78 : 0.92, warm ? 0.5 : 0.82);
+    }
+  }
+
+  // 白い息
+  const breathTex = radialTexture('rgba(235,240,248,0.9)', 'rgba(235,240,248,0)', 64);
+  const breaths = Array.from({ length: 28 }, () => {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: breathTex, transparent: true, depthWrite: false, opacity: 0 }));
+    m.visible = false; scene.add(m);
+    return { m, life: 0, max: 1, v: V(0, 0, 0), size: 0.2 };
+  });
+  let breathCursor = 0;
+  function exhale(at, forward, strength) {
+    for (let i = 0; i < 2; i++) {
+      const b = breaths[breathCursor]; breathCursor = (breathCursor + 1) % breaths.length;
+      b.m.position.copy(at).addScaledVector(forward, 0.05 + i * 0.04);
+      b.v.copy(forward).multiplyScalar(0.18 + strength * 0.25).add(V((Math.random() - 0.5) * 0.06, 0.12 + strength * 0.08, 0));
+      b.max = b.life = 1.1 + strength * 0.9;
+      b.size = 0.12 + strength * 0.22;
+      b.peak = 0.16 + strength * 0.42;
+      b.m.visible = true;
+    }
+  }
+
+  // 雪
+  const SNOW_N = 650;
+  const snowGeo = new THREE.BufferGeometry();
+  const snowPos = new Float32Array(SNOW_N * 3);
+  const snowR = rng(11);
+  for (let i = 0; i < SNOW_N; i++) {
+    snowPos[i * 3] = (snowR() - 0.5) * 16;
+    snowPos[i * 3 + 1] = snowR() * 7;
+    snowPos[i * 3 + 2] = (snowR() - 0.5) * 16 - 2;
+  }
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ size: 0.035, map: sparkTex, color: 0xdfe6f2, transparent: true, opacity: 0.75, depthWrite: false }));
+  snow.frustumCulled = false;
+  scene.add(snow);
+
+  // ───────────────────────── 音 ─────────────────────────
+  const Audio = (() => {
+    let ctx = null, master = null, wind = null, noiseBuf = null;
+    function init() {
+      if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.ratio.value = 4;
+      master = ctx.createGain(); master.gain.value = 0.9;
+      master.connect(comp); comp.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      // 風
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380;
+      wind = ctx.createGain(); wind.gain.value = 0.05;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.025;
+      lfo.connect(lfoGain); lfoGain.connect(wind.gain);
+      src.connect(lp); lp.connect(wind); wind.connect(master);
+      src.start(); lfo.start();
+    }
+    const now = () => ctx.currentTime;
+    function noise(dur, type, freq, q, gain, sweepTo) {
+      if (!ctx) return;
+      const t = now();
+      const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+      const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+      if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f); f.connect(g); g.connect(master);
+      s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+    }
+    function bell(base, decay, gain, ratios) {
+      if (!ctx) return;
+      const t = now();
+      (ratios || [1, 2.76, 5.4, 8.93]).forEach((r, i) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = base * r;
+        const g = ctx.createGain();
+        const gg = gain / (1 + i * 1.3);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(gg, t + 0.003);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + decay / (1 + i * 0.5));
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + decay + 0.1);
+      });
+    }
+    function thump(gain) {
+      if (!ctx) return;
+      const t = now();
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.28);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.4);
+    }
+    return {
+      init,
+      parry(tier) {
+        if (tier === 'go') { bell(1240, 0.35, 0.22); noise(0.04, 'bandpass', 5200, 1.2, 0.18); }
+        else if (tier === 'tai') { bell(980, 0.9, 0.3); bell(1960, 0.5, 0.08, [1, 2.4]); noise(0.06, 'bandpass', 4200, 1, 0.24); }
+        else { bell(1480, 1.8, 0.32); bell(740, 1.2, 0.12, [1, 3.01]); noise(0.05, 'highpass', 6000, 0.7, 0.16); }
+      },
+      clash() { bell(420, 0.35, 0.18, [1, 1.93, 3.7]); noise(0.12, 'bandpass', 1800, 0.8, 0.25); },
+      hit() { thump(0.55); noise(0.18, 'lowpass', 900, 0.7, 0.35); },
+      whiff() { noise(0.16, 'bandpass', 700, 2, 0.12, 2400); },
+      crunch(strength) { noise(0.12 + strength * 0.05, 'bandpass', 1700, 1.4, 0.05 + strength * 0.06); },
+      swing(w) { noise(0.12 + w * 0.06, 'bandpass', 500 + 400 / w, 1.5, 0.05 + 0.04 * w, 1400); },
+      breath(strength) { noise(0.45, 'bandpass', 900, 0.8, 0.012 + strength * 0.03); },
+      issen() {
+        if (!ctx) return;
+        const t = now();
+        if (wind) { wind.gain.cancelScheduledValues(t); wind.gain.setValueAtTime(0.0001, t); wind.gain.linearRampToValueAtTime(0.05, t + 3.5); }
+        setTimeout(() => { bell(196, 3.6, 0.36, [1, 2.0, 3.0, 4.17]); bell(2350, 2.2, 0.06, [1, 1.5]); }, 260);
+      },
+    };
+  })();
+
+  // ───────────────────────── 状態 ─────────────────────────
+  const S = {
+    started: false,
+    gt: 0,                 // 試合の時間（ミリ秒）。停止やゆっくりの影響を受ける
+    speed: 1,              // 試験用
+    freezeUntil: 0, slowUntil: 0, slowScale: 0.3,  // 実時間（performance.now）
+    frameReal: 0, frameGt: 0, frameScale: 1,
+    phase: 1,              // 1 前半 / 2 後半
+    mode: 'idle',          // idle / attack / staggered / broken / falling / victory / defeat
+    B: 0, P: 0,            // 相手と自分の崩れ（0〜100）。画面には出さない
+    lastPressure: 0, lastHit: -9999,
+    offset: CFG.offsetInit,
+    action: null,          // 進行中の攻撃
+    queue: [],             // 連撃の残り
+    nextAt: 1800,          // 次の攻撃を始める時刻
+    lockUntil: 0,          // 空振り後の硬直
+    enemyPose: clonePose(NEUTRAL),
+    actionFrom: clonePose(NEUTRAL),
+    stagger: { x: 0, vx: 0, p: 0, vp: 0 },
+    brokenUntil: 0,
+    fallStart: 0,
+    playerAnim: null,
+    playerPose: clonePose(P_GUARD),
+    breathE: 0, breathP: 0.5,
+    shake: 0,
+    log: [],
+    r: rng(1234),
+    auto: false,
+    stats: { go: 0, tai: 0, sen: 0, hits: 0, whiffs: 0, start: 0 },
+    pending: null,         // 方向待ちの入力
+  };
+
+  function timing(move, phase) {
+    const k = phase === 2 ? 0.9 : 1;
+    const w = move.w;
+    return { O: (150 + 150 * w) * k, W: (220 + 330 * w) * k, S: 110 + 70 * w, F: 200 + 140 * w, R: 380 + 300 * w };
+  }
+
+  const PATTERNS = {
+    1: [['over'], ['cutR'], ['cutL'], ['cutL', 'cutR'], ['over', 'cutR'], ['rise'], ['cutR', 'cutL']],
+    2: [['quickR', 'quickL', 'quickR'], ['thrust'], ['over*'], ['~', 'quickR'], ['~', 'over'], ['cutL', 'thrust'],
+        ['rise', 'over*'], ['quickL', 'quickR', 'cutL'], ['~', 'thrust'], ['cutR', 'cutL', 'over']],
+  };
+
+  function planNext() {
+    const list = PATTERNS[S.phase];
+    S.queue = list[Math.floor(S.r() * list.length)].slice();
+  }
+
+  function startAction(token) {
+    const feint = token === '~';
+    const delayed = token.endsWith('*');
+    const key = token.replace('*', '');
+    const move = feint ? { mom: ['R', 'L', 'D'][Math.floor(S.r() * 3)], w: 1.2, name: '虚' } : MOVES[key];
+    const tm = timing(move, S.phase);
+    const D = delayed ? 380 + S.r() * 380 : 0;
+    const a = { move, feint, t0: S.gt, ...tm, D, resolved: false, parried: false, awaitLate: false, crunched: false, swung: false };
+    a.T = a.t0 + a.O + a.W + a.D + a.S;
+    if (feint) a.end = a.t0 + a.O + 300;
+    S.action = a;
+    S.mode = 'attack';
+    S.actionFrom = clonePose(S.enemyPose);
+    if (!feint) { Audio.crunch(move.w / 1.6); a.crunched = true; }
+  }
+
+  // ───────────────────────── 入力 ─────────────────────────
+  function toGameTime(realT) {
+    return S.frameGt + (realT - S.frameReal) * S.frameScale * S.speed;
+  }
+
+  function quality(mom, dir) {
+    if (!dir) return 'tap';
+    if (mom === 'T') return (dir === 'L' || dir === 'R') ? 'flow' : 'against';
+    if (dir === mom) return 'flow';
+    const opp = { R: 'L', L: 'R', U: 'D', D: 'U' };
+    return opp[mom] === dir ? 'against' : 'perp';
+  }
+
+  function onPress(tGame) {
+    if (!S.started) return null;
+    if (S.mode === 'broken') { issen(); return null; }
+    if (S.mode === 'victory' || S.mode === 'defeat' || S.mode === 'falling') return null;
+    if (tGame < S.lockUntil) return null;
+    if (S.pending) return null;                      // 前のはじきの向きがまだ決まっていない
+    const a = S.action;
+    if (a && (a.pendingDeflect || (a.resolved && a.parried))) return null;  // 二度押しは数えない
+    if (a && !a.resolved) {
+      const sinceStart = tGame - a.t0;
+      if (sinceStart >= 0 && sinceStart <= a.O) {
+        if (a.feint) return whiff('虚');
+        return sen(a, tGame);
+      }
+      if (!a.feint) {
+        const e = tGame - a.T - S.offset;
+        if (e >= CFG.winTai[0] && e <= CFG.winTai[1]) return deflect(a, 'tai', tGame);
+        if (e >= CFG.winGo[0] && e < CFG.winGo[1]) return deflect(a, 'go', tGame);
+        if (e < CFG.winGo[0]) return whiff('早');
+        return whiff('遅');
+      }
+    }
+    return whiff('空');
+  }
+
+  function whiff(reason) {
+    S.lockUntil = S.gt + CFG.whiffLock;
+    S.P = clamp(S.P + 6, 0, 100);
+    S.lastHit = S.gt;
+    S.stats.whiffs++;
+    Audio.whiff();
+    S.playerAnim = { kind: 'whiff', t0: S.gt };
+    pushLog(reason === '虚' ? '虚' : '空', '—', reason === '虚' ? '虚に釣られた' : reason === '早' ? '早い' : reason === '遅' ? '遅い' : '空振り', 0);
+    glyphAtScreen(reason === '虚' ? '虚' : '空', 'miss', 0.5, 0.62);
+    return null;
+  }
+
+  function sen(a, tGame) {
+    a.resolved = true; a.parried = true;
+    S.stats.sen++;
+    const hold = { tier: 'sen', a, err: tGame - a.t0 };
+    S.slowUntil = performance.now() + 320;
+    Audio.parry('sen');
+    flash(0.32);
+    tmpA.copy(enemy.mid).lerp(player.headWorld, 0.45);
+    burst(tmpA, 34, 2.6, true);
+    glyphAt('先', 'sen', tmpA);
+    S.playerAnim = { kind: 'parry', t0: S.gt, dir: null };
+    beginStagger(a, 'sen');
+    return hold;
+  }
+
+  function deflect(a, tier, tGame) {
+    // 刃が届く前なら、届いた瞬間に火花を散らす。届いた後（対の先の遅い側）なら今すぐ。
+    const hold = { tier, a, err: tGame - a.T };
+    if (S.gt >= a.T) { resolveDeflect(hold); }
+    else { a.pendingDeflect = hold; }
+    S.playerAnim = { kind: 'parry', t0: S.gt, dir: null };
+    // 自動補正：成功した弾きのタイミングに合わせて少しずつ寄せる
+    S.offset = clamp(S.offset + 0.08 * ((tGame - a.T) - S.offset), CFG.offsetRange[0], CFG.offsetRange[1]);
+    return hold;
+  }
+
+  function resolveDeflect(hold) {
+    const a = hold.a;
+    a.resolved = true; a.parried = true;
+    S.stats[hold.tier]++;
+    Audio.parry(hold.tier);
+    if (hold.tier === 'tai') { S.freezeUntil = performance.now() + 85; flash(0.16); }
+    else { S.freezeUntil = performance.now() + 45; }
+    tmpA.copy(enemy.tip).lerp(enemy.mid, 0.35);
+    burst(tmpA, hold.tier === 'tai' ? 26 : 12, hold.tier === 'tai' ? 2.2 : 1.4, false);
+    glyphAt(hold.tier === 'tai' ? '対' : '後', hold.tier, tmpA);
+    hold.landed = true;
+    if (hold.dir !== undefined) applyBreak(hold);
+  }
+
+  // 方向が決まったら崩しを確定する
+  function applyBreak(hold) {
+    if (hold.applied || !hold.landed && hold.tier !== 'sen') return;
+    hold.applied = true;
+    const a = hold.a;
+    const q = quality(a.move.mom, hold.dir);
+    const amount = CFG.breakBase[hold.tier] * a.move.w * CFG.dirMult[q];
+    S.B = clamp(S.B + amount, 0, 100);
+    S.lastPressure = S.gt;
+    if (q === 'against') { S.P = clamp(S.P + 5 * a.move.w, 0, 100); Audio.clash(); S.shake = Math.max(S.shake, 0.05); }
+    // 相手の体は、返された向きへ流れる
+    const sx = hold.dir === 'R' ? 1 : hold.dir === 'L' ? -1 : 0;
+    const push = (hold.tier === 'sen' ? 1.4 : hold.tier === 'tai' ? 1.1 : 0.6) * (q === 'flow' ? 1.3 : 0.6) * a.move.w;
+    S.stagger.vx += sx * push * 1.6;
+    S.stagger.vp += (hold.dir === 'D' ? 1 : hold.dir === 'U' ? -0.6 : -0.5) * push * 1.2;
+    if (S.playerAnim && S.playerAnim.kind === 'parry') S.playerAnim.dir = hold.dir || 'N';
+    const label = { flow: '流し', perp: '横', against: '受け', tap: '方向なし' }[q];
+    const tierName = { go: '後の先', tai: '対の先', sen: '先の先' }[hold.tier];
+    const errText = hold.tier === 'sen' ? `起こり+${Math.round(hold.err)}` : `${hold.err >= 0 ? '+' : ''}${Math.round(hold.err)}ms`;
+    pushLog(tierName, errText, `${label}　崩し ${Math.round(amount)}`, amount);
+    // 対の先で流した時と先の先は、相手の連撃を止める
+    if (hold.tier === 'sen' || (hold.tier === 'tai' && q === 'flow')) {
+      S.queue = [];
+      beginStagger(a, hold.tier);
+    }
+    if (S.B >= 100) breakEnemy();
+  }
+
+  function setDir(dir) {
+    const h = S.pending;
+    if (!h) return;
+    S.pending = null;
+    h.dir = dir;
+    if (h.landed || h.tier === 'sen') applyBreak(h);
+  }
+
+  function beginStagger(a, tier) {
+    S.mode = 'staggered';
+    S.actionFrom = clonePose(S.enemyPose);
+    S.staggerStart = S.gt;
+    S.staggerDur = tier === 'sen' ? 900 : tier === 'tai' ? 700 : 450;
+    S.action = null;
+  }
+
+  function breakEnemy() {
+    S.mode = 'broken';
+    S.queue = []; S.action = null;
+    S.brokenUntil = S.gt + CFG.brokenTime;
+    S.actionFrom = clonePose(S.enemyPose);
+    S.brokenStart = S.gt;
+    pushLog('崩れ', '', '膝をついた。一閃の機会', 0);
+  }
+
+  function issen() {
+    S.mode = 'falling';
+    S.fallStart = S.gt;
+    S.actionFrom = clonePose(S.enemyPose);
+    S.freezeUntil = performance.now() + 420;
+    S.playerAnim = { kind: 'issen', t0: S.gt };
+    Audio.issen();
+    flash(0.55);
+    const sl = document.getElementById('slash');
+    sl.classList.remove('on'); void sl.offsetWidth; sl.classList.add('on');
+    tmpA.copy(enemy.headWorld).lerp(enemy.mid, 0.5);
+    burst(tmpA, 40, 1.8, false);
+    pushLog('一閃', '', S.phase === 1 ? '前半を制した' : '勝負あり', 0);
+  }
+
+  function hitPlayer(a) {
+    a.resolved = true;
+    S.P = clamp(S.P + CFG.hitDamage(a.move.w), 0, 100);
+    S.lastHit = S.gt;
+    S.stats.hits++;
+    Audio.hit();
+    S.shake = 0.16;
+    S.playerAnim = { kind: 'hit', t0: S.gt };
+    flash(0.08, '#ff6a4a');
+    pushLog('被弾', '', a.move.name, 0);
+    if (S.P >= 100) defeat();
+  }
+
+  function defeat() {
+    S.mode = 'defeat';
+    S.queue = []; S.action = null;
+    S.playerAnim = { kind: 'down', t0: S.gt };
+    setTimeout(() => showEnd(false), 1300);
+  }
+
+  // ───────────────────────── 画面上の表現 ─────────────────────────
+  const glyphs = document.getElementById('glyphs');
+  const projV = V(0, 0, 0);
+  function glyphAt(text, cls, world) {
+    projV.copy(world).project(camera);
+    glyphAtScreen(text, cls, (projV.x + 1) / 2, (1 - projV.y) / 2);
+  }
+  function glyphAtScreen(text, cls, nx, ny) {
+    const el = document.createElement('div');
+    el.className = `glyph ${cls}`;
+    el.textContent = text;
+    el.style.left = `${clamp(nx, 0.08, 0.92) * 100}%`;
+    el.style.top = `${clamp(ny, 0.08, 0.92) * 100}%`;
+    glyphs.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+  const flashEl = document.getElementById('flash');
+  function flash(strength, color) {
+    flashEl.style.transition = 'none';
+    flashEl.style.background = color || '#fff';
+    flashEl.style.opacity = String(strength);
+    void flashEl.offsetWidth;
+    flashEl.style.transition = 'opacity 260ms ease-out';
+    flashEl.style.opacity = '0';
+  }
+
+  const logEl = document.getElementById('log');
+  const logBtn = document.getElementById('logBtn');
+  function pushLog(t, e, d) {
+    S.log.unshift({ t, e, d });
+    S.log.length = Math.min(S.log.length, 7);
+    renderLog();
+  }
+  function renderLog() {
+    if (logEl.hidden) return;
+    const meta = `${S.phase === 1 ? '前半' : '後半'}　相手 ${Math.round(S.B)}　自分 ${Math.round(S.P)}　補正 ${Math.round(S.offset)}ms`;
+    logEl.innerHTML = `<div class="meta">${meta}</div>` + S.log.map((r) => `<div class="row"><span class="t">${r.t}</span><span>${r.e}</span><span>${r.d}</span></div>`).join('');
+  }
+  logBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    logEl.hidden = !logEl.hidden;
+    logBtn.setAttribute('aria-pressed', String(!logEl.hidden));
+    renderLog();
+  });
+  logBtn.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+
+  // ───────────────────────── 入力の受け取り ─────────────────────────
+  const FLICK_PX = 14;
+  let touch = null;
+  function press(realT, x, y) {
+    const tGame = toGameTime(realT);
+    const hold = onPress(tGame);
+    if (hold) S.pending = hold;
+    touch = { x, y, t: realT, resolved: false, hold };
+    if (hold) setTimeout(() => { if (touch && touch.hold === hold && !touch.resolved) { touch.resolved = true; setDir(null); } }, 170);
+  }
+  function eventTime(ev) {
+    const n = performance.now();
+    const t = ev.timeStamp;
+    return (t > 0 && Math.abs(n - t) < 1000) ? t : n;
+  }
+  stage.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    Audio.init();
+    press(eventTime(ev), ev.clientX, ev.clientY);
+  });
+  stage.addEventListener('pointermove', (ev) => {
+    if (!touch || touch.resolved) return;
+    const dx = ev.clientX - touch.x, dy = ev.clientY - touch.y;
+    if (dx * dx + dy * dy < FLICK_PX * FLICK_PX) return;
+    touch.resolved = true;
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U');
+    if (touch.hold) setDir(dir);
+  });
+  const release = () => { if (touch && !touch.resolved) { touch.resolved = true; if (touch.hold) setDir(null); } touch = null; };
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+  window.addEventListener('keydown', (ev) => {
+    if (ev.repeat || !S.started) return;
+    const map = { ArrowRight: 'R', ArrowLeft: 'L', ArrowUp: 'U', ArrowDown: 'D', ' ': null };
+    if (!(ev.key in map)) return;
+    ev.preventDefault();
+    Audio.init();
+    const hold = onPress(toGameTime(eventTime(ev)));
+    if (hold) { S.pending = hold; setDir(map[ev.key]); }
+  });
+
+  // ───────────────────────── 進行 ─────────────────────────
+  function updateAI() {
+    const gt = S.gt;
+    if (S.mode === 'idle' && gt >= S.nextAt) {
+      if (!S.queue.length) planNext();
+      startAction(S.queue.shift());
+    }
+    const a = S.action;
+    if (S.mode === 'attack' && a) {
+      if (a.feint) {
+        if (gt >= a.end) {
+          S.action = null; S.mode = 'idle';
+          S.actionFrom = clonePose(S.enemyPose);
+          S.nextAt = gt + (S.queue.length ? 140 : 700);
+        }
+      } else {
+        if (!a.swung && gt >= a.T - a.S) { a.swung = true; Audio.swing(a.move.w); }
+        if (!a.resolved && gt >= a.T) {
+          if (a.pendingDeflect) { resolveDeflect(a.pendingDeflect); a.pendingDeflect = null; }
+          else if (gt >= a.T + CFG.winTai[1] + S.offset) { hitPlayer(a); }
+        }
+        const end = a.T + a.F + a.R;
+        if (S.mode === 'attack' && S.action === a) {
+          if (S.queue.length && gt >= a.T + a.F * 0.9) {
+            startAction(S.queue.shift());
+          } else if (gt >= end) {
+            S.action = null; S.mode = 'idle';
+            S.actionFrom = clonePose(S.enemyPose);
+            S.nextAt = gt + gapAfterPattern();
+          }
+        }
+      }
+    }
+    if (S.mode === 'staggered' && gt >= S.staggerStart + S.staggerDur) {
+      S.mode = 'idle';
+      S.actionFrom = clonePose(S.enemyPose);
+      S.nextAt = gt + 450 + S.r() * 300;
+    }
+    if (S.mode === 'broken' && gt >= S.brokenUntil) {
+      S.B = 62;
+      S.mode = 'idle';
+      S.actionFrom = clonePose(S.enemyPose);
+      S.nextAt = gt + 600;
+      pushLog('立ち直り', '', '一閃の機会を逃した', 0);
+    }
+    if (S.mode === 'falling' && gt >= S.fallStart + (S.phase === 1 ? 3200 : 2600)) {
+      if (S.phase === 1) {
+        S.phase = 2; S.B = 0; S.P = Math.max(0, S.P - 40);
+        S.mode = 'idle'; S.actionFrom = clonePose(S.enemyPose);
+        S.nextAt = gt + 900; S.queue = [];
+        pushLog('後半', '', '相手が立ち上がった', 0);
+      } else {
+        S.mode = 'victory';
+        setTimeout(() => showEnd(true), 900);
+      }
+    }
+  }
+
+  function gapAfterPattern() {
+    // 次の攻撃は、相手の吐く息の拍子に合わせて始まる
+    const base = S.phase === 1 ? 950 + S.r() * 650 : 600 + S.r() * 550;
+    const period = breathPeriod(S.B);
+    const target = S.gt + base;
+    const phaseNow = (target / period) % 1;
+    return base + (1 - phaseNow) * period * 0.5;
+  }
+
+  const breathPeriod = (load) => lerp(2400, 900, clamp(load / 100, 0, 1));
+
+  const P_TMP = clonePose(NEUTRAL), P_TMP2 = clonePose(NEUTRAL);
+  function enemyPoseNow() {
+    const gt = S.gt;
+    const out = S.enemyPose;
+    const a = S.action;
+    if (S.mode === 'attack' && a) {
+      const K = KEY[a.move.mom] || KEY.D;
+      const t = gt - a.t0;
+      if (a.feint) {
+        // 虚：腕と刀だけが動き、腰は動かない
+        if (t <= a.O) blendSplit(S.actionFrom, K.wind, smooth(t / a.O) * 0.08, smooth(t / a.O) * 0.5, out);
+        else { blendSplit(S.actionFrom, K.wind, 0.08, 0.5, P_TMP); blend(P_TMP, NEUTRAL, smooth((t - a.O) / 300), out); }
+      } else if (t <= a.O) {
+        // 本物の起こり：腰が先に動き、腕は少し遅れる
+        const u = smooth(t / a.O);
+        blendSplit(S.actionFrom, K.wind, u, u * 0.25, out);
+      } else if (t <= a.O + a.W) {
+        const u = smooth((t - a.O) / a.W);
+        blendSplit(S.actionFrom, K.wind, 1, 0.25 + 0.75 * u, out);
+      } else if (t <= a.O + a.W + a.D) {
+        blend(K.wind, K.wind, 0, out);
+        out.hand.x += Math.sin(gt * 0.09) * 0.006; out.hand.y += Math.sin(gt * 0.13) * 0.006;
+      } else if (gt <= a.T) {
+        const u = easeIn((gt - (a.T - a.S)) / a.S);
+        blend(K.wind, K.hit, u, out);
+      } else if (gt <= a.T + a.F) {
+        blend(K.hit, K.follow, easeOut((gt - a.T) / a.F), out);
+      } else {
+        blend(K.follow, NEUTRAL, smooth((gt - a.T - a.F) / a.R), out);
+      }
+    } else if (S.mode === 'staggered') {
+      blend(S.actionFrom, NEUTRAL, smooth((gt - S.staggerStart) / S.staggerDur), out);
+    } else if (S.mode === 'broken') {
+      blend(S.actionFrom, KNEEL, easeOut((gt - S.brokenStart) / 380), out);
+    } else if (S.mode === 'falling') {
+      const u = (gt - S.fallStart);
+      blend(S.actionFrom, KNEEL, easeOut(u / 300), out);
+      if (S.phase === 2 || S.mode === 'victory') { out.pitch += smooth((u - 300) / 1400) * 0.9; out.crouch += smooth((u - 300) / 1400) * 0.25; }
+    } else if (S.mode === 'victory') {
+      blend(KNEEL, KNEEL, 0, out); out.pitch += 0.9; out.crouch += 0.25;
+    } else {
+      // 待ち：呼吸
+      blend(S.actionFrom, NEUTRAL, smooth((gt - (S.idleSince || 0)) / 500), out);
+    }
+    // 崩れ：沈み、揺れ、刀先が震える
+    const load = S.B / 100;
+    if (S.mode !== 'falling' && S.mode !== 'victory') {
+      const br = Math.sin(gt / breathPeriod(S.B) * Math.PI * 2);
+      out.crouch += 0.012 * br + load * 0.1;
+      out.roll += Math.sin(gt * 0.0031) * load * 0.07;
+      out.hand.y -= load * 0.12;
+      out.hand.x += Math.sin(gt * 0.047) * load * load * 0.02;
+    }
+    out.hipX += S.stagger.x * 0.35;
+    out.yaw += -S.stagger.x * 0.6;
+    out.pitch += S.stagger.p * 0.35;
+    out.hand.x += S.stagger.x * 0.4;
+    return out;
+  }
+
+  function playerPoseNow() {
+    const gt = S.gt;
+    const out = S.playerPose;
+    const an = S.playerAnim;
+    blend(P_GUARD, P_GUARD, 0, out);
+    if (an) {
+      const t = gt - an.t0;
+      if (an.kind === 'parry') {
+        const target = playerParryPose(an.dir && an.dir !== 'N' ? an.dir : null);
+        const u = t < 70 ? easeOut(t / 70) : 1 - smooth((t - 160) / 360);
+        blend(P_GUARD, target, clamp(u, 0, 1), out);
+        if (t > 600) S.playerAnim = null;
+      } else if (an.kind === 'hit') {
+        const u = t < 80 ? easeOut(t / 80) : 1 - smooth((t - 200) / 500);
+        blend(P_GUARD, P_HIT, clamp(u, 0, 1), out);
+        if (t > 800) S.playerAnim = null;
+      } else if (an.kind === 'whiff') {
+        const target = pose({ hand: V(-0.3, 1.0, 0.6), sword: V(-0.8, -0.2, 0.55).normalize(), crouch: 0.12, yaw: 0.3 });
+        const u = t < 90 ? easeOut(t / 90) : 1 - smooth((t - 150) / 300);
+        blend(P_GUARD, target, clamp(u, 0, 1), out);
+        if (t > 500) S.playerAnim = null;
+      } else if (an.kind === 'issen') {
+        const target = pose({ hand: V(-0.55, 1.05, 0.5), sword: V(-0.85, -0.35, 0.4).normalize(), crouch: 0.2, yaw: 0.6, hipZ: 0.15 });
+        blend(P_GUARD, target, easeOut(t / 120), out);
+        if (t > 2200) S.playerAnim = null;
+      } else if (an.kind === 'down') {
+        blend(P_GUARD, P_KNEEL, easeOut(t / 500), out);
+      }
+    }
+    const load = S.P / 100;
+    const br = Math.sin(gt / breathPeriod(S.P) * Math.PI * 2);
+    out.crouch += 0.01 * br + load * 0.08;
+    out.roll += Math.sin(gt * 0.0027) * load * 0.06;
+    out.hand.y -= load * 0.1;
+    return out;
+  }
+
+  function updateBodies(dtGame) {
+    // 体勢の自然な回復
+    if (S.mode !== 'broken' && S.mode !== 'falling' && S.mode !== 'victory') {
+      if (S.gt - S.lastPressure > CFG.enemyRecoverDelay) S.B = Math.max(0, S.B - CFG.enemyRecoverRate * dtGame / 1000);
+    }
+    if (S.mode !== 'defeat' && S.gt - S.lastHit > CFG.playerRecoverDelay) S.P = Math.max(0, S.P - CFG.playerRecoverRate * dtGame / 1000);
+    // よろめきのばね
+    const k = 38, d = 9, dt = Math.min(dtGame, 50) / 1000;
+    S.stagger.vx += (-k * S.stagger.x - d * S.stagger.vx) * dt; S.stagger.x += S.stagger.vx * dt;
+    S.stagger.vp += (-k * S.stagger.p - d * S.stagger.vp) * dt; S.stagger.p += S.stagger.vp * dt;
+    if (S.mode === 'idle' && !S.idleMark) { S.idleSince = S.gt; S.idleMark = true; }
+    if (S.mode !== 'idle') S.idleMark = false;
+
+    enemy.apply(enemyPoseNow());
+    player.apply(playerPoseNow());
+
+    // 白い息
+    const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
+    const eb = Math.floor(S.gt / ep), pb = Math.floor(S.gt / pp);
+    if (eb !== S.breathE) { S.breathE = eb; if (S.mode !== 'victory' && !(S.mode === 'falling' && S.phase === 2)) { exhale(enemy.headWorld, V(0, -0.05, 1), S.B / 100); if (S.B > 55) Audio.breath(S.B / 100); } }
+    if (pb !== S.breathP) { S.breathP = pb; exhale(player.headWorld, V(0, -0.05, -1), S.P / 100); }
+  }
+
+  function updateEffects(dtReal) {
+    const dt = dtReal / 1000;
+    // 火花
+    for (let i = 0; i < SPARK_N; i++) {
+      const s = sparkState[i];
+      if (s.life > 0) {
+        s.life -= dt;
+        s.v.y -= 6 * dt;
+        s.p.addScaledVector(s.v, dt);
+        const f = Math.max(0, s.life / s.max);
+        sparkCol[i * 3] = s.c.r * f; sparkCol[i * 3 + 1] = s.c.g * f; sparkCol[i * 3 + 2] = s.c.b * f;
+      } else { sparkCol[i * 3] = sparkCol[i * 3 + 1] = sparkCol[i * 3 + 2] = 0; }
+      sparkPos[i * 3] = s.p.x; sparkPos[i * 3 + 1] = s.p.y; sparkPos[i * 3 + 2] = s.p.z;
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkGeo.attributes.color.needsUpdate = true;
+    // 息
+    for (const b of breaths) {
+      if (!b.m.visible) continue;
+      b.life -= dt;
+      if (b.life <= 0) { b.m.visible = false; continue; }
+      const u = 1 - b.life / b.max;
+      b.m.position.addScaledVector(b.v, dt);
+      b.v.multiplyScalar(1 - 0.9 * dt);
+      const sz = b.size * (0.6 + u * 1.6);
+      b.m.scale.set(sz, sz, 1);
+      b.m.material.opacity = b.peak * Math.sin(Math.min(1, u * 1.4) * Math.PI) * (1 - u * 0.4);
+    }
+    // 雪
+    for (let i = 0; i < SNOW_N; i++) {
+      snowPos[i * 3 + 1] -= dt * (0.35 + (i % 7) * 0.04);
+      snowPos[i * 3] += Math.sin((performance.now() * 0.0004) + i) * dt * 0.08;
+      if (snowPos[i * 3 + 1] < 0) snowPos[i * 3 + 1] += 7;
+    }
+    snowGeo.attributes.position.needsUpdate = true;
+    // 刃の軌跡
+    const a = S.action;
+    const active = a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F;
+    if (active) trailSamples.unshift({ tip: enemy.tip.clone(), mid: enemy.mid.clone(), t: performance.now() });
+    const nowR = performance.now();
+    while (trailSamples.length > TRAIL_N || (trailSamples.length && nowR - trailSamples[trailSamples.length - 1].t > 220)) trailSamples.pop();
+    for (let i = 0; i < TRAIL_N; i++) {
+      const s = trailSamples[Math.min(i, trailSamples.length - 1)];
+      const f = s ? Math.max(0, 1 - (nowR - s.t) / 220) * (1 - i / TRAIL_N) : 0;
+      const o = i * 6;
+      if (s) { trailPos.set([s.tip.x, s.tip.y, s.tip.z, s.mid.x, s.mid.y, s.mid.z], o); }
+      trailCol.set([0.75 * f, 0.82 * f, 0.95 * f, 0, 0, 0], o);
+    }
+    trailGeo.attributes.position.needsUpdate = true;
+    trailGeo.attributes.color.needsUpdate = true;
+    // 灯籠のゆらぎ
+    lantern.intensity = 1.5 + Math.sin(nowR * 0.007) * 0.08 + Math.sin(nowR * 0.0173) * 0.05;
+  }
+
+  function updateCamera(dtReal) {
+    S.shake = Math.max(0, S.shake - dtReal / 1000 * 0.5);
+    const s = S.shake;
+    const t = performance.now();
+    camera.position.set(
+      CAM_BASE.x + (Math.sin(t * 0.091) * s),
+      CAM_BASE.y + (Math.sin(t * 0.077) * s * 0.7),
+      CAM_BASE.z,
+    );
+    camera.lookAt(CAM_LOOK);
+  }
+
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = camera.aspect < 1 ? 48 : 36;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ───────────────────────── 自動で弾く（試験用） ─────────────────────────
+  function autoPlay() {
+    if (!S.auto) return;
+    if (S.mode === 'broken' && S.gt > S.brokenStart + 300) { issen(); return; }
+    const a = S.action;
+    if (!a || a.resolved || a.feint || a.autoDone) return;
+    const flow = a.move.mom === 'T' ? 'L' : a.move.mom;
+    if (S.auto === 'sen' && a.move.w >= 1.4 && S.gt >= a.t0 + a.O * 0.5) {
+      a.autoDone = true; const h = onPress(S.gt); if (h) { S.pending = h; setDir(flow); } return;
+    }
+    if (S.gt >= a.T + S.offset - 8) {
+      a.autoDone = true; const h = onPress(S.gt); if (h) { S.pending = h; setDir(flow); }
+    }
+  }
+
+  // ───────────────────────── ループ ─────────────────────────
+  let last = performance.now();
+  function frame(now) {
+    const dtReal = Math.min(64, now - last);
+    last = now;
+    let scale = 1;
+    if (now < S.freezeUntil) scale = 0;
+    else if (now < S.slowUntil) scale = S.slowScale;
+    S.frameReal = now; S.frameGt = S.gt; S.frameScale = scale;
+    if (S.started) {
+      const dtGame = dtReal * scale * S.speed;
+      S.gt += dtGame;
+      S.frameGt = S.gt; S.frameReal = now;
+      autoPlay();
+      updateAI();
+      updateBodies(dtGame);
+    } else {
+      updateBodies(0);
+    }
+    updateEffects(dtReal * (scale === 0 ? 0.15 : scale));
+    updateCamera(dtReal);
+    renderer.render(scene, camera);
+    if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ───────────────────────── 開始と終了 ─────────────────────────
+  const startEl = document.getElementById('start');
+  const endEl = document.getElementById('end');
+  function begin(fromPhase) {
+    Object.assign(S, {
+      started: true, phase: fromPhase, mode: 'idle', B: 0, P: 0, action: null, queue: [],
+      nextAt: S.gt + 1400, lockUntil: 0, brokenUntil: 0, playerAnim: null, pending: null, lastPressure: S.gt, lastHit: -9999,
+    });
+    S.actionFrom = clonePose(S.enemyPose);
+    S.r = rng((Date.now() ^ (fromPhase * 7919)) >>> 0);
+    S.stats = { go: 0, tai: 0, sen: 0, hits: 0, whiffs: 0, start: S.gt };
+    S.log = []; renderLog();
+  }
+  document.getElementById('startBtn').addEventListener('click', () => {
+    Audio.init();
+    startEl.hidden = true;
+    begin(1);
+  });
+  function showEnd(won) {
+    const st = S.stats;
+    const secs = Math.round((S.gt - st.start) / 1000);
+    document.getElementById('endTitle').textContent = won ? '勝負あり' : '倒れた';
+    document.getElementById('endText').textContent = won
+      ? `${secs}秒。先の先 ${st.sen}・対の先 ${st.tai}・後の先 ${st.go}・被弾 ${st.hits}・空振り ${st.whiffs}`
+      : `${S.phase === 1 ? '前半' : '後半'}から、すぐにやり直せます。`;
+    document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
+    endEl.hidden = false;
+    S.lastWon = won;
+  }
+  document.getElementById('againBtn').addEventListener('click', () => {
+    endEl.hidden = true;
+    begin(S.lastWon ? 1 : S.phase);
+  });
+
+  // 試験用の窓口
+  window.__kaeshi = {
+    get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, gt: S.gt, offset: S.offset, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, T: S.action.T } }; },
+    setSpeed(v) { S.speed = v; },
+    setAuto(v) { S.auto = v; },
+    start() { startEl.hidden = true; begin(1); },
+  };
+})();
+</script>
