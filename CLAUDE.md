@@ -3,6 +3,7 @@
 ## このプロジェクトについて
 
 本質的な面白さと洗練を目指すiOSゲーム。現在は設計段階。戦闘の手触りを確かめる試作が `prototype/kaeshi/` にある（1つのHTMLファイル、Three.js r128）。
+試作を直したら `python3 tools/build_play.py` を実行して `play/index.html`（GitHub Pages で公開する単独のHTML）を作り直してから push する。
 作業を始める前に `docs/README.md` から設計資料を読み、決定事項と設計の柱に沿って進めること。
 
 ## 進め方の約束

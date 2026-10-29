@@ -1,0 +1,1901 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="返し">
+<meta name="theme-color" content="#0a0f1c">
+<style>html { -webkit-text-size-adjust: 100%; } body { margin: 0; }</style>
+</head>
+<body>
+<title>返し</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap">
+<style>
+  /* 一枚の画面：上に相手、下に親指。雪の夜に、月の冷たさと灯籠の温かさ。 */
+  :root {
+    --night: #0a0f1c;
+    --ink: #e8ecf3;
+    --mist: #9aa6ba;
+    --lantern: #ffb36b;
+    --steel: #dfe7f2;
+    --ember: #c8303c;
+    --veil: rgba(10, 15, 28, 0.8);
+    --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font-family: var(--body);
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #stage { position: fixed; inset: 0; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+
+  #glyphs { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .glyph {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--display);
+    font-weight: 700;
+    color: var(--steel);
+    text-shadow: 0 0 18px rgba(223, 231, 242, 0.55);
+    animation: glyph 640ms ease-out forwards;
+    white-space: nowrap;
+  }
+  .glyph.go { font-size: 26px; opacity: 0.8; }
+  .glyph.tai { font-size: 40px; }
+  .glyph.sen { font-size: 56px; color: #fff4e6; text-shadow: 0 0 26px rgba(255, 179, 107, 0.75); }
+  .glyph.miss { font-size: 22px; color: var(--mist); text-shadow: none; }
+  .glyph.cut { font-size: 30px; color: #ffe2c4; text-shadow: 0 0 16px rgba(255, 120, 80, 0.6); }
+  .glyph.chain { font-size: 15px; letter-spacing: 0.2em; color: var(--lantern); text-shadow: 0 0 12px rgba(255, 179, 107, 0.6); animation-duration: 900ms; }
+  .glyph.phase { font-size: 34vmin; font-weight: 800; color: rgba(232, 236, 243, 0.9); text-shadow: 0 0 40px rgba(200, 48, 60, 0.55); animation: phase 1900ms ease-out forwards; }
+  @keyframes glyph {
+    0% { opacity: 0; transform: translate(-50%, -30%) scale(0.85); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -95%) scale(1.04); }
+  }
+  @keyframes phase {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); filter: blur(8px); }
+    25% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); filter: blur(2px); }
+  }
+
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.55) 100%); }
+  #slash {
+    position: fixed; left: 50%; top: 42%;
+    width: 160vmax; height: 3px;
+    background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent);
+    transform: translate(-50%, -50%) rotate(-28deg) scaleX(0);
+    opacity: 0; pointer-events: none;
+    box-shadow: 0 0 26px rgba(255, 255, 255, 0.95);
+  }
+  #slash.on { animation: slash 1000ms cubic-bezier(.2, .9, .2, 1) forwards; }
+  @keyframes slash {
+    0% { opacity: 1; transform: translate(-50%, -50%) rotate(-28deg) scaleX(0); }
+    20% { opacity: 1; transform: translate(-50%, -50%) rotate(-28deg) scaleX(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(-28deg) scaleX(1); }
+  }
+
+  #logBtn {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    font-family: var(--body); font-size: 12px; letter-spacing: 0.08em;
+    color: var(--mist); background: transparent;
+    border: 1px solid rgba(154, 166, 186, 0.35); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  #logBtn:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
+  #log {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 48px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    width: min(310px, calc(100vw - 24px));
+    background: var(--veil);
+    border: 1px solid rgba(154, 166, 186, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px; line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  #log .meta { color: var(--mist); margin-bottom: 6px; }
+  #log .row { display: grid; grid-template-columns: 3.8em 4.6em 1fr; gap: 6px; }
+  #log .row .t { font-family: var(--display); font-weight: 700; }
+
+  .veil {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    background: var(--veil);
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    overflow-y: auto;
+  }
+  .card { max-width: 30em; display: grid; gap: 14px; text-align: left; }
+  .card h1 {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(56px, 18vw, 96px); line-height: 1;
+    margin: 0; letter-spacing: 0.06em;
+  }
+  .card .kicker { font-size: 11px; letter-spacing: 0.24em; color: var(--mist); text-transform: uppercase; margin: 0; }
+  .card p { margin: 0; font-size: 15px; line-height: 1.75; color: var(--ink); }
+  .card .note { font-size: 13px; color: var(--mist); }
+  .card details { font-size: 13px; color: var(--mist); line-height: 1.7; }
+  .card summary { cursor: pointer; color: var(--ink); }
+  .card dl { display: grid; grid-template-columns: 5em 1fr; gap: 4px 10px; margin: 10px 0 0; }
+  .card dt { font-family: var(--display); font-weight: 700; color: var(--ink); }
+  .card dd { margin: 0; }
+  .card button {
+    justify-self: start;
+    font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.2em;
+    color: var(--night); background: var(--steel);
+    border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer;
+  }
+  .card button:focus-visible { outline: 2px solid var(--lantern); outline-offset: 3px; }
+  .end h2 { font-family: var(--display); font-size: clamp(40px, 12vw, 64px); margin: 0; letter-spacing: 0.1em; }
+  @media (prefers-reduced-motion: reduce) {
+    .glyph, .glyph.phase { animation-duration: 1ms; }
+    #slash.on { animation-duration: 1ms; }
+  }
+</style>
+
+<div id="stage" aria-label="対戦の画面"></div>
+<div id="vignette"></div>
+<div id="glyphs"></div>
+<div id="flash"></div>
+<div id="slash"></div>
+<button id="logBtn" type="button" aria-pressed="false">記録</button>
+<div id="log" hidden></div>
+
+<div id="start" class="veil">
+  <div class="card">
+    <p class="kicker">Kaeshi · 試作 0.3</p>
+    <h1>返し</h1>
+    <p>操作は、はじくだけ。<br>相手の刃が届く瞬間なら、刃を返す。<br>それ以外なら、体が動く。</p>
+    <details>
+      <summary>はじく向きと、判定の三段階</summary>
+      <dl>
+        <dt>上</dt><dd>踏み込んで斬る。相手に隙がなければ受けられ、反撃される。</dd>
+        <dt>下</dt><dd>退く。</dd>
+        <dt>左・右</dt><dd>回り込む。</dd>
+        <dt>後の先</dt><dd>刃が届く少し前に返す。受け流す。</dd>
+        <dt>対の先</dt><dd>刃と完全に同時に返す。大きく崩す。</dd>
+        <dt>先の先</dt><dd>相手が動き出した瞬間に返す。攻撃そのものを断つ。</dd>
+      </dl>
+      <p class="note">どの向きに返すと効くか、どの隙が本物か、赤く光る刃をどう避けるかは、相手の体を見て探してください。相手もあなたの癖を見ています。</p>
+    </details>
+    <p class="note">画面のどこをはじいてもかまいません。PCでは、マウスでドラッグするか、矢印キーとスペースキーで遊べます。音が出ます。</p>
+    <button id="startBtn" type="button">はじめる</button>
+  </div>
+</div>
+
+<div id="end" class="veil" hidden>
+  <div class="card end">
+    <h2 id="endTitle">勝負あり</h2>
+    <p id="endText" class="note"></p>
+    <button id="againBtn" type="button">もう一度</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ───────────────────────── 調整値 ─────────────────────────
+  const CFG = {
+    winTai: [-40, 40],         // 対の先：刃が届く瞬間からのずれ（ミリ秒）
+    winGo: [-185, -40],        // 後の先
+    whiffLock: 260,
+    offsetInit: 25,
+    offsetRange: [-30, 90],
+    breakBase: { go: 8, tai: 18, sen: 28 },
+    dirMult: { flow: 1.0, perp: 0.6, against: 0.35, tap: 0.45 },
+    cutOpen: 9, cutStagger: 14,
+    enemyRecoverDelay: 2200, enemyRecoverRate: 7,
+    playerRecoverDelay: 1600, playerRecoverRate: 6,
+    brokenTime: 2200,
+    hitDamage: (w) => 22 + 14 * w,
+    reachPlayer: 2.35,
+    minGap: 1.25,
+    arena: 7.5,
+  };
+  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const easeOut = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+  const easeIn = (t) => Math.pow(clamp(t, 0, 1), 2.4);
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ───────────────────────── 技 ─────────────────────────
+  // mom：刃の流れる向き（画面上）。R 右へ / L 左へ / D 下へ / U 上へ / T 突き / S 低い薙ぎ払い
+  const MOVES = {
+    cutR:   { key: 'R', mom: 'R', w: 1.0, reach: 2.55, lunge: 0.45, name: '右薙ぎ' },
+    cutL:   { key: 'L', mom: 'L', w: 1.0, reach: 2.55, lunge: 0.45, name: '左薙ぎ' },
+    over:   { key: 'D', mom: 'D', w: 1.6, reach: 2.6, lunge: 0.55, name: '振り下ろし' },
+    rise:   { key: 'U', mom: 'U', w: 1.1, reach: 2.5, lunge: 0.4, name: '斬り上げ' },
+    thrust: { key: 'T', mom: 'T', w: 1.2, reach: 2.9, lunge: 0.75, name: '突き' },
+    quickR: { key: 'R', mom: 'R', w: 0.6, reach: 2.45, lunge: 0.3, name: '小薙ぎ' },
+    quickL: { key: 'L', mom: 'L', w: 0.6, reach: 2.45, lunge: 0.3, name: '小薙ぎ' },
+    dash:   { key: 'T', mom: 'T', w: 1.3, reach: 2.9, lunge: 0, dash: true, name: '突進突き' },
+    sweep:  { key: 'S', mom: 'L', w: 1.4, reach: 2.7, lunge: 0.4, peril: 'sweep', name: '危：薙ぎ払い' },
+    pierce: { key: 'T', mom: 'T', w: 1.5, reach: 3.1, lunge: 0.9, peril: 'pierce', name: '危：突き' },
+    counterR: { key: 'R', mom: 'R', w: 0.75, reach: 2.6, lunge: 0.45, fast: true, name: '反撃' },
+    counterL: { key: 'L', mom: 'L', w: 0.75, reach: 2.6, lunge: 0.45, fast: true, name: '反撃' },
+  };
+
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.05, pitch: 0, yaw: 0, roll: 0 }, o);
+
+  // 姿勢は「前＝+z」のローカル座標。相手の x は画面の右。
+  const NEUTRAL = pose({ hand: V(0.05, 1.2, 0.42), sword: V(0, 0.38, 1).normalize(), crouch: 0.13, pitch: 0.05 });
+  const KEY = {
+    R: {
+      wind: pose({ hand: V(-0.62, 1.64, 0.0), sword: V(-0.72, 0.52, -0.42).normalize(), hipX: -0.16, crouch: 0.22, yaw: 0.95, roll: 0.08, pitch: -0.05 }),
+      hit:  pose({ hand: V(0.05, 1.3, 0.82), sword: V(1, 0.05, 0.3).normalize(), hipX: 0.04, crouch: 0.2, yaw: -0.3, pitch: 0.12 }),
+      follow: pose({ hand: V(0.66, 1.02, 0.36), sword: V(0.76, -0.34, -0.5).normalize(), hipX: 0.2, crouch: 0.22, yaw: -1.05, pitch: 0.15, roll: -0.06 }),
+    },
+    D: {
+      wind: pose({ hand: V(0.02, 2.08, -0.12), sword: V(0, 0.5, -0.87).normalize(), hipZ: -0.16, crouch: 0.08, pitch: -0.36 }),
+      hit:  pose({ hand: V(0.02, 1.4, 0.78), sword: V(0, -0.3, 1).normalize(), hipZ: 0.08, crouch: 0.22, pitch: 0.26 }),
+      follow: pose({ hand: V(0.02, 0.86, 0.66), sword: V(0, -0.92, 0.38).normalize(), hipZ: 0.18, crouch: 0.34, pitch: 0.52 }),
+    },
+    U: {
+      wind: pose({ hand: V(0.1, 0.76, 0.12), sword: V(0.15, -0.75, -0.45).normalize(), hipZ: -0.06, crouch: 0.25, pitch: 0.22 }),
+      hit:  pose({ hand: V(0.02, 1.3, 0.76), sword: V(0, 0.4, 1).normalize(), crouch: 0.1 }),
+      follow: pose({ hand: V(-0.05, 1.95, 0.3), sword: V(0, 0.95, -0.2).normalize(), crouch: 0.03, pitch: -0.2 }),
+    },
+    T: {
+      wind: pose({ hand: V(0.18, 1.28, -0.34), sword: V(0, 0.05, 1).normalize(), hipZ: -0.24, crouch: 0.24, yaw: 0.45, pitch: -0.05 }),
+      hit:  pose({ hand: V(0.02, 1.3, 1.18), sword: V(0, 0.02, 1).normalize(), hipZ: 0.32, crouch: 0.22, yaw: -0.1, pitch: 0.2 }),
+      follow: pose({ hand: V(0.02, 1.24, 1.05), sword: V(0, 0.0, 1).normalize(), hipZ: 0.3, crouch: 0.22, pitch: 0.18 }),
+    },
+    S: {
+      wind: pose({ hand: V(0.62, 0.78, -0.02), sword: V(0.8, -0.42, -0.42).normalize(), hipX: 0.12, crouch: 0.34, yaw: -0.65, pitch: 0.18 }),
+      hit:  pose({ hand: V(0.02, 0.6, 0.85), sword: V(-1, -0.22, 0.3).normalize(), crouch: 0.36, pitch: 0.22 }),
+      follow: pose({ hand: V(-0.62, 0.7, 0.42), sword: V(-0.8, -0.3, -0.45).normalize(), hipX: -0.12, crouch: 0.32, yaw: 0.6, pitch: 0.18 }),
+    },
+  };
+  const mirrorX = (p) => pose({ hand: V(-p.hand.x, p.hand.y, p.hand.z), sword: V(-p.sword.x, p.sword.y, p.sword.z), hipX: -p.hipX, hipZ: p.hipZ, crouch: p.crouch, pitch: p.pitch, yaw: -p.yaw, roll: -p.roll });
+  KEY.L = { wind: mirrorX(KEY.R.wind), hit: mirrorX(KEY.R.hit), follow: mirrorX(KEY.R.follow) };
+  const KNEEL = pose({ hand: V(0.25, 0.72, 0.55), sword: V(0.3, -0.85, 0.4).normalize(), crouch: 0.44, pitch: 0.5, hipZ: -0.05 });
+  // 本物の隙：腰が伸び、力が抜けている。誘い：見た目は似ているが、腰が沈んで溜まっている。
+  const OPEN = pose({ hand: V(0.3, 0.98, 0.32), sword: V(0.35, -0.62, 0.7).normalize(), crouch: 0.0, hipZ: 0.03, pitch: 0.06 });
+  const BAIT = pose({ hand: V(0.3, 0.98, 0.32), sword: V(0.35, -0.62, 0.7).normalize(), crouch: 0.17, hipZ: -0.11, pitch: 0.06 });
+  const GUARD = pose({ hand: V(0.05, 1.42, 0.5), sword: V(0.75, 0.66, 0.1).normalize(), crouch: 0.1, yaw: -0.15 });
+
+  // 手と刀は、直線ではなく肩の前の支点を中心に弧を描いて動く
+  const PIVOT = V(0, 1.36, 0.05);
+  const _ua = V(0, 0, 0), _ub = V(0, 0, 0), _qa = new THREE.Quaternion(), _qi = new THREE.Quaternion();
+  function slerpDir(a, b, t, out) {
+    _ua.copy(a).normalize(); _ub.copy(b).normalize();
+    if (_ua.dot(_ub) < -0.999) { out.copy(_ua).lerp(_ub, t).normalize(); return out; }
+    _qa.setFromUnitVectors(_ua, _ub);
+    _qi.identity().slerp(_qa, t);
+    return out.copy(_ua).applyQuaternion(_qi);
+  }
+  const _ha = V(0, 0, 0), _hb = V(0, 0, 0), _sa = V(0, 0, 0), _sb = V(0, 0, 0);
+  function blendArms(a, b, t, out) {
+    _ha.copy(a.hand).sub(PIVOT); _hb.copy(b.hand).sub(PIVOT);
+    const la = _ha.length(), lb = _hb.length();
+    _sa.copy(a.sword); _sb.copy(b.sword);
+    slerpDir(_ha, _hb, t, out.hand).multiplyScalar(lerp(la, lb, t)).add(PIVOT);
+    slerpDir(_sa, _sb, t, out.sword).normalize();
+  }
+  function blend(a, b, t, out) {
+    out = out || pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    const hipX = lerp(a.hipX, b.hipX, t), hipZ = lerp(a.hipZ, b.hipZ, t), crouch = lerp(a.crouch, b.crouch, t);
+    const pitch = lerp(a.pitch, b.pitch, t), yaw = lerp(a.yaw, b.yaw, t), roll = lerp(a.roll, b.roll, t);
+    blendArms(a, b, t, out);
+    out.hipX = hipX; out.hipZ = hipZ; out.crouch = crouch; out.pitch = pitch; out.yaw = yaw; out.roll = roll;
+    return out;
+  }
+  // 体（腰）と腕（刀）を別々の割合で混ぜる。本物の起こりは腰が先に動く。
+  function blendSplit(a, b, tBody, tArm, out) {
+    out = out || pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    const hipX = lerp(a.hipX, b.hipX, tBody), hipZ = lerp(a.hipZ, b.hipZ, tBody), crouch = lerp(a.crouch, b.crouch, tBody);
+    const pitch = lerp(a.pitch, b.pitch, tBody), yaw = lerp(a.yaw, b.yaw, tBody), roll = lerp(a.roll, b.roll, tBody);
+    blendArms(a, b, tArm, out);
+    out.hipX = hipX; out.hipZ = hipZ; out.crouch = crouch; out.pitch = pitch; out.yaw = yaw; out.roll = roll;
+    return out;
+  }
+  const clonePose = (p) => blend(p, p, 0);
+
+  // ───────────────────────── 描画の準備 ─────────────────────────
+  const stage = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0f1c);
+  scene.fog = new THREE.Fog(0x0a0f1c, 7, 24);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 80);
+
+  scene.add(new THREE.HemisphereLight(0x8fa3c8, 0x1a1f2c, 0.55));
+  const moon = new THREE.DirectionalLight(0xbcd0f0, 0.9);
+  moon.position.set(-4, 8, 5);
+  scene.add(moon);
+
+  function radialTexture(inner, outer, size = 128) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grd.addColorStop(0, inner); grd.addColorStop(1, outer);
+    g.fillStyle = grd; g.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(c);
+  }
+  const ringTex = (() => {
+    const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(s / 2, s / 2, s * 0.32, s / 2, s / 2, s / 2);
+    grd.addColorStop(0, 'rgba(255,255,255,0)'); grd.addColorStop(0.7, 'rgba(255,255,255,0.9)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, s, s);
+    return new THREE.CanvasTexture(c);
+  })();
+  const softTex = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 64);
+  const shadowTex = radialTexture('rgba(5,8,16,0.75)', 'rgba(5,8,16,0)');
+  const footTex = radialTexture('rgba(30,38,58,0.55)', 'rgba(30,38,58,0)', 64);
+
+  // 雪の地面
+  const groundTex = (() => {
+    const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c7d0dd'; g.fillRect(0, 0, s, s);
+    const r = rng(7);
+    for (let i = 0; i < 2600; i++) {
+      const v = 190 + Math.floor(r() * 50);
+      g.fillStyle = `rgba(${v},${v + 6},${v + 14},${0.25 + r() * 0.35})`;
+      g.fillRect(r() * s, r() * s, 1 + r() * 2, 1 + r() * 2);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(14, 14);
+    return t;
+  })();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0x5a6680, map: groundTex, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // 周りの景色：石灯籠の輪、枯れ木、遠い山。回り込むと流れていく。
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x1d1c22, roughness: 0.95 });
+  const lanternLights = [];
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + 0.3;
+    const x = Math.cos(a) * 8.2, z = Math.sin(a) * 8.2;
+    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.34), stoneMat); base.position.y = 0.06; g.add(base);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.15), stoneMat); post.position.y = 0.47; g.add(post);
+    const fire = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.3), new THREE.MeshBasicMaterial({ color: 0xffb36b })); fire.position.y = 0.93; g.add(fire);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.24, 4), stoneMat); roof.position.y = 1.16; roof.rotation.y = Math.PI / 4; g.add(roof);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('rgba(255,179,107,0.9)', 'rgba(255,179,107,0)'), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.position.y = 0.93; halo.scale.set(1.5, 1.5, 1); g.add(halo);
+    scene.add(g);
+    if (i % 3 === 0) { const l = new THREE.PointLight(0xffa860, 1.3, 9, 1.6); l.position.set(x, 0.95, z); scene.add(l); lanternLights.push(l); }
+  }
+  const barkMat = new THREE.MeshStandardMaterial({ color: 0x15141a, roughness: 1 });
+  const treeR = rng(31);
+  for (let i = 0; i < 14; i++) {
+    const a = treeR() * Math.PI * 2, r = 11 + treeR() * 6;
+    const g = new THREE.Group(); g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    const h = 3 + treeR() * 2.5;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.16, h, 6), barkMat); trunk.position.y = h / 2; g.add(trunk);
+    for (let b = 0; b < 4; b++) {
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.05, 1.2 + treeR(), 5), barkMat);
+      br.position.y = h * (0.45 + b * 0.12); br.rotation.z = (treeR() - 0.5) * 2.2; br.rotation.y = treeR() * 6;
+      br.position.x = Math.sin(br.rotation.z) * -0.4;
+      g.add(br);
+    }
+    scene.add(g);
+  }
+  const mountainMat = new THREE.MeshBasicMaterial({ color: 0x04060b, fog: false });
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(9 + (i % 3) * 3, 6 + (i % 4) * 2.2, 5), mountainMat);
+    m.position.set(Math.cos(a) * 46, 1.5, Math.sin(a) * 46);
+    scene.add(m);
+  }
+
+  // ───────────────────────── 布（ベルレ積分） ─────────────────────────
+  let TOON_CACHE = null;
+  const TOON_REF = () => TOON_CACHE;
+  function makeChain(n, segLen, width, color, opacity) {
+    const pts = Array.from({ length: n }, () => ({ p: V(0, -10, 0), o: V(0, -10, 0) }));
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 2 * 3);
+    const idx = [];
+    for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const chainMat = new THREE.MeshToonMaterial({ color, gradientMap: TOON_REF(), side: THREE.DoubleSide, transparent: opacity < 1, opacity });
+    chainMat.color.convertSRGBToLinear();
+    const mesh = new THREE.Mesh(geo, chainMat);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    let ready = false;
+    const side = V(0, 0, 0), seg = V(0, 0, 0);
+    return {
+      update(anchor, sideHint, dt, wind) {
+        if (!ready) { pts.forEach((q, i) => { q.p.copy(anchor).y -= i * segLen; q.o.copy(q.p); }); ready = true; }
+        pts[0].p.copy(anchor); pts[0].o.copy(anchor);
+        if (dt > 0) {
+          const d2 = dt * dt;
+          for (let i = 1; i < n; i++) {
+            const q = pts[i];
+            const vx = (q.p.x - q.o.x) * 0.96, vy = (q.p.y - q.o.y) * 0.96, vz = (q.p.z - q.o.z) * 0.96;
+            q.o.copy(q.p);
+            q.p.x += vx + wind.x * d2; q.p.y += vy - 7 * d2; q.p.z += vz + wind.z * d2;
+            if (q.p.y < 0.03) q.p.y = 0.03;
+          }
+          for (let k = 0; k < 3; k++) {
+            for (let i = 1; i < n; i++) {
+              const a = pts[i - 1].p, b = pts[i].p;
+              seg.copy(b).sub(a);
+              const L = seg.length() || 1e-4;
+              b.copy(a).addScaledVector(seg, segLen / L);
+            }
+          }
+        }
+        for (let i = 0; i < n; i++) {
+          const a = pts[Math.max(0, i - 1)].p, b = pts[Math.min(n - 1, i + 1)].p;
+          seg.copy(b).sub(a).normalize();
+          side.copy(sideHint).addScaledVector(seg, -sideHint.dot(seg)).normalize().multiplyScalar(width * (1 - 0.35 * i / n) / 2);
+          const q = pts[i].p;
+          pos.set([q.x - side.x, q.y - side.y, q.z - side.z, q.x + side.x, q.y + side.y, q.z + side.z], i * 6);
+        }
+        geo.attributes.position.needsUpdate = true;
+        geo.computeVertexNormals();
+      },
+      reset() { ready = false; },
+    };
+  }
+
+  // ───────────────────────── 人物 ─────────────────────────
+  // 形：先細りの胴、継ぎ目の見えない肩と肘、膝を隠す袴、広い袖、反りのある刀。
+  // 墨の輪郭線と、三段階の影で、デフォルメを「意図した形」に見せる。
+  const UP = V(0, 1, 0), DOWN = V(0, -1, 0);
+  const tA = V(0, 0, 0), tB = V(0, 0, 0), tC = V(0, 0, 0), tD = V(0, 0, 0), tE = V(0, 0, 0);
+  function placeLimb(mesh, a, b) {
+    tC.copy(b).sub(a);
+    const len = Math.max(0.001, tC.length());
+    mesh.position.copy(a).add(b).multiplyScalar(0.5);
+    mesh.scale.set(1, len, 1);
+    mesh.quaternion.setFromUnitVectors(UP, tC.normalize());
+  }
+  function ik(root, target, l1, l2, bend, outJoint) {
+    tD.copy(target).sub(root);
+    let d = tD.length();
+    d = clamp(d, 0.05, (l1 + l2) * 0.999);
+    tD.normalize();
+    const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+    tE.copy(bend).addScaledVector(tD, -bend.dot(tD)).normalize();
+    outJoint.copy(root).addScaledVector(tD, a).addScaledVector(tE, h);
+    return outJoint;
+  }
+
+  const TOON = (() => {
+    const t = new THREE.DataTexture(new Uint8Array([70, 70, 70, 150, 150, 150, 255, 255, 255]), 3, 1, THREE.RGBFormat);
+    t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+    TOON_CACHE = t;
+    return t;
+  })();
+  const INK = new THREE.MeshBasicMaterial({ color: 0x03050a, side: THREE.BackSide });
+  // 色は見た目どおりの色（sRGB）で指定し、描画用に変換する
+  const toon = (color, extra) => { const m = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: TOON }, extra || {})); m.color.convertSRGBToLinear(); return m; };
+  function inked(geo, mat, thick) {
+    const m = new THREE.Mesh(geo, mat);
+    const o = new THREE.Mesh(geo, INK);
+    o.scale.setScalar(1 + (thick || 0.08));
+    m.add(o);
+    return m;
+  }
+
+  // 反りのある刀身（平らな刃を両面で描く）
+  function katanaGeometry(len, w0, w1, sori) {
+    const n = 18, pos = [], idx = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, y = 0.01 + t * len;
+      const c = sori * t * t;
+      let w = lerp(w0, w1, t);
+      if (t > 0.9) w *= Math.max(0, 1 - (t - 0.9) / 0.1) * 0.85 + 0.15 * (1 - (t - 0.9) / 0.1);
+      pos.push(c, y, 0, c + w, y, 0);
+      if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+  const bladeCurve = (t, len, sori) => sori * t * t;
+
+  // 足跡
+  const prints = Array.from({ length: 110 }, () => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.26), new THREE.MeshBasicMaterial({ map: footTex, transparent: true, depthWrite: false, opacity: 0 }));
+    m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m);
+    return { m, born: 0 };
+  });
+  let printCursor = 0;
+  function footprint(x, z, yaw) {
+    const p = prints[printCursor]; printCursor = (printCursor + 1) % prints.length;
+    p.m.position.set(x, 0.011 + printCursor * 0.00002, z);
+    p.m.rotation.z = -yaw;
+    p.m.visible = true; p.born = performance.now();
+  }
+
+  // 二次の動き（ばね）：目標の姿勢に、行き過ぎて戻りながら追いつく
+  function so() { return { y: null, yd: 0, xp: 0 }; }
+  function soStep(s, x, T, f, z, r) {
+    if (s.y === null) { s.y = x; s.xp = x; s.yd = 0; return x; }
+    if (T <= 0) return s.y;
+    const k1 = z / (Math.PI * f), k2 = 1 / ((2 * Math.PI * f) * (2 * Math.PI * f)), k3 = r * z / (2 * Math.PI * f);
+    const xd = (x - s.xp) / T; s.xp = x;
+    const k2s = Math.max(k2, T * T / 2 + T * k1 / 2, T * k1);
+    s.y += T * s.yd;
+    s.yd += T * (x + k3 * xd - s.y - k1 * s.yd) / k2s;
+    return s.y;
+  }
+  const CHANNELS = ['hx', 'hy', 'hz', 'sx', 'sy', 'sz', 'hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll'];
+
+  function makeFigure({ scale, kimono, hakamaColor, skin, blade, sash, kind }) {
+    const root = new THREE.Group();
+    root.scale.setScalar(scale);
+    scene.add(root);
+    const matKimono = toon(kimono), matHakama = toon(hakamaColor, { side: THREE.DoubleSide }), matSkin = toon(skin);
+    const matSash = toon(sash), matDark = toon(0x16141c);
+    const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.95, roughness: 0.16, emissive: 0x1a2230, side: THREE.DoubleSide });
+
+    // 腰
+    const hips = new THREE.Group(); root.add(hips);
+    const pelvis = inked(new THREE.SphereGeometry(1, 16, 12), matHakama, 0.06); pelvis.scale.set(0.23, 0.15, 0.17); hips.add(pelvis);
+    const obi = inked(new THREE.CylinderGeometry(0.235, 0.245, 0.1, 18), matSash, 0.05); obi.position.y = 0.07; obi.scale.z = 0.78; hips.add(obi);
+    const skirt = inked(new THREE.CylinderGeometry(0.24, 0.36, 0.38, 18, 1, true), matHakama, 0.04); skirt.position.y = -0.15; skirt.scale.z = 0.82; hips.add(skirt);
+    // 胴：腰は細く、胸と肩は広い
+    const torso = new THREE.Group(); hips.add(torso);
+    const prof = [[0.0, 0.0], [0.2, 0.0], [0.205, 0.1], [0.24, 0.26], [0.285, 0.44], [0.3, 0.54], [0.24, 0.63], [0.12, 0.68], [0.0, 0.69]].map(([r, y]) => new THREE.Vector2(r, y));
+    const chest = inked(new THREE.LatheGeometry(prof, 18), matKimono, 0.045); chest.scale.z = 0.7; chest.position.y = 0.02; torso.add(chest);
+    const lapelGeo = new THREE.BoxGeometry(0.05, 0.42, 0.02);
+    [-1, 1].forEach((s) => { const l = new THREE.Mesh(lapelGeo, matSash); l.position.set(s * 0.06, 0.48, 0.2); l.rotation.z = s * 0.42; l.rotation.x = -0.12; torso.add(l); });
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.12, 10), matSkin); neck.position.y = 0.74; torso.add(neck);
+    const headG = new THREE.Group(); headG.position.y = 0.86; torso.add(headG);
+    const head = inked(new THREE.SphereGeometry(1, 20, 16), matSkin, 0.05); head.scale.set(0.12, 0.135, 0.125); headG.add(head);
+    if (kind === 'enemy') {
+      const kasa = inked(new THREE.ConeGeometry(0.5, 0.2, 28, 1, true), toon(0x9c8a5f, { side: THREE.DoubleSide }), 0.03); kasa.position.y = 0.12; headG.add(kasa);
+      const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 28), new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide })); under.rotation.x = Math.PI / 2; under.position.y = 0.025; headG.add(under);
+    } else {
+      const hair = inked(new THREE.SphereGeometry(1, 16, 12), toon(0x0d0f14), 0.05); hair.scale.set(0.125, 0.11, 0.13); hair.position.set(0, 0.04, -0.015); headG.add(hair);
+      const knot = inked(new THREE.SphereGeometry(0.05, 10, 8), toon(0x0d0f14), 0.08); knot.position.set(0, 0.11, -0.09); headG.add(knot);
+    }
+
+    // 脚：袴が膝を隠し、裾が広がる
+    const legs = [0, 1].map(() => {
+      const trouser = inked(new THREE.CylinderGeometry(0.1, 0.2, 1, 14, 1, true), matHakama, 0.03);
+      const foot = inked(new THREE.SphereGeometry(1, 10, 8), toon(0xe6e8ee), 0.12); foot.scale.set(0.05, 0.035, 0.11);
+      root.add(trouser); root.add(foot);
+      return { trouser, foot };
+    });
+    // 腕：肩と肘は球で継ぎ目を隠し、広い袖が遅れてなびく
+    const arms = [0, 1].map(() => {
+      const shoulder = inked(new THREE.SphereGeometry(0.085, 12, 10), matKimono, 0.06);
+      const upper = inked(new THREE.CylinderGeometry(0.058, 0.05, 1, 10), matKimono, 0.07);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), matSkin);
+      const fore = inked(new THREE.CylinderGeometry(0.047, 0.036, 1, 10), matSkin, 0.08);
+      const hand = inked(new THREE.SphereGeometry(0.046, 10, 8), matSkin, 0.1);
+      const sleeve = inked(new THREE.CylinderGeometry(0.07, 0.17, 1, 12, 1, true), toon(kimono, { side: THREE.DoubleSide }), 0.03);
+      [shoulder, upper, elbow, fore, hand, sleeve].forEach((m) => root.add(m));
+      return { shoulder, upper, elbow, fore, hand, sleeve, sdir: V(0, -1, 0) };
+    });
+    // 刀
+    const BL = 0.98, SORI = 0.045;
+    const sword = new THREE.Group(); root.add(sword);
+    const bladeMesh = new THREE.Mesh(katanaGeometry(BL, 0.03, 0.022, SORI), matBlade); sword.add(bladeMesh);
+    const tsuba = inked(new THREE.CylinderGeometry(0.048, 0.048, 0.012, 16), matDark, 0.08); sword.add(tsuba);
+    const tsuka = inked(new THREE.CylinderGeometry(0.019, 0.021, 0.27, 8), toon(0x1b2030), 0.12); tsuka.position.y = -0.14; sword.add(tsuka);
+
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2;
+    scene.add(shadow);
+
+    const chains = [];
+    if (kind === 'enemy') {
+      for (let i = 0; i < 5; i++) chains.push({ c: makeChain(5, 0.18, 0.15, 0x1c1f2b, 1), anchor: V(-0.24 + i * 0.12, 0.62, -0.15) });
+    } else {
+      chains.push({ c: makeChain(11, 0.14, 0.11, 0xb02e3a, 1), anchor: V(0.05, 0.7, -0.13), head: false });
+      chains.push({ c: makeChain(4, 0.07, 0.045, 0x0d0f14, 1), anchor: V(0, 0.12, -0.12), head: true });
+    }
+
+    const feet = [0, 1].map(() => ({ pos: V(0, 0, 0), from: V(0, 0, 0), to: V(0, 0, 0), t: 1, stepping: false }));
+    let feetReady = false;
+    const tip = V(0, 0, 0), mid = V(0, 0, 0), headWorld = V(0, 0, 0), hipWorld = V(0, 0, 0), chestWorld = V(0, 0, 0);
+    const right = V(0, 0, 0), fwd = V(0, 0, 0);
+    const local = V(0, 0, 0), joint = V(0, 0, 0), bendL = V(0, 0, 0), sh = V(0, 0, 0), hand = V(0, 0, 0), knee = V(0, 0, 0);
+    const springs = {}; CHANNELS.forEach((c) => { springs[c] = so(); });
+    const sm = pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    let lastX = null, lastZ = 0;
+    const vel = V(0, 0, 0);
+
+    function idealFoot(i, p, out) {
+      const sx = (i === 0 ? -1 : 1) * (0.25 + p.crouch * 0.4);
+      out.set(sx, 0, i === 0 ? 0.14 : -0.12);
+      return root.localToWorld(out);
+    }
+
+    // 目標の姿勢を、ばねを通して滑らかにする。fast は振りの最中（遅れを小さく、しなりを大きく）。
+    function animate(p, T, fast) {
+      const H = fast ? [15, 0.5, 1.7] : [6.2, 0.62, 1.3];
+      const Sw = fast ? [13, 0.42, 2.0] : [5.4, 0.5, 1.6];
+      const Bd = fast ? [9, 0.6, 1.25] : [4.2, 0.72, 1.05];
+      sm.hand.set(soStep(springs.hx, p.hand.x, T, ...H), soStep(springs.hy, p.hand.y, T, ...H), soStep(springs.hz, p.hand.z, T, ...H));
+      sm.sword.set(soStep(springs.sx, p.sword.x, T, ...Sw), soStep(springs.sy, p.sword.y, T, ...Sw), soStep(springs.sz, p.sword.z, T, ...Sw)).normalize();
+      sm.hipX = soStep(springs.hipX, p.hipX, T, ...Bd); sm.hipZ = soStep(springs.hipZ, p.hipZ, T, ...Bd);
+      sm.crouch = soStep(springs.crouch, p.crouch, T, ...Bd);
+      sm.pitch = soStep(springs.pitch, p.pitch, T, ...Bd); sm.yaw = soStep(springs.yaw, p.yaw, T, ...Bd); sm.roll = soStep(springs.roll, p.roll, T, ...Bd);
+      return sm;
+    }
+
+    function apply(target, wx, wz, yaw, dtMs, onStep, opts) {
+      const T = dtMs / 1000;
+      root.position.set(wx, 0, wz);
+      root.rotation.y = yaw;
+      root.updateMatrixWorld(true);
+      right.set(1, 0, 0).applyQuaternion(root.quaternion);
+      fwd.set(0, 0, 1).applyQuaternion(root.quaternion);
+      // 動く向きへ体を傾ける
+      if (lastX === null || T <= 0) vel.set(0, 0, 0);
+      else vel.set((wx - lastX) / T, 0, (wz - lastZ) / T);
+      lastX = wx; lastZ = wz;
+      const vf = clamp(vel.dot(fwd), -6, 6), vs = clamp(vel.dot(right), -6, 6);
+      const lean = clonePose(target);
+      lean.pitch += vf * 0.045; lean.roll -= vs * 0.05; lean.crouch += Math.min(0.08, (Math.abs(vf) + Math.abs(vs)) * 0.012);
+      const p = animate(lean, T, opts && opts.fast);
+
+      hips.position.set(p.hipX, 1.0 - p.crouch, p.hipZ);
+      hips.rotation.set(p.pitch * 0.35, p.yaw * 0.4, p.roll * 0.4);
+      torso.rotation.set(p.pitch * 0.65, p.yaw * 0.6, p.roll * 0.6);
+      const breathe = 1 + Math.sin(performance.now() * 0.0026) * 0.012;
+      chest.scale.set(1, breathe, 0.7);
+      if (opts && opts.look) { headG.lookAt(opts.look); }
+      root.updateMatrixWorld(true);
+
+      // 足の踏み出し
+      if (!feetReady) { feet.forEach((f, i) => { idealFoot(i, p, f.pos); f.pos.y = 0; f.t = 1; }); feetReady = true; }
+      const anyStepping = feet.some((f) => f.stepping);
+      feet.forEach((f, i) => {
+        idealFoot(i, p, tA);
+        const lag = tA.distanceTo(f.pos);
+        if (lag > 0.8 * scale) { f.pos.copy(tA); f.pos.y = 0; f.stepping = false; f.t = 1; return; }
+        if (!f.stepping && dtMs > 0 && lag > 0.42 * scale) { f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA); f.to.y = 0; }
+        if (f.stepping) {
+          f.t += dtMs / 130;
+          f.pos.copy(f.from).lerp(f.to, smooth(f.t));
+          f.pos.y = Math.sin(clamp(f.t, 0, 1) * Math.PI) * 0.09 * scale;
+          if (f.t >= 1) { f.stepping = false; f.pos.copy(f.to); f.pos.y = 0; footprint(f.to.x, f.to.z, yaw); if (onStep) onStep(f.to); }
+        } else if (!anyStepping && dtMs > 0 && lag > 0.18 * scale) {
+          f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA);
+          tB.copy(tA).sub(f.pos).multiplyScalar(0.25); f.to.add(tB); f.to.y = 0;
+        }
+      });
+
+      // 脚：袴の筒は腰から足首へ。膝は前へ曲がる。
+      bendL.set(0, 0, 1);
+      for (let i = 0; i < 2; i++) {
+        tA.set(i === 0 ? -0.12 : 0.12, -0.06, 0); hips.localToWorld(tA); root.worldToLocal(tA);
+        local.copy(feet[i].pos); root.worldToLocal(local); local.y += 0.05;
+        tB.copy(local).sub(tA);
+        if (tB.length() > 1.0) local.copy(tA).addScaledVector(tB.normalize(), 1.0);
+        ik(tA, local, 0.52, 0.5, bendL, knee);
+        // 筒の中心線は、膝の方へ少しふくらませる
+        tB.copy(tA).lerp(local, 0.5).lerp(knee, 0.35);
+        tC.copy(local).sub(tA);
+        legs[i].trouser.position.copy(tA).lerp(local, 0.5).lerp(knee, 0.25);
+        legs[i].trouser.scale.set(1, tC.length() * 1.02, 1);
+        legs[i].trouser.quaternion.setFromUnitVectors(UP, tC.normalize());
+        legs[i].foot.position.set(local.x, local.y - 0.03, local.z + 0.04);
+      }
+      // 腕
+      const dt = Math.max(0, T);
+      for (let i = 0; i < 2; i++) {
+        const sgn = i === 0 ? -1 : 1, A = arms[i];
+        sh.set(sgn * 0.27, 0.58, 0); torso.localToWorld(sh); root.worldToLocal(sh);
+        hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.06 : 0.07);
+        bendL.set(sgn * 0.75, -0.55, -0.35);
+        ik(sh, hand, 0.33, 0.31, bendL, joint);
+        A.shoulder.position.copy(sh);
+        placeLimb(A.upper, sh, joint);
+        A.elbow.position.copy(joint);
+        placeLimb(A.fore, joint, hand);
+        A.hand.position.copy(hand);
+        // 袖：上腕に沿いながら重さで垂れ、動きに遅れてついてくる
+        tA.copy(joint).sub(sh).normalize().multiplyScalar(0.5).addScaledVector(DOWN, 0.55).normalize();
+        A.sdir.lerp(tA, 1 - Math.exp(-dt * 11)).normalize();
+        tB.copy(sh).addScaledVector(A.sdir, 0.42);
+        placeLimb(A.sleeve, sh, tB);
+      }
+      sword.position.copy(p.hand);
+      sword.quaternion.setFromUnitVectors(UP, p.sword);
+      root.updateMatrixWorld(true);
+      tip.set(bladeCurve(1, BL, SORI), BL, 0); sword.localToWorld(tip);
+      mid.set(bladeCurve(0.45, BL, SORI), BL * 0.45, 0); sword.localToWorld(mid);
+      headWorld.set(0, 0, 0.13); headG.localToWorld(headWorld);
+      chestWorld.set(0, 0.4, 0); torso.localToWorld(chestWorld);
+      hipWorld.set(0, 0, 0); hips.localToWorld(hipWorld);
+      shadow.position.set(hipWorld.x, 0.012, hipWorld.z);
+      const s = scale * (0.95 + p.crouch * 0.6);
+      shadow.scale.set(s, s * 0.8, 1);
+      shadow.rotation.z = -yaw;
+
+      const wind = tB.set(Math.sin(performance.now() * 0.0007) * 1.2 + 0.6, 0, Math.cos(performance.now() * 0.0005) * 0.6);
+      chains.forEach((ch) => {
+        tA.copy(ch.anchor); (ch.head ? headG : torso).localToWorld(tA);
+        tC.copy(right);
+        ch.c.update(tA, tC, T, wind);
+      });
+    }
+    return {
+      root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd,
+      resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
+    };
+  }
+
+  const enemy = makeFigure({ scale: 1.25, kimono: 0x2a2433, hakamaColor: 0x3b3541, skin: 0x6e5a52, blade: 0xdfe7f2, sash: 0xd2c08f, kind: 'enemy' });
+  const player = makeFigure({ scale: 0.95, kimono: 0x2d3a4f, hakamaColor: 0x1f2633, skin: 0x9f8577, blade: 0xe8eef7, sash: 0x8fa3bf, kind: 'player' });
+
+  // 自分の構え（ローカル：前＝+z。画面の右はローカルの -x）
+  const P_GUARD = pose({ hand: V(-0.08, 1.1, 0.4), sword: V(-0.12, 0.62, 0.78).normalize(), crouch: 0.14, pitch: 0.06 });
+  function playerParryPose(dir) {
+    const sx = dir === 'R' ? -1 : dir === 'L' ? 1 : 0;
+    const sy = dir === 'U' ? 1 : dir === 'D' ? -1 : 0;
+    return pose({
+      hand: V(0.12 * sx, 1.28 + 0.12 * sy, 0.58),
+      sword: V(0.95 * sx, 0.25 + 0.7 * sy + (sx === 0 && sy === 0 ? 0.6 : 0), 0.35).normalize(),
+      crouch: 0.2, yaw: -0.75 * sx, pitch: 0.12, hipX: -0.06 * sx,
+    });
+  }
+  const P_HIT = pose({ hand: V(-0.15, 1.0, 0.2), sword: V(-0.3, 0.4, 0.6).normalize(), crouch: 0.18, pitch: -0.28, hipZ: -0.12 });
+  const P_KNEEL = pose({ hand: V(-0.2, 0.62, 0.42), sword: V(-0.2, -0.9, 0.3).normalize(), crouch: 0.44, pitch: 0.45 });
+  const P_CUT_WIND = pose({ hand: V(0.05, 1.75, 0.15), sword: V(0.1, 0.8, -0.55).normalize(), crouch: 0.1, pitch: -0.15 });
+  const P_CUT_HIT = pose({ hand: V(0.0, 1.1, 0.82), sword: V(0.05, -0.35, 1).normalize(), crouch: 0.3, pitch: 0.32, hipZ: 0.2 });
+  const P_LOW = pose({ hand: V(-0.1, 1.0, 0.4), sword: V(-0.2, 0.4, 0.85).normalize(), crouch: 0.22, pitch: 0.12 });
+
+  // ───────────────────────── 効果 ─────────────────────────
+  function makeTrail(n, r, g, b) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 2 * 3), col = new Float32Array(n * 2 * 3);
+    const idx = [];
+    for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    mesh.frustumCulled = false; scene.add(mesh);
+    const samples = [];
+    return {
+      color: { r, g, b },
+      update(active, fig, now) {
+        if (active) samples.unshift({ tip: fig.tip.clone(), mid: fig.mid.clone(), t: now });
+        while (samples.length > n || (samples.length && now - samples[samples.length - 1].t > 240)) samples.pop();
+        for (let i = 0; i < n; i++) {
+          const s = samples[Math.min(i, samples.length - 1)];
+          const f = s ? Math.max(0, 1 - (now - s.t) / 240) * (1 - i / n) : 0;
+          if (s) pos.set([s.tip.x, s.tip.y, s.tip.z, s.mid.x, s.mid.y, s.mid.z], i * 6);
+          const c = this.color;
+          col.set([c.r * f, c.g * f, c.b * f, 0, 0, 0], i * 6);
+        }
+        geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+      },
+    };
+  }
+  const enemyTrail = makeTrail(20, 0.78, 0.84, 0.98);
+  const playerTrail = makeTrail(16, 0.95, 0.62, 0.55);
+
+  const SPARK_N = 220;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(SPARK_N * 3), sparkCol = new Float32Array(SPARK_N * 3);
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
+  const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 0.075, map: softTex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparks.frustumCulled = false; scene.add(sparks);
+  const sparkState = Array.from({ length: SPARK_N }, () => ({ life: 0, max: 1, p: V(0, -10, 0), v: V(0, 0, 0), c: new THREE.Color() }));
+  let sparkCursor = 0;
+  function burst(at, count, power, tint) {
+    for (let i = 0; i < count; i++) {
+      const s = sparkState[sparkCursor]; sparkCursor = (sparkCursor + 1) % SPARK_N;
+      s.p.copy(at);
+      const a = Math.random() * Math.PI * 2, b = (Math.random() - 0.3) * Math.PI;
+      const sp = power * (0.6 + Math.random() * 0.9);
+      s.v.set(Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 0.8, Math.sin(a) * Math.cos(b) * sp);
+      s.max = s.life = 0.25 + Math.random() * 0.5;
+      if (tint === 'warm') s.c.setRGB(1, 0.78, 0.5); else if (tint === 'red') s.c.setRGB(1, 0.35, 0.3); else s.c.setRGB(1, 0.94, 0.85);
+    }
+  }
+  // 打ち合いの光
+  const clashLight = new THREE.PointLight(0xfff1dc, 0, 7, 2);
+  scene.add(clashLight);
+  let clashLightUntil = 0, clashLightPeak = 0;
+  function lightAt(at, peak, color) {
+    clashLight.position.copy(at); clashLight.color.set(color || 0xfff1dc);
+    clashLightPeak = peak; clashLightUntil = performance.now() + 220;
+  }
+  // 地面の衝撃の輪
+  const rings = Array.from({ length: 6 }, () => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, color: 0xdfe7f2 }));
+    m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m);
+    return { m, t0: 0, size: 1 };
+  });
+  let ringCursor = 0;
+  function ring(x, z, size, color) {
+    const r = rings[ringCursor]; ringCursor = (ringCursor + 1) % rings.length;
+    r.m.position.set(x, 0.02, z); r.m.material.color.set(color || 0xdfe7f2);
+    r.t0 = performance.now(); r.size = size; r.m.visible = true;
+  }
+  // 白い息と、舞う雪
+  const puffs = Array.from({ length: 60 }, () => {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, transparent: true, depthWrite: false, opacity: 0, color: 0xebf0f8 }));
+    m.visible = false; scene.add(m);
+    return { m, life: 0, max: 1, v: V(0, 0, 0), size: 0.2, peak: 0.3, grav: 0 };
+  });
+  let puffCursor = 0;
+  function puff(at, vel, life, size, peak, grav) {
+    const b = puffs[puffCursor]; puffCursor = (puffCursor + 1) % puffs.length;
+    b.m.position.copy(at); b.v.copy(vel); b.max = b.life = life; b.size = size; b.peak = peak; b.grav = grav || 0; b.m.visible = true;
+  }
+  function exhale(at, forward, strength) {
+    for (let i = 0; i < 2; i++) {
+      tA.copy(at).addScaledVector(forward, 0.05 + i * 0.04);
+      tB.copy(forward).multiplyScalar(0.18 + strength * 0.25).add(V((Math.random() - 0.5) * 0.06, 0.12 + strength * 0.08, 0));
+      puff(tA, tB, 1.1 + strength * 0.9, 0.12 + strength * 0.22, 0.16 + strength * 0.42, 0);
+    }
+  }
+  function kickSnow(at, strength) {
+    for (let i = 0; i < 3 + strength * 6; i++) {
+      tA.copy(at); tA.y = 0.05;
+      tB.set((Math.random() - 0.5) * 1.6 * strength, 0.4 + Math.random() * 0.9 * strength, (Math.random() - 0.5) * 1.6 * strength);
+      puff(tA, tB, 0.5 + Math.random() * 0.4, 0.08 + strength * 0.08, 0.35, 2.2);
+    }
+  }
+  // 危険な技の赤い光
+  const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, color: 0xff3b30, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  glint.scale.set(0.9, 0.9, 1); scene.add(glint);
+
+  // 雪
+  const SNOW_N = 750;
+  const snowGeo = new THREE.BufferGeometry();
+  const snowPos = new Float32Array(SNOW_N * 3);
+  const snowR = rng(11);
+  for (let i = 0; i < SNOW_N; i++) { snowPos[i * 3] = (snowR() - 0.5) * 20; snowPos[i * 3 + 1] = snowR() * 8; snowPos[i * 3 + 2] = (snowR() - 0.5) * 20; }
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ size: 0.035, map: softTex, color: 0xdfe6f2, transparent: true, opacity: 0.75, depthWrite: false }));
+  snow.frustumCulled = false; scene.add(snow);
+
+  // ───────────────────────── 音 ─────────────────────────
+  const Sound = (() => {
+    let ctx = null, master = null, wind = null, noiseBuf = null;
+    function init() {
+      if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+      master = ctx.createGain(); master.gain.value = 0.9;
+      master.connect(comp); comp.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380;
+      wind = ctx.createGain(); wind.gain.value = 0.05;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.025;
+      lfo.connect(lfoGain); lfoGain.connect(wind.gain);
+      src.connect(lp); lp.connect(wind); wind.connect(master);
+      src.start(); lfo.start();
+    }
+    const now = () => ctx.currentTime;
+    function noise(dur, type, freq, q, gain, sweepTo) {
+      if (!ctx) return;
+      const t = now();
+      const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+      const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+      if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f); f.connect(g); g.connect(master);
+      s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+    }
+    function bell(base, decay, gain, ratios) {
+      if (!ctx) return;
+      const t = now();
+      (ratios || [1, 2.76, 5.4, 8.93]).forEach((r, i) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = base * r;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain / (1 + i * 1.3), t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + decay / (1 + i * 0.5));
+        o.connect(g); g.connect(master); o.start(t); o.stop(t + decay + 0.1);
+      });
+    }
+    function tone(f0, f1, dur, gain, type) {
+      if (!ctx) return;
+      const t = now();
+      const o = ctx.createOscillator(); o.type = type || 'sine';
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+    }
+    return {
+      init,
+      parry(tier, chain) {
+        const k = Math.pow(2, PENTA[Math.min(chain, PENTA.length - 1)] / 12);
+        if (tier === 'go') { bell(1240 * k * 0.8, 0.35, 0.22); noise(0.04, 'bandpass', 5200, 1.2, 0.18); }
+        else if (tier === 'tai') { bell(980 * k * 0.8, 0.9, 0.3); bell(1960 * k * 0.8, 0.5, 0.08, [1, 2.4]); noise(0.06, 'bandpass', 4200, 1, 0.24); }
+        else { bell(1480 * k * 0.8, 1.8, 0.32); bell(740 * k * 0.8, 1.2, 0.12, [1, 3.01]); noise(0.05, 'highpass', 6000, 0.7, 0.16); }
+      },
+      clash() { bell(420, 0.35, 0.2, [1, 1.93, 3.7]); noise(0.12, 'bandpass', 1800, 0.8, 0.26); },
+      cut() { noise(0.18, 'bandpass', 2600, 0.9, 0.22, 900); tone(220, 90, 0.18, 0.12, 'triangle'); },
+      hit() { tone(150, 42, 0.32, 0.55); noise(0.18, 'lowpass', 900, 0.7, 0.35); },
+      whiff() { noise(0.16, 'bandpass', 700, 2, 0.12, 2400); },
+      dodge() { noise(0.2, 'bandpass', 500, 1.2, 0.1, 1800); },
+      crunch(strength) { noise(0.12 + strength * 0.05, 'bandpass', 1700, 1.4, 0.04 + strength * 0.06); },
+      step(strength) { noise(0.07, 'bandpass', 2200, 1.6, 0.012 + strength * 0.02); },
+      swing(w) { noise(0.12 + w * 0.06, 'bandpass', 500 + 400 / w, 1.5, 0.05 + 0.04 * w, 1400); },
+      peril() { tone(70, 55, 0.9, 0.35, 'sawtooth'); bell(311, 0.8, 0.08, [1, 1.06]); },
+      breath(strength) { noise(0.45, 'bandpass', 900, 0.8, 0.012 + strength * 0.03); },
+      phase() { tone(55, 41, 2.2, 0.4, 'sawtooth'); bell(130, 2.5, 0.2, [1, 2.0, 3.0]); },
+      issen() {
+        if (!ctx) return;
+        const t = now();
+        if (wind) { wind.gain.cancelScheduledValues(t); wind.gain.setValueAtTime(0.0001, t); wind.gain.linearRampToValueAtTime(0.05, t + 3.5); }
+        setTimeout(() => { bell(196, 3.6, 0.36, [1, 2.0, 3.0, 4.17]); bell(2350, 2.2, 0.06, [1, 1.5]); }, 260);
+      },
+    };
+  })();
+
+  // ───────────────────────── 状態 ─────────────────────────
+  const S = {
+    started: false, gt: 0, speed: 1,
+    freezeUntil: 0, slowUntil: 0, slowScale: 0.3,
+    frameReal: 0, frameGt: 0, frameScale: 1,
+    phase: 1, mode: 'stalk', modeStart: 0, modeUntil: 0,
+    B: 0, P: 0, lastPressure: 0, lastHit: -9999,
+    offset: CFG.offsetInit,
+    action: null, queue: [],
+    lockUntil: 0, moveLockUntil: 0, iframeUntil: 0,
+    pend: null,
+    enemyPose: clonePose(NEUTRAL), actionFrom: clonePose(NEUTRAL),
+    playerPose: clonePose(P_GUARD), playerAnim: null,
+    stagger: { x: 0, vx: 0, p: 0, vp: 0 },
+    e: { x: 0, z: -1.4, tw: null, vx: 0, vz: 0, yaw: 0 },
+    p: { x: 0, z: 1.8, tw: null, yaw: Math.PI },
+    stalkDir: 1,
+    chain: 0, bestChain: 0,
+    strikeAt: 0,
+    guardUntil: 0,
+    breathE: 0, breathP: 0,
+    shake: 0, fovKick: 0, cine: null,
+    habit: { early: 0, attack: 0, back: 0 },
+    lastBack: -9999,
+    log: [], r: rng(1234), auto: false,
+    stats: { go: 0, tai: 0, sen: 0, cut: 0, hits: 0, whiffs: 0, dodges: 0, start: 0 },
+  };
+
+  const dist = () => Math.hypot(S.e.x - S.p.x, S.e.z - S.p.z);
+  function dirPE() { const dx = S.e.x - S.p.x, dz = S.e.z - S.p.z, d = Math.hypot(dx, dz) || 1; return { x: dx / d, z: dz / d, d }; }
+
+  function tween(actor, tx, tz, dur, easing) {
+    actor.tw = { fx: actor.x, fz: actor.z, tx, tz, t0: S.gt, dur, easing: easing || easeOut };
+  }
+
+  function timing(move) {
+    const k = S.phase === 2 ? 0.9 : 1;
+    const w = move.w;
+    if (move.fast) return { O: 70, W: 120, S: 105, F: 220, R: 420 };
+    if (move.dash) return { O: 230 * k, W: 380 * k, S: 300, F: 260, R: 520 };
+    return { O: (150 + 150 * w) * k, W: (220 + 330 * w) * k, S: 110 + 70 * w, F: 200 + 140 * w, R: 380 + 300 * w };
+  }
+
+  const PATTERNS = {
+    1: [['over'], ['cutR'], ['cutL'], ['cutL', 'cutR'], ['over', 'cutR'], ['rise'], ['cutR', 'cutL'], ['thrust']],
+    2: [['quickR', 'quickL', 'quickR'], ['thrust'], ['over*'], ['~', 'quickR'], ['~', 'over'], ['cutL', 'thrust'],
+        ['rise', 'over*'], ['quickL', 'quickR', 'cutL'], ['~', 'thrust'], ['cutR', 'cutL', 'over'], ['sweep'], ['cutR', 'pierce'], ['quickL', 'sweep']],
+  };
+
+  function pickPattern() {
+    const list = PATTERNS[S.phase];
+    // 相手はこちらの癖を学ぶ：早押しが多いと、虚と溜めを増やす
+    const weights = list.map((p) => {
+      const tricky = p.some((t) => t === '~' || t.endsWith('*'));
+      const peril = p.some((t) => t === 'sweep' || t === 'pierce');
+      return 1 + (tricky ? S.habit.early * 0.6 : 0) + (peril ? S.habit.back * 0.3 : 0);
+    });
+    let sum = weights.reduce((a, b) => a + b, 0), r = S.r() * sum;
+    for (let i = 0; i < list.length; i++) { r -= weights[i]; if (r <= 0) return list[i].slice(); }
+    return list[0].slice();
+  }
+
+  function setMode(m, dur) {
+    S.mode = m; S.modeStart = S.gt; S.modeUntil = S.gt + (dur || 0);
+    S.actionFrom = clonePose(S.enemyPose);
+    if (m === 'stalk') S.stalkDir = S.r() < 0.5 ? -1 : 1;
+  }
+
+  function think() {
+    const d = dist();
+    if (S.queue.length) { startAction(S.queue.shift()); return; }
+    Object.keys(S.habit).forEach((k) => { S.habit[k] *= 0.93; });
+    const r = S.r();
+    // 退いてばかりいると、突進で追ってくる
+    if (d > 3.6 && S.gt - S.lastBack < 1500 && r < 0.7) { startAction('dash'); return; }
+    if (d > 4.6) { if (r < 0.55) startAction('dash'); else setMode('approach', 4000); return; }
+    if (d > 2.7) { if (r < 0.6) setMode('approach', 4000); else setMode('stalk', 700 + S.r() * 900); return; }
+    if (r < 0.18) { setMode('stalk', 600 + S.r() * 700); return; }
+    S.queue = pickPattern();
+    startAction(S.queue.shift());
+  }
+
+  function startAction(token) {
+    const feint = token === '~';
+    const delayed = token.endsWith('*');
+    const key = token.replace('*', '');
+    const move = feint ? { key: ['R', 'L', 'D'][Math.floor(S.r() * 3)], mom: 'R', w: 1.2, reach: 2.6, lunge: 0, name: '虚' } : MOVES[key];
+    if (!move) { setMode('stalk', 600); return; }
+    const tm = timing(move);
+    const D = delayed ? 380 + S.r() * 380 : 0;
+    const a = { move, feint, t0: S.gt, ...tm, D, resolved: false, parried: false, swung: false, lunged: false, peril: move.peril || null };
+    a.T = a.t0 + a.O + a.W + a.D + a.S;
+    if (feint) a.end = a.t0 + a.O + 320;
+    S.action = a;
+    S.mode = 'attack'; S.modeStart = S.gt;
+    S.actionFrom = clonePose(S.enemyPose);
+    if (!feint) { Sound.crunch(move.w / 1.6); kickSnow(enemy.hipWorld, move.dash ? 1 : 0.35); }
+    if (a.peril) Sound.peril();
+  }
+
+  // ───────────────────────── 判定 ─────────────────────────
+  function toGameTime(realT) { return S.frameGt + (realT - S.frameReal) * S.frameScale * S.speed; }
+  function quality(mom, dir) {
+    if (!dir) return 'tap';
+    if (mom === 'T') return (dir === 'L' || dir === 'R') ? 'flow' : 'against';
+    if (dir === mom) return 'flow';
+    const opp = { R: 'L', L: 'R', U: 'D', D: 'U' };
+    return opp[mom] === dir ? 'against' : 'perp';
+  }
+
+  // 指が触れた瞬間に、何をしたことになるかを決める（向きは後で決まる）
+  function classify(tGame) {
+    if (!S.started) return null;
+    if (S.mode === 'broken') { issen(); return null; }
+    if (['victory', 'defeat', 'falling'].includes(S.mode)) return null;
+    if (tGame < S.lockUntil || S.pend) return null;
+    const a = S.action;
+    if (a && (a.pendingDeflect || (a.resolved && a.parried))) return null;
+    if (a && !a.resolved) {
+      const since = tGame - a.t0;
+      if (a.feint) {
+        if (since >= 0 && since <= a.O) return { kind: 'whiff', reason: '虚' };
+        return { kind: 'move', tGame };
+      }
+      if (a.peril) return { kind: 'move', tGame };
+      if (since >= 0 && since <= a.O) return { kind: 'kaeshi', tier: 'sen', a, err: since };
+      const e = tGame - a.T - S.offset;
+      if (e >= CFG.winTai[0] && e <= CFG.winTai[1]) return { kind: 'kaeshi', tier: 'tai', a, err: tGame - a.T };
+      if (e >= CFG.winGo[0] && e < CFG.winGo[1]) return { kind: 'kaeshi', tier: 'go', a, err: tGame - a.T };
+      if (e > CFG.winTai[1]) return { kind: 'whiff', reason: '遅' };
+      return { kind: 'move', tGame, early: true };
+    }
+    return { kind: 'move', tGame };
+  }
+
+  function onTouchDown(tGame) {
+    const h = classify(tGame);
+    if (!h) return null;
+    if (h.kind === 'whiff') { whiff(h.reason); return null; }
+    if (h.kind === 'kaeshi') {
+      if (h.tier === 'sen') senNoSen(h);
+      else beginDeflect(h);
+    }
+    S.pend = h;
+    return h;
+  }
+
+  function onDir(dir) {
+    const h = S.pend;
+    if (!h) return;
+    S.pend = null;
+    h.dir = dir;
+    if (h.kind === 'kaeshi') { if (h.landed || h.tier === 'sen') applyBreak(h); }
+    else if (h.kind === 'move') doMove(dir, h);
+  }
+
+  function whiff(reason) {
+    S.lockUntil = S.gt + CFG.whiffLock;
+    S.P = clamp(S.P + 6, 0, 100); S.lastHit = S.gt;
+    S.stats.whiffs++;
+    if (reason === '虚' || reason === '早') S.habit.early += 1;
+    breakChain();
+    Sound.whiff();
+    S.playerAnim = { kind: 'whiff', t0: S.gt };
+    pushLog(reason === '虚' ? '虚' : '空', '—', reason === '虚' ? '虚に釣られた' : reason === '遅' ? '遅い' : '空振り');
+    glyphAtScreen(reason === '虚' ? '虚' : '空', 'miss', 0.5, 0.62);
+  }
+
+  function breakChain() {
+    if (S.chain >= 3) pushLog('連', '', `${S.chain}連が途切れた`);
+    S.chain = 0;
+  }
+  function addChain() {
+    S.chain++;
+    S.bestChain = Math.max(S.bestChain, S.chain);
+    if (S.chain >= 3) glyphAtScreen(`${S.chain} 連`, 'chain', 0.5, 0.3);
+  }
+
+  function senNoSen(h) {
+    const a = h.a;
+    a.resolved = true; a.parried = true;
+    S.stats.sen++; addChain();
+    S.slowUntil = performance.now() + 340;
+    Sound.parry('sen', S.chain);
+    flash(0.32);
+    tA.copy(enemy.mid).lerp(player.chestWorld, 0.45);
+    burst(tA, 40, 2.8, 'warm');
+    lightAt(tA, 5, 0xffd2a0);
+    ring((S.e.x + S.p.x) / 2, (S.e.z + S.p.z) / 2, 3.2, 0xffd2a0);
+    glyphAt('先', 'sen', tA);
+    S.fovKick = 7;
+    S.playerAnim = { kind: 'parry', t0: S.gt, dir: null };
+    beginStagger('sen');
+    if (S.habit.early > 0) S.habit.early *= 0.8;
+  }
+
+  function beginDeflect(h) {
+    const a = h.a;
+    if (S.gt >= a.T) resolveDeflect(h); else a.pendingDeflect = h;
+    S.playerAnim = { kind: 'parry', t0: S.gt, dir: null };
+    S.offset = clamp(S.offset + 0.08 * (h.err - S.offset), CFG.offsetRange[0], CFG.offsetRange[1]);
+  }
+
+  function resolveDeflect(h) {
+    const a = h.a;
+    a.resolved = true; a.parried = true; a.pendingDeflect = null;
+    S.stats[h.tier]++; addChain();
+    Sound.parry(h.tier, S.chain);
+    tA.copy(enemy.tip).lerp(enemy.mid, 0.35);
+    if (h.tier === 'tai') {
+      S.freezeUntil = performance.now() + 85; flash(0.16);
+      burst(tA, 30, 2.3, 'cool'); lightAt(tA, 4, 0xe6eeff); S.fovKick = 4;
+      ring((S.e.x + S.p.x) / 2, (S.e.z + S.p.z) / 2, 2.4);
+    } else {
+      S.freezeUntil = performance.now() + 45;
+      burst(tA, 14, 1.4, 'cool'); lightAt(tA, 2.2, 0xe6eeff);
+    }
+    glyphAt(h.tier === 'tai' ? '対' : '後', h.tier, tA);
+    h.landed = true;
+    if (h.dir !== undefined) applyBreak(h);
+  }
+
+  function applyBreak(h) {
+    if (h.applied || (!h.landed && h.tier !== 'sen')) return;
+    h.applied = true;
+    const a = h.a;
+    const q = quality(a.move.mom, h.dir);
+    const amount = CFG.breakBase[h.tier] * a.move.w * CFG.dirMult[q];
+    S.B = clamp(S.B + amount, 0, 100);
+    S.lastPressure = S.gt;
+    if (q === 'against') { S.P = clamp(S.P + 5 * a.move.w, 0, 100); Sound.clash(); S.shake = Math.max(S.shake, 0.06); }
+    // 相手の体は、返された向きへ流れる。押し返されて間合いも開く。
+    const sx = h.dir === 'R' ? 1 : h.dir === 'L' ? -1 : 0;
+    const push = (h.tier === 'sen' ? 1.4 : h.tier === 'tai' ? 1.1 : 0.6) * (q === 'flow' ? 1.3 : 0.6) * a.move.w;
+    S.stagger.vx += sx * push * 1.6;
+    S.stagger.vp += (h.dir === 'D' ? 1 : h.dir === 'U' ? -0.6 : -0.5) * push * 1.2;
+    const f = dirPE();
+    if (h.tier !== 'go') tween(S.e, S.e.x + f.x * 0.35 * push, S.e.z + f.z * 0.35 * push, 260);
+    if (S.playerAnim && S.playerAnim.kind === 'parry') S.playerAnim.dir = h.dir || 'N';
+    const label = { flow: '流し', perp: '横', against: '受け', tap: '方向なし' }[q];
+    const tierName = { go: '後の先', tai: '対の先', sen: '先の先' }[h.tier];
+    const errText = h.tier === 'sen' ? `起こり+${Math.round(h.err)}` : `${h.err >= 0 ? '+' : ''}${Math.round(h.err)}ms`;
+    pushLog(tierName, errText, `${label}　崩し ${Math.round(amount)}`);
+    if (h.tier === 'sen' || (h.tier === 'tai' && q === 'flow')) { S.queue = []; beginStagger(h.tier); }
+    if (S.B >= 100) breakEnemy();
+  }
+
+  function beginStagger(tier) {
+    S.action = null;
+    setMode('staggered', tier === 'sen' ? 950 : tier === 'tai' ? 720 : 450);
+  }
+
+  // 体の動き：上は踏み込み斬り、下は退く、左右は回り込む
+  function doMove(dir, h) {
+    if (!dir) return;
+    if (S.gt < S.moveLockUntil) return;
+    const f = dirPE();
+    if (dir === 'U') {
+      S.habit.attack += 1;
+      const step = f.d > CFG.reachPlayer ? Math.min(1.1, f.d - 1.5) : Math.min(0.5, Math.max(0, f.d - CFG.minGap));
+      tween(S.p, S.p.x + f.x * step, S.p.z + f.z * step, 170);
+      S.playerAnim = { kind: 'cut', t0: S.gt };
+      S.strikeAt = S.gt + 120;
+      S.moveLockUntil = S.gt + 380;
+      Sound.swing(0.8);
+      if (h && h.early && S.action && !S.action.resolved) S.intoWindup = true;
+    } else if (dir === 'D') {
+      S.habit.back += 1; S.lastBack = S.gt;
+      tween(S.p, S.p.x - f.x * 1.15, S.p.z - f.z * 1.15, 230);
+      S.iframeUntil = S.gt + 260; S.moveLockUntil = S.gt + 330;
+      S.playerAnim = { kind: 'back', t0: S.gt };
+      Sound.dodge(); kickSnow(player.hipWorld, 0.5);
+    } else {
+      const sgn = dir === 'R' ? 1 : -1;
+      // 相手を中心に、今の距離のまま円を描くように回り込む
+      const ang = Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z) - sgn * 0.5;
+      const r = Math.max(f.d, 1.6);
+      tween(S.p, S.e.x + Math.sin(ang) * r, S.e.z + Math.cos(ang) * r, 220);
+      S.iframeUntil = S.gt + 220; S.moveLockUntil = S.gt + 320;
+      S.playerAnim = { kind: 'side', t0: S.gt, sgn };
+      Sound.dodge(); kickSnow(player.hipWorld, 0.45);
+    }
+  }
+
+  function resolvePlayerStrike() {
+    S.strikeAt = 0;
+    const d = dist();
+    const into = S.intoWindup; S.intoWindup = false;
+    if (d > CFG.reachPlayer + 0.1) return;
+    tA.copy(enemy.chestWorld).lerp(player.chestWorld, 0.35);
+    const m = S.mode;
+    if (m === 'broken') { issen(); return; }
+    if (m === 'open' || m === 'staggered' || m === 'retreat') {
+      const amount = m === 'staggered' ? CFG.cutStagger : CFG.cutOpen;
+      S.B = clamp(S.B + amount, 0, 100); S.lastPressure = S.gt;
+      S.stats.cut++; addChain();
+      Sound.cut(); burst(tA, 18, 1.8, 'red'); lightAt(tA, 2.5, 0xffb08a);
+      S.freezeUntil = performance.now() + 60;
+      glyphAt('斬', 'cut', tA);
+      S.stagger.vp += -0.9;
+      const f = dirPE();
+      tween(S.e, S.e.x + f.x * 0.3, S.e.z + f.z * 0.3, 200);
+      pushLog('斬り', '', `${m === 'open' ? '隙' : m === 'staggered' ? '崩れ' : '退き際'}を斬った　崩し ${amount}`);
+      if (S.B >= 100) { breakEnemy(); return; }
+      if (m === 'open') setMode(S.r() < 0.5 ? 'retreatStart' : 'staggered', 320);
+      return;
+    }
+    if (m === 'bait') {
+      pushLog('誘い', '', '誘いに乗った');
+      Sound.clash(); S.guardUntil = S.gt + 160;
+      S.queue = [];
+      startAction(S.r() < 0.5 ? 'counterR' : 'counterL');
+      return;
+    }
+    if (m === 'attack' && S.action && !S.action.resolved) {
+      // 振りかぶった相手に斬りかかっても、相手の勢いは止まらない
+      Sound.clash(); burst(tA, 8, 1.0, 'cool');
+      S.P = clamp(S.P + 6, 0, 100); S.lastHit = S.gt;
+      pushLog('弾かれ', '', '相手の勢いに弾かれた');
+      return;
+    }
+    // 構えている相手に斬りかかると、受けられ、反撃される
+    Sound.clash(); burst(tA, 12, 1.4, 'cool'); lightAt(tA, 1.8);
+    S.guardUntil = S.gt + 240;
+    S.P = clamp(S.P + 5, 0, 100); S.lastHit = S.gt;
+    breakChain();
+    glyphAt('受', 'miss', tA);
+    pushLog('受けられ', '', '構えている相手に斬りかかった');
+    S.queue = [];
+    if (S.r() < 0.7 || S.habit.attack > 2) setTimeout(() => { if (S.mode !== 'broken' && S.mode !== 'falling' && S.mode !== 'victory' && S.mode !== 'defeat') startAction(S.r() < 0.5 ? 'counterR' : 'counterL'); }, 0);
+  }
+
+  function breakEnemy() {
+    S.queue = []; S.action = null;
+    setMode('broken', CFG.brokenTime);
+    pushLog('崩れ', '', '膝をついた。一閃の機会');
+  }
+
+  function issen() {
+    setMode('falling', S.phase === 1 ? 3200 : 2600);
+    S.freezeUntil = performance.now() + 420;
+    S.slowUntil = performance.now() + 1500;
+    S.playerAnim = { kind: 'issen', t0: S.gt };
+    Sound.issen();
+    flash(0.6);
+    const sl = document.getElementById('slash');
+    sl.classList.remove('on'); void sl.offsetWidth; sl.classList.add('on');
+    tA.copy(enemy.chestWorld);
+    burst(tA, 60, 2.2, 'warm'); lightAt(tA, 6, 0xfff1dc);
+    ring(S.e.x, S.e.z, 4.5);
+    // 横からの画
+    const f = dirPE();
+    const mx = (S.e.x + S.p.x) / 2, mz = (S.e.z + S.p.z) / 2;
+    // 縦長の画面は横が狭いので、遠くから二人を収める
+    const far = camera.aspect < 1 ? 7.2 : 4.0;
+    const cx = S.e.x + f.x * 0.8, cz = S.e.z + f.z * 0.8;
+    S.cine = { until: S.gt + 1700, pos: V(cx - f.z * far, 1.25, cz + f.x * far), look: V(cx, 1.0, cz) };
+    // 一閃で、自分は相手の向こう側へ抜ける
+    tween(S.p, S.e.x + f.x * 1.6, S.e.z + f.z * 1.6, 180);
+    pushLog('一閃', '', S.phase === 1 ? '前半を制した' : '勝負あり');
+  }
+
+  function hitPlayer(a) {
+    a.resolved = true;
+    S.P = clamp(S.P + CFG.hitDamage(a.move.w) * (a.peril ? 1.3 : 1), 0, 100);
+    S.lastHit = S.gt; S.stats.hits++;
+    breakChain();
+    Sound.hit();
+    S.shake = 0.18;
+    S.playerAnim = { kind: 'hit', t0: S.gt };
+    flash(0.1, '#ff6a4a');
+    tA.copy(player.chestWorld); burst(tA, 16, 1.6, 'red');
+    const f = dirPE();
+    tween(S.p, S.p.x - f.x * 0.55, S.p.z - f.z * 0.55, 200);
+    pushLog('被弾', '', a.move.name);
+    if (S.P >= 100) defeat();
+  }
+
+  function missPlayer(a, dodged) {
+    a.resolved = true; a.missed = true;
+    if (dodged) {
+      S.stats.dodges++;
+      glyphAt('避', 'go', player.chestWorld);
+      pushLog('避け', '', `${a.move.name}を避けた`);
+    } else {
+      pushLog('届かず', '', `${a.move.name}は届かなかった`);
+    }
+  }
+
+  function defeat() {
+    S.queue = []; S.action = null;
+    S.mode = 'defeat'; S.modeStart = S.gt;
+    S.playerAnim = { kind: 'down', t0: S.gt };
+    setTimeout(() => showEnd(false), 1300);
+  }
+
+  // ───────────────────────── 画面上の表現 ─────────────────────────
+  const glyphs = document.getElementById('glyphs');
+  const projV = V(0, 0, 0);
+  function glyphAt(text, cls, world) {
+    projV.copy(world).project(camera);
+    glyphAtScreen(text, cls, (projV.x + 1) / 2, (1 - projV.y) / 2);
+  }
+  function glyphAtScreen(text, cls, nx, ny) {
+    const el = document.createElement('div');
+    el.className = `glyph ${cls}`;
+    el.textContent = text;
+    el.style.left = `${clamp(nx, 0.08, 0.92) * 100}%`;
+    el.style.top = `${clamp(ny, 0.08, 0.92) * 100}%`;
+    glyphs.appendChild(el);
+    setTimeout(() => el.remove(), cls === 'phase' ? 2000 : 950);
+  }
+  const flashEl = document.getElementById('flash');
+  function flash(strength, color) {
+    flashEl.style.transition = 'none';
+    flashEl.style.background = color || '#fff';
+    flashEl.style.opacity = String(strength);
+    void flashEl.offsetWidth;
+    flashEl.style.transition = 'opacity 260ms ease-out';
+    flashEl.style.opacity = '0';
+  }
+
+  const logEl = document.getElementById('log');
+  const logBtn = document.getElementById('logBtn');
+  function pushLog(t, e, d) {
+    S.log.unshift({ t, e, d });
+    S.log.length = Math.min(S.log.length, 8);
+    renderLog();
+  }
+  function renderLog() {
+    if (logEl.hidden) return;
+    const h = S.habit;
+    const learn = h.early > 1.5 ? '　早押しを読まれている' : h.attack > 2 ? '　斬りかかりを読まれている' : h.back > 2 ? '　退きを読まれている' : '';
+    const meta = `${S.phase === 1 ? '前半' : '後半'}　相手 ${Math.round(S.B)}　自分 ${Math.round(S.P)}　間合い ${dist().toFixed(1)}m　補正 ${Math.round(S.offset)}ms${learn}`;
+    logEl.innerHTML = `<div class="meta">${meta}</div>` + S.log.map((r) => `<div class="row"><span class="t">${r.t}</span><span>${r.e}</span><span>${r.d}</span></div>`).join('');
+  }
+  logBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    logEl.hidden = !logEl.hidden;
+    logBtn.setAttribute('aria-pressed', String(!logEl.hidden));
+    renderLog();
+  });
+
+  // ───────────────────────── 入力 ─────────────────────────
+  const FLICK_PX = 14;
+  let touch = null;
+  function eventTime(ev) {
+    const n = performance.now(), t = ev.timeStamp;
+    return (t > 0 && Math.abs(n - t) < 1000) ? t : n;
+  }
+  stage.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    Sound.init();
+    const h = onTouchDown(toGameTime(eventTime(ev)));
+    touch = { x: ev.clientX, y: ev.clientY, resolved: false, h };
+    if (h) setTimeout(() => { if (touch && touch.h === h && !touch.resolved) { touch.resolved = true; onDir(null); } }, 170);
+  });
+  stage.addEventListener('pointermove', (ev) => {
+    if (!touch || touch.resolved) return;
+    const dx = ev.clientX - touch.x, dy = ev.clientY - touch.y;
+    if (dx * dx + dy * dy < FLICK_PX * FLICK_PX) return;
+    touch.resolved = true;
+    if (touch.h) onDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+  });
+  const release = () => { if (touch && !touch.resolved) { touch.resolved = true; if (touch.h) onDir(null); } touch = null; };
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+  window.addEventListener('keydown', (ev) => {
+    if (ev.repeat || !S.started) return;
+    const map = { ArrowRight: 'R', ArrowLeft: 'L', ArrowUp: 'U', ArrowDown: 'D', ' ': null };
+    if (!(ev.key in map)) return;
+    ev.preventDefault();
+    Sound.init();
+    if (onTouchDown(toGameTime(eventTime(ev)))) onDir(map[ev.key]);
+  });
+
+  // ───────────────────────── 相手の進行 ─────────────────────────
+  function updateAI(dt) {
+    const gt = S.gt;
+    const m = S.mode;
+    const f = dirPE();
+    if (m === 'stalk') {
+      // 間合いを測りながら回り込む
+      const pref = S.phase === 1 ? 3.3 : 2.9;
+      const radial = clamp((f.d - pref) * 1.2, -0.8, 0.8);
+      S.e.vx = (-f.z * S.stalkDir * 0.95 - f.x * radial);
+      S.e.vz = (f.x * S.stalkDir * 0.95 - f.z * radial);
+      if (gt >= S.modeUntil) { S.e.vx = S.e.vz = 0; think(); }
+    } else if (m === 'approach') {
+      const sp = S.phase === 1 ? 1.5 : 1.9;
+      S.e.vx = -f.x * sp; S.e.vz = -f.z * sp;
+      if (f.d <= 2.45 || gt >= S.modeUntil) { S.e.vx = S.e.vz = 0; think(); }
+    } else { S.e.vx = 0; S.e.vz = 0; }
+
+    if (m === 'open' || m === 'bait') { if (gt >= S.modeUntil) afterOpening(); }
+    if (m === 'retreatStart') {
+      tween(S.e, S.e.x + f.x * 1.5, S.e.z + f.z * 1.5, 380);
+      kickSnow(enemy.hipWorld, 0.5);
+      setMode('retreat', 420);
+    }
+    if (m === 'retreat' && gt >= S.modeUntil) setMode('stalk', 500 + S.r() * 700);
+    if (m === 'staggered' && gt >= S.modeUntil) {
+      if (S.r() < 0.35) setMode('retreatStart', 0); else { setMode('stalk', 300 + S.r() * 300); }
+    }
+    if (m === 'broken' && gt >= S.modeUntil) {
+      S.B = 62; setMode('retreatStart', 0);
+      pushLog('立ち直り', '', '一閃の機会を逃した');
+    }
+    if (m === 'falling' && gt >= S.modeUntil) {
+      if (S.phase === 1) {
+        S.phase = 2; S.B = 0; S.P = Math.max(0, S.P - 40);
+        enemy.bladeMat.emissive.set(0x3a0c10);
+        setMode('stalk', 1200); S.queue = [];
+        glyphAtScreen('弐', 'phase', 0.5, 0.42);
+        Sound.phase();
+        pushLog('後半', '', '相手が立ち上がった');
+      } else {
+        S.mode = 'victory';
+        setTimeout(() => showEnd(true), 900);
+      }
+    }
+
+    const a = S.action;
+    if (S.mode === 'attack' && a) {
+      if (a.feint) {
+        if (gt >= a.end) { S.action = null; if (S.queue.length) startAction(S.queue.shift()); else setMode('stalk', 500); }
+      } else {
+        // 振り始めに踏み込む。突進は一気に間合いを詰める。
+        if (!a.lunged && gt >= a.T - a.S) {
+          a.lunged = true; a.swung = true;
+          Sound.swing(a.move.w);
+          if (a.move.dash) {
+            const stop = Math.max(CFG.minGap + 0.2, 1.65);
+            const go = Math.max(0, f.d - stop);
+            tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, a.S, easeIn);
+            kickSnow(enemy.hipWorld, 1.2);
+          } else {
+            const go = Math.min(a.move.lunge, Math.max(0, f.d - CFG.minGap - 0.1));
+            tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, a.S + 60, easeOut);
+          }
+        }
+        if (!a.resolved && gt >= a.T) {
+          if (a.pendingDeflect) resolveDeflect(a.pendingDeflect);
+          else if (gt >= a.T + (a.peril ? 0 : CFG.winTai[1] + S.offset)) {
+            const reach = a.move.reach + 0.15;
+            const dodged = gt < S.iframeUntil;
+            if (dodged || dist() > reach) missPlayer(a, dodged);
+            else hitPlayer(a);
+          }
+        }
+        const end = a.T + a.F + a.R;
+        if (S.mode === 'attack' && S.action === a) {
+          if (S.queue.length && gt >= a.T + a.F * 0.9) startAction(S.queue.shift());
+          else if (gt >= end) { S.action = null; afterPattern(a); }
+        }
+      }
+    }
+  }
+
+  function afterPattern(a) {
+    // 技を出し切った後には隙がある。後半は、わざと隙を見せる「誘い」が混ざる。
+    const baitChance = S.phase === 2 ? clamp(0.2 + S.habit.attack * 0.08, 0, 0.55) : 0;
+    if (S.r() < baitChance) setMode('bait', 650 + S.r() * 300);
+    else setMode('open', a && a.missed ? 900 : 520 + S.r() * 200);
+  }
+  function afterOpening() {
+    if (S.mode === 'bait' && S.r() < 0.6) { startAction(S.r() < 0.5 ? 'counterR' : 'counterL'); return; }
+    if (S.r() < 0.3) setMode('retreatStart', 0); else setMode('stalk', 500 + S.r() * 800);
+  }
+
+  // ───────────────────────── 位置 ─────────────────────────
+  function updateActor(actor, dt) {
+    if (actor.tw) {
+      const tw = actor.tw;
+      const u = clamp((S.gt - tw.t0) / tw.dur, 0, 1);
+      const k = tw.easing(u);
+      actor.x = lerp(tw.fx, tw.tx, k); actor.z = lerp(tw.fz, tw.tz, k);
+      if (u >= 1) actor.tw = null;
+    } else if (actor.vx !== undefined) {
+      actor.x += actor.vx * dt; actor.z += actor.vz * dt;
+    }
+  }
+  function updatePositions(dtGame) {
+    const dt = dtGame / 1000;
+    updateActor(S.e, dt);
+    updateActor(S.p, dt);
+    // 重ならない
+    const dx = S.e.x - S.p.x, dz = S.e.z - S.p.z, d = Math.hypot(dx, dz);
+    if (d < CFG.minGap && S.mode !== 'falling') {
+      const push = (CFG.minGap - d) / 2, nx = dx / (d || 1), nz = dz / (d || 1);
+      S.e.x += nx * push; S.e.z += nz * push; S.p.x -= nx * push; S.p.z -= nz * push;
+    }
+    // 石灯籠の輪の内側に留まる
+    [S.e, S.p].forEach((a) => {
+      const r = Math.hypot(a.x, a.z);
+      if (r > CFG.arena) { a.x *= CFG.arena / r; a.z *= CFG.arena / r; }
+    });
+    S.e.yaw = Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z);
+    if (S.mode !== 'falling' || !S.cine) S.p.yaw = Math.atan2(S.e.x - S.p.x, S.e.z - S.p.z);
+  }
+
+  // ───────────────────────── 姿勢 ─────────────────────────
+  const breathPeriod = (load) => lerp(2400, 900, clamp(load / 100, 0, 1));
+  const P_TMP = clonePose(NEUTRAL);
+  function enemyPoseNow() {
+    const gt = S.gt, out = S.enemyPose, a = S.action, m = S.mode;
+    const since = gt - S.modeStart;
+    if (m === 'attack' && a) {
+      const K = KEY[a.move.key] || KEY.D;
+      const t = gt - a.t0;
+      if (a.feint) {
+        if (t <= a.O) blendSplit(S.actionFrom, K.wind, smooth(t / a.O) * 0.08, smooth(t / a.O) * 0.5, out);
+        else { blendSplit(S.actionFrom, K.wind, 0.08, 0.5, P_TMP); blend(P_TMP, NEUTRAL, smooth((t - a.O) / 320), out); }
+      } else if (t <= a.O) {
+        const u = smooth(t / a.O);
+        blendSplit(S.actionFrom, K.wind, u, u * 0.25, out);
+      } else if (t <= a.O + a.W) {
+        blendSplit(S.actionFrom, K.wind, 1, 0.25 + 0.75 * smooth((t - a.O) / a.W), out);
+      } else if (t <= a.O + a.W + a.D) {
+        blend(K.wind, K.wind, 0, out);
+        out.hand.x += Math.sin(gt * 0.09) * 0.006; out.hand.y += Math.sin(gt * 0.13) * 0.006;
+      } else if (gt <= a.T) {
+        // 振り：腰と胴が先に回り、腕と刀が後から追いつく
+        const u = (gt - (a.T - a.S)) / a.S;
+        blendSplit(K.wind, K.hit, easeOut(clamp(u * 1.35, 0, 1)), easeIn(u), out);
+      } else if (gt <= a.T + a.F) {
+        const u = (gt - a.T) / a.F;
+        blendSplit(K.hit, K.follow, easeOut(clamp(u * 1.2, 0, 1)), easeOut(u), out);
+      } else {
+        blend(K.follow, NEUTRAL, smooth((gt - a.T - a.F) / a.R), out);
+      }
+    } else if (m === 'open') {
+      blend(S.actionFrom, OPEN, smooth(since / 220), out);
+    } else if (m === 'bait') {
+      blend(S.actionFrom, BAIT, smooth(since / 220), out);
+    } else if (m === 'broken') {
+      blend(S.actionFrom, KNEEL, easeOut(since / 380), out);
+    } else if (m === 'falling') {
+      blend(S.actionFrom, KNEEL, easeOut(since / 300), out);
+      if (S.phase === 2) { out.pitch += smooth((since - 300) / 1400) * 0.9; out.crouch += smooth((since - 300) / 1400) * 0.25; }
+    } else if (m === 'victory') {
+      blend(KNEEL, KNEEL, 0, out); out.pitch += 0.9; out.crouch += 0.25;
+    } else {
+      blend(S.actionFrom, NEUTRAL, smooth(since / 420), out);
+      if (m === 'stalk' || m === 'approach') {
+        // 歩くときの上下と、横歩きの体のひねり
+        out.crouch += 0.03 + Math.abs(Math.sin(gt * 0.011)) * 0.025;
+        out.roll += S.stalkDir * 0.04 * (m === 'stalk' ? 1 : 0);
+      }
+    }
+    if (gt < S.guardUntil) blend(out, GUARD, 0.85, out);
+    // 崩れ：沈み、揺れ、刀先が震える
+    const load = S.B / 100;
+    if (m !== 'falling' && m !== 'victory') {
+      out.crouch += 0.012 * Math.sin(gt / breathPeriod(S.B) * Math.PI * 2) + load * 0.1;
+      out.roll += Math.sin(gt * 0.0031) * load * 0.07;
+      out.hand.y -= load * 0.12;
+      out.hand.x += Math.sin(gt * 0.047) * load * load * 0.02;
+    }
+    out.hipX += S.stagger.x * 0.35; out.yaw += -S.stagger.x * 0.6; out.pitch += S.stagger.p * 0.35; out.hand.x += S.stagger.x * 0.4;
+    return out;
+  }
+
+  function playerPoseNow() {
+    const gt = S.gt, out = S.playerPose, an = S.playerAnim;
+    blend(P_GUARD, P_GUARD, 0, out);
+    // 相手が間合いに入るほど、構えが低く締まる
+    const d = dist();
+    blend(out, P_LOW, clamp((3.2 - d) / 1.6, 0, 1) * 0.6, out);
+    if (an) {
+      const t = gt - an.t0;
+      if (an.kind === 'parry') {
+        const target = playerParryPose(an.dir && an.dir !== 'N' ? an.dir : null);
+        const u = t < 70 ? easeOut(t / 70) : 1 - smooth((t - 160) / 360);
+        blend(out, target, clamp(u, 0, 1), out);
+        if (t > 600) S.playerAnim = null;
+      } else if (an.kind === 'cut') {
+        if (t < 90) blend(out, P_CUT_WIND, easeOut(t / 90), out);
+        else if (t < 170) blend(P_CUT_WIND, P_CUT_HIT, easeIn((t - 90) / 80), out);
+        else blend(P_CUT_HIT, out, smooth((t - 170) / 300), out);
+        if (t > 500) S.playerAnim = null;
+      } else if (an.kind === 'hit') {
+        const u = t < 80 ? easeOut(t / 80) : 1 - smooth((t - 200) / 500);
+        blend(out, P_HIT, clamp(u, 0, 1), out);
+        if (t > 800) S.playerAnim = null;
+      } else if (an.kind === 'whiff') {
+        const target = pose({ hand: V(-0.3, 1.0, 0.6), sword: V(-0.8, -0.2, 0.55).normalize(), crouch: 0.12, yaw: 0.3 });
+        const u = t < 90 ? easeOut(t / 90) : 1 - smooth((t - 150) / 300);
+        blend(out, target, clamp(u, 0, 1), out);
+        if (t > 500) S.playerAnim = null;
+      } else if (an.kind === 'back') {
+        const u = t < 100 ? easeOut(t / 100) : 1 - smooth((t - 150) / 250);
+        out.crouch += 0.12 * u; out.pitch -= 0.12 * u; out.hipZ -= 0.1 * u;
+        if (t > 450) S.playerAnim = null;
+      } else if (an.kind === 'side') {
+        const u = t < 100 ? easeOut(t / 100) : 1 - smooth((t - 150) / 250);
+        out.crouch += 0.14 * u; out.roll += -an.sgn * 0.18 * u; out.hipX += -an.sgn * 0.08 * u;
+        if (t > 450) S.playerAnim = null;
+      } else if (an.kind === 'issen') {
+        const target = pose({ hand: V(-0.55, 1.05, 0.5), sword: V(-0.85, -0.35, 0.4).normalize(), crouch: 0.24, yaw: 0.6, hipZ: 0.15 });
+        blend(out, target, easeOut(t / 120), out);
+        if (t > 2400) S.playerAnim = null;
+      } else if (an.kind === 'down') {
+        blend(out, P_KNEEL, easeOut(t / 500), out);
+      }
+    }
+    const load = S.P / 100;
+    out.crouch += 0.01 * Math.sin(gt / breathPeriod(S.P) * Math.PI * 2) + load * 0.08;
+    out.roll += Math.sin(gt * 0.0027) * load * 0.06;
+    out.hand.y -= load * 0.1;
+    return out;
+  }
+
+  function updateBodies(dtGame) {
+    if (!['broken', 'falling', 'victory'].includes(S.mode) && S.gt - S.lastPressure > CFG.enemyRecoverDelay) S.B = Math.max(0, S.B - CFG.enemyRecoverRate * dtGame / 1000);
+    if (S.mode !== 'defeat' && S.gt - S.lastHit > CFG.playerRecoverDelay) S.P = Math.max(0, S.P - CFG.playerRecoverRate * dtGame / 1000);
+    const k = 38, dmp = 9, dt = Math.min(dtGame, 50) / 1000;
+    S.stagger.vx += (-k * S.stagger.x - dmp * S.stagger.vx) * dt; S.stagger.x += S.stagger.vx * dt;
+    S.stagger.vp += (-k * S.stagger.p - dmp * S.stagger.vp) * dt; S.stagger.p += S.stagger.vp * dt;
+    const act = S.action;
+    const eFast = S.mode === 'attack' && act && !act.feint && S.gt >= act.T - act.S - 40 && S.gt <= act.T + act.F;
+    const pa = S.playerAnim;
+    const pFast = pa && ['parry', 'cut', 'issen', 'hit'].includes(pa.kind) && S.gt - pa.t0 < 260;
+    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw, dtGame, () => Sound.step(0.5), { fast: eFast, look: player.headWorld });
+    player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, null, { fast: pFast, look: enemy.headWorld });
+
+    const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
+    const eb = Math.floor(S.gt / ep), pb = Math.floor(S.gt / pp);
+    if (eb !== S.breathE) { S.breathE = eb; if (S.mode !== 'victory' && !(S.mode === 'falling' && S.phase === 2)) { exhale(enemy.headWorld, enemy.fwd, S.B / 100); if (S.B > 55) Sound.breath(S.B / 100); } }
+    if (pb !== S.breathP) { S.breathP = pb; exhale(player.headWorld, player.fwd, S.P / 100); }
+  }
+
+  function updateEffects(dtReal) {
+    const dt = dtReal / 1000, now = performance.now();
+    for (let i = 0; i < SPARK_N; i++) {
+      const s = sparkState[i];
+      if (s.life > 0) {
+        s.life -= dt; s.v.y -= 6 * dt; s.p.addScaledVector(s.v, dt);
+        const f = Math.max(0, s.life / s.max);
+        sparkCol[i * 3] = s.c.r * f; sparkCol[i * 3 + 1] = s.c.g * f; sparkCol[i * 3 + 2] = s.c.b * f;
+      } else { sparkCol[i * 3] = sparkCol[i * 3 + 1] = sparkCol[i * 3 + 2] = 0; }
+      sparkPos[i * 3] = s.p.x; sparkPos[i * 3 + 1] = s.p.y; sparkPos[i * 3 + 2] = s.p.z;
+    }
+    sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
+    for (const b of puffs) {
+      if (!b.m.visible) continue;
+      b.life -= dt;
+      if (b.life <= 0) { b.m.visible = false; continue; }
+      const u = 1 - b.life / b.max;
+      b.v.y -= b.grav * dt;
+      b.m.position.addScaledVector(b.v, dt);
+      if (b.m.position.y < 0.02) b.m.position.y = 0.02;
+      b.v.multiplyScalar(1 - 0.9 * dt);
+      const sz = b.size * (0.6 + u * 1.6);
+      b.m.scale.set(sz, sz, 1);
+      b.m.material.opacity = b.peak * Math.sin(Math.min(1, u * 1.4) * Math.PI) * (1 - u * 0.4);
+    }
+    for (const r of rings) {
+      if (!r.m.visible) continue;
+      const u = (now - r.t0) / 520;
+      if (u >= 1) { r.m.visible = false; continue; }
+      const s = r.size * easeOut(u);
+      r.m.scale.set(s, s, 1);
+      r.m.material.opacity = 0.75 * (1 - u);
+    }
+    for (const p of prints) {
+      if (!p.m.visible) continue;
+      const age = (now - p.born) / 1000;
+      p.m.material.opacity = age < 0.2 ? age / 0.2 * 0.8 : Math.max(0, 0.8 - (age - 0.2) / 30);
+      if (age > 31) p.m.visible = false;
+    }
+    for (let i = 0; i < SNOW_N; i++) {
+      snowPos[i * 3 + 1] -= dt * (0.35 + (i % 7) * 0.04);
+      snowPos[i * 3] += Math.sin(now * 0.0004 + i) * dt * 0.08;
+      if (snowPos[i * 3 + 1] < 0) snowPos[i * 3 + 1] += 8;
+    }
+    snowGeo.attributes.position.needsUpdate = true;
+    const a = S.action;
+    enemyTrail.color = a && a.peril ? { r: 1, g: 0.35, b: 0.32 } : { r: 0.78, g: 0.84, b: 0.98 };
+    enemyTrail.update(a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F, enemy, now);
+    const pa = S.playerAnim;
+    playerTrail.update(pa && (pa.kind === 'cut' || pa.kind === 'parry' || pa.kind === 'issen') && S.gt - pa.t0 < 220, player, now);
+    // 危険な技の赤い光：起こりから振り始めまで
+    const perilOn = a && a.peril && S.mode === 'attack' && S.gt < a.T - a.S;
+    glint.material.opacity = perilOn ? 0.55 + Math.sin(now * 0.03) * 0.25 : Math.max(0, glint.material.opacity - dt * 4);
+    glint.position.copy(enemy.tip);
+    enemy.bladeMat.emissive.set(perilOn ? 0x7a1010 : (S.phase === 2 ? 0x3a0c10 : 0x1a2230));
+    const lt = (clashLightUntil - now) / 220;
+    clashLight.intensity = lt > 0 ? clashLightPeak * lt : 0;
+    lanternLights.forEach((l, i) => { l.intensity = 1.25 + Math.sin(now * 0.007 + i) * 0.08 + Math.sin(now * 0.0173 + i * 2) * 0.05; });
+  }
+
+  // ───────────────────────── カメラ ─────────────────────────
+  const camPos = V(0, 2.4, 5), camLook = V(0, 1, 0), camPosT = V(0, 0, 0), camLookT = V(0, 0, 0);
+  let camInit = false;
+  function updateCamera(dtReal) {
+    const dt = dtReal / 1000;
+    const f = dirPE();
+    if (S.cine && S.gt < S.cine.until) {
+      camPosT.copy(S.cine.pos); camLookT.copy(S.cine.look);
+    } else {
+      S.cine = null;
+      // 自分の背中の右肩越しに、相手を見る。離れるほど引く。
+      const back = 3.25 + Math.max(0, f.d - 3) * 0.35;
+      const rx = -f.z, rz = f.x;
+      camPosT.set(S.p.x - f.x * back + rx * 0.95, 2.6 + Math.max(0, f.d - 3) * 0.15, S.p.z - f.z * back + rz * 0.95);
+      camLookT.set(S.p.x + f.x * f.d * 0.7, 1.1, S.p.z + f.z * f.d * 0.7);
+    }
+    if (!camInit || (S.cine && !S.cine.cut)) { camPos.copy(camPosT); camLook.copy(camLookT); camInit = true; if (S.cine) S.cine.cut = true; }
+    const k = 1 - Math.exp(-dt * (S.cine ? 9 : 5));
+    camPos.lerp(camPosT, k); camLook.lerp(camLookT, k);
+    S.shake = Math.max(0, S.shake - dt * 0.5);
+    const t = performance.now();
+    camera.position.set(camPos.x + Math.sin(t * 0.091) * S.shake, camPos.y + Math.sin(t * 0.077) * S.shake * 0.7, camPos.z + Math.cos(t * 0.083) * S.shake * 0.5);
+    camera.lookAt(camLook);
+    S.fovKick = Math.max(0, S.fovKick - dt * 18);
+    const base = camera.aspect < 1 ? 52 : 38;
+    const fov = base - S.fovKick;
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  }
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ───────────────────────── 自動で遊ぶ（試験用） ─────────────────────────
+  function autoPlay() {
+    if (!S.auto || S.pend) return;
+    const tap = (dir) => { if (onTouchDown(S.gt)) onDir(dir); };
+    if (S.mode === 'broken' && S.gt > S.modeStart + 300) { tap('U'); return; }
+    const a = S.action;
+    if (S.mode === 'open' && !S.autoCut && dist() < CFG.reachPlayer && S.gt > S.modeStart + 120) { S.autoCut = true; tap('U'); return; }
+    if (S.mode !== 'open') S.autoCut = false;
+    if (!a || a.resolved || a.feint || a.autoDone) return;
+    if (a.peril) {
+      if (S.gt >= a.T - 120) { a.autoDone = true; tap(a.peril === 'sweep' ? 'D' : 'R'); }
+      return;
+    }
+    const flow = a.move.mom === 'T' ? 'L' : a.move.mom;
+    if (S.auto === 'sen' && a.move.w >= 1.4 && S.gt >= a.t0 + a.O * 0.5) { a.autoDone = true; tap(flow); return; }
+    if (S.gt >= a.T + S.offset - 8) { a.autoDone = true; tap(flow); }
+  }
+
+  // ───────────────────────── ループ ─────────────────────────
+  let last = performance.now();
+  function frame(now) {
+    const dtReal = Math.min(64, now - last);
+    last = now;
+    let scale = 1;
+    if (now < S.freezeUntil) scale = 0;
+    else if (now < S.slowUntil) scale = S.slowScale;
+    const dtGame = S.started ? dtReal * scale * S.speed : 0;
+    if (S.started) {
+      S.gt += dtGame;
+      S.frameGt = S.gt; S.frameReal = now; S.frameScale = scale;
+      autoPlay();
+      if (S.strikeAt && S.gt >= S.strikeAt) resolvePlayerStrike();
+      updateAI(dtGame / 1000);
+      updatePositions(dtGame);
+    }
+    updateBodies(dtGame);
+    updateEffects(dtReal * (scale === 0 ? 0.15 : scale));
+    updateCamera(dtReal);
+    renderer.render(scene, camera);
+    if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ───────────────────────── 開始と終了 ─────────────────────────
+  const startEl = document.getElementById('start');
+  const endEl = document.getElementById('end');
+  function begin(fromPhase) {
+    Object.assign(S, {
+      started: true, phase: fromPhase, B: 0, P: 0, action: null, queue: [], pend: null,
+      lockUntil: 0, moveLockUntil: 0, iframeUntil: 0, strikeAt: 0, guardUntil: 0,
+      playerAnim: null, lastPressure: S.gt, lastHit: -9999, chain: 0, cine: null,
+      habit: { early: 0, attack: 0, back: 0 },
+    });
+    S.e.x = 0; S.e.z = -2.2; S.e.tw = null; S.p.x = 0; S.p.z = 2.0; S.p.tw = null;
+    enemy.resetFeet(); player.resetFeet();
+    enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
+    S.r = rng((Date.now() ^ (fromPhase * 7919)) >>> 0);
+    setMode('stalk', 1600);
+    S.stats = { go: 0, tai: 0, sen: 0, cut: 0, hits: 0, whiffs: 0, dodges: 0, start: S.gt };
+    S.bestChain = 0;
+    S.log = []; renderLog();
+  }
+  document.getElementById('startBtn').addEventListener('click', () => {
+    Sound.init();
+    startEl.hidden = true;
+    begin(1);
+  });
+  function showEnd(won) {
+    const st = S.stats;
+    const secs = Math.round((S.gt - st.start) / 1000);
+    document.getElementById('endTitle').textContent = won ? '勝負あり' : '倒れた';
+    document.getElementById('endText').textContent = won
+      ? `${secs}秒。先の先 ${st.sen}・対の先 ${st.tai}・後の先 ${st.go}・斬り ${st.cut}・避け ${st.dodges}・被弾 ${st.hits}・最高 ${S.bestChain}連`
+      : `${S.phase === 1 ? '前半' : '後半'}から、すぐにやり直せます。`;
+    document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
+    endEl.hidden = false;
+    S.lastWon = won;
+  }
+  document.getElementById('againBtn').addEventListener('click', () => {
+    endEl.hidden = true;
+    begin(S.lastWon ? 1 : S.phase);
+  });
+
+  window.__kaeshi = {
+    get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, gt: S.gt, offset: S.offset, d: dist(), chain: S.chain, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0 } }; },
+    setSpeed(v) { S.speed = v; },
+    setAuto(v) { S.auto = v; },
+    force(token) { S.queue = []; S.action = null; startAction(token); },
+    forceMode(m, dur) { S.action = null; S.queue = []; setMode(m, dur); },
+    flick(dir) { if (onTouchDown(S.gt)) onDir(dir); },
+  };
+})();
+</script>
+
+</body>
+</html>
