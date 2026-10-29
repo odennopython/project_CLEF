@@ -170,7 +170,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.6</p>
+    <p class="kicker">Kaeshi · 試作 0.7</p>
     <h1>返し</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -475,6 +475,7 @@
   // 周りの景色：石灯籠の輪、枯れ木、遠い山。回り込むと流れていく。
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0x1d1c22, roughness: 0.95 });
   const lanternLights = [];
+  const scenery = [];   // カメラの近くに来たら隠す（自分の姿を遮らないように）
   for (let i = 0; i < 6; i++) {
     const a = i / 6 * Math.PI * 2 + 0.3;
     const x = Math.cos(a) * 8.2, z = Math.sin(a) * 8.2;
@@ -485,7 +486,7 @@
     const roof = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.24, 4), stoneMat); roof.position.y = 1.16; roof.rotation.y = Math.PI / 4; g.add(roof);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('rgba(255,179,107,0.9)', 'rgba(255,179,107,0)'), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
     halo.position.y = 0.93; halo.scale.set(1.5, 1.5, 1); g.add(halo);
-    scene.add(g);
+    scene.add(g); scenery.push(g);
     if (i % 3 === 0) { const l = new THREE.PointLight(0xffa860, 1.3, 9, 1.6); l.position.set(x, 0.95, z); scene.add(l); lanternLights.push(l); }
   }
   const barkMat = new THREE.MeshStandardMaterial({ color: 0x15141a, roughness: 1 });
@@ -501,7 +502,7 @@
       br.position.x = Math.sin(br.rotation.z) * -0.4;
       g.add(br);
     }
-    scene.add(g);
+    scene.add(g); scenery.push(g);
   }
   const mountainMat = new THREE.MeshBasicMaterial({ color: 0x04060b, fog: false });
   for (let i = 0; i < 9; i++) {
@@ -675,6 +676,8 @@
     const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.95, roughness: 0.16, emissive: 0x1a2230, side: THREE.DoubleSide });
 
     let hat = null, hatFall = null;
+    const hatPieces = [], chips = [], cracks = [];
+    let hitGlow = 0;
     const tears = [];
     // 骨盤 → 腰 → 胸 → 首 → 頭
     const hips = new THREE.Group(); root.add(hips);
@@ -702,10 +705,23 @@
     headG.add(sphere(mS, 0.105, 0.125, 0.115, 0.05));
     if (kind === 'enemy') {
       const menpo = sphere(toon(0x5a1a1c), 0.095, 0.075, 0.06, 0.06); menpo.position.set(0, -0.035, 0.07); headG.add(menpo);
+      // 面頬のひび（後半、傷の節目で一筋ずつ入る）
+      const crackMat = toon(0xe8d8c8), crackGeo = new THREE.BoxGeometry(0.006, 0.05, 0.004);
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(crackGeo, crackMat);
+        c.position.set(-0.03 + i * 0.03, -0.03 + (i % 2) * 0.012, 0.128); c.rotation.z = 0.5 - i * 0.45; c.visible = false;
+        headG.add(c); cracks.push(c);
+      }
       const brow = sphere(toon(0x0d0f14), 0.11, 0.06, 0.11, 0.05); brow.position.set(0, 0.06, -0.01); headG.add(brow);
       hat = new THREE.Group(); hat.position.y = 0.11; headG.add(hat);
-      const kasa = inked(new THREE.ConeGeometry(0.5, 0.2, 28, 1, true), toon(0x9c8a5f, { side: THREE.DoubleSide }), 0.03); hat.add(kasa);
-      const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 28), new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide })); under.rotation.x = Math.PI / 2; under.position.y = -0.095; hat.add(under);
+      const mKasa = toon(0x9c8a5f, { side: THREE.DoubleSide }), mUnder = new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide });
+      for (let i = 0; i < 6; i++) {
+        const th = i / 6 * Math.PI * 2, tl = Math.PI * 2 / 6;
+        const piece = new THREE.Group();
+        piece.add(inked(new THREE.ConeGeometry(0.5, 0.2, 5, 1, true, th, tl), mKasa, 0.03));
+        const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 5, Math.PI / 2 - th - tl, tl), mUnder); under.rotation.x = Math.PI / 2; under.position.y = -0.095; piece.add(under);
+        hat.add(piece); hatPieces.push(piece);
+      }
     } else {
       const hair = sphere(toon(0x0d0f14), 0.112, 0.105, 0.12, 0.05); hair.position.set(0, 0.035, -0.015); headG.add(hair);
       const knot = sphere(toon(0x0d0f14), 0.045, 0.045, 0.06, 0.1); knot.position.set(0, 0.11, -0.08); headG.add(knot);
@@ -916,6 +932,17 @@
         hatFall = { v: V((Math.random() - 0.5) * 2, 3.2, (Math.random() - 0.5) * 2).addScaledVector(fwd, -1.2), spin: V(6 + Math.random() * 4, Math.random() * 8, 3), rest: false };
       },
       updateHat(dt) {
+        if (hitGlow > 0) {
+          hitGlow = Math.max(0, hitGlow - dt * 5);
+          const g = Math.min(1, hitGlow) * 1.1;
+          [mK, mH, mS, mWrap].forEach((m) => m.emissive.setRGB(g, g * 0.96, g * 0.9));
+        }
+        chips.forEach((c) => {
+          if (c.rest || dt <= 0) return;
+          c.v.y -= 6 * dt; c.m.position.addScaledVector(c.v, dt);
+          c.m.rotation.x += c.spin.x * dt; c.m.rotation.y += c.spin.y * dt; c.m.rotation.z += c.spin.z * dt;
+          if (c.m.position.y < 0.05) { c.m.position.y = 0.05; c.rest = true; c.m.rotation.x = Math.PI * 0.5; kickSnow(c.m.position, 0.4); }
+        });
         if (!hatFall || hatFall.rest || dt <= 0) return;
         hatFall.v.y -= 6 * dt;
         hat.position.addScaledVector(hatFall.v, dt);
@@ -923,12 +950,28 @@
         if (hat.position.y < 0.12 * scale) { hat.position.y = 0.12 * scale; hatFall.rest = true; hat.rotation.set(Math.PI * 0.08, hat.rotation.y, Math.PI * 0.05); kickSnow(hat.position, 0.8); }
       },
       resetHat() {
-        if (!hat || !hatFall) return;
-        scene.remove(hat); headG.add(hat);
-        hat.position.set(0, 0.11, 0); hat.rotation.set(0, 0, 0); hat.scale.set(1, 1, 1);
-        hatFall = null;
+        if (!hat) return;
+        if (hatFall) { scene.remove(hat); headG.add(hat); hat.position.set(0, 0.11, 0); hat.rotation.set(0, 0, 0); hat.scale.set(1, 1, 1); hatFall = null; }
+        chips.forEach((c) => { scene.remove(c.m); hat.add(c.m); c.m.position.set(0, 0, 0); c.m.rotation.set(0, 0, 0); c.m.scale.set(1, 1, 1); });
+        chips.length = 0;
+        cracks.forEach((c) => { c.visible = false; });
       },
       hatOn: () => !!hat && !hatFall,
+      flashHit(k) { hitGlow = Math.max(hitGlow, k); },
+      chipHat() {
+        if (!hat || hatFall) return false;
+        const left = hatPieces.filter((pc) => pc.parent === hat);
+        if (left.length <= 2) return false;
+        const pc = left[Math.floor(Math.random() * left.length)];
+        pc.updateMatrixWorld(true);
+        const wp = V(0, 0, 0), wq = new THREE.Quaternion(), ws = V(0, 0, 0);
+        pc.matrixWorld.decompose(wp, wq, ws);
+        hat.remove(pc); scene.add(pc);
+        pc.position.copy(wp); pc.quaternion.copy(wq); pc.scale.copy(ws);
+        chips.push({ m: pc, v: V((Math.random() - 0.5) * 2.5, 2.6, (Math.random() - 0.5) * 2.5), spin: V(Math.random() * 12, Math.random() * 12, Math.random() * 12), rest: false });
+        return true;
+      },
+      crackMask() { const c = cracks.find((x) => !x.visible); if (c) c.visible = true; },
     };
   }
 
@@ -1344,6 +1387,8 @@
       clank() { tone(260, 150, 0.12, 0.22, 'triangle'); noise(0.1, 'bandpass', 1200, 1.1, 0.22); },
       clashLow() { bell(330, 0.5, 0.24, [1, 1.93, 3.1]); noise(0.12, 'bandpass', 1500, 0.8, 0.28); tone(120, 70, 0.2, 0.2); },
       mikiri() { tone(60, 48, 0.5, 0.45); setTimeout(() => tone(58, 46, 0.4, 0.32), 320); noise(0.6, 'bandpass', 420, 0.8, 0.12, 180); },
+      grunt(big) { tone(big ? 150 : 175, big ? 92 : 115, big ? 0.24 : 0.16, big ? 0.22 : 0.15, 'sawtooth'); noise(big ? 0.22 : 0.14, 'bandpass', 520, 3, big ? 0.16 : 0.1); },
+      gasp() { noise(0.55, 'bandpass', 760, 1.2, 0.2, 380); tone(125, 78, 0.45, 0.2, 'sawtooth'); },
       rip() { noise(0.16, 'bandpass', 3200, 1.6, 0.16, 1400); noise(0.08, 'highpass', 4000, 0.8, 0.08); },
       cut(big) { noise(big ? 0.3 : 0.18, 'bandpass', 2600, 0.9, big ? 0.32 : 0.22, 700); tone(big ? 150 : 220, 60, big ? 0.3 : 0.18, big ? 0.3 : 0.14, 'triangle'); },
       hit() { tone(150, 42, 0.32, 0.55); noise(0.18, 'lowpass', 900, 0.7, 0.35); },
@@ -1593,6 +1638,12 @@
 
   function landHit(amount, label, cls, big) {
     S.B = clamp(S.B + amount, 0, 100); S.lastPressure = S.gt;
+    S.W = Math.min(90, (S.W || 0) + amount * 0.6);
+    // 斬られた側へ体がひねられ、頭がのけぞる。体が一瞬白く光り、うめく。
+    S.flinch = { t0: S.gt, amt: big ? 1 : 0.6, side: S.pa && (S.pa.kind === 'slash2') ? -1 : 1 };
+    enemy.flashHit(big ? 1 : 0.7);
+    Sound.grunt(big);
+    woundMilestone();
     if (label === '斬') S.stats.cut++;
     S.enemyDeflects = 0;
     addChain();
@@ -1611,6 +1662,19 @@
     if (big) { ring(S.e.x, S.e.z, 3.2, 0xe8f0ff); S.fovKick = Math.max(S.fovKick, 6); S.shake = Math.max(S.shake, 0.07); fxFlash(0.12, 0.13, 0.16); }
     pushLog(label, '', `崩し ${Math.round(amount)}`);
     if (S.B >= 100) breakEnemy();
+  }
+
+  // 傷の節目（4分の1、半分、4分の3）：前半は笠が一片ずつ欠け、後半は面頬にひびが入る
+  function woundMilestone() {
+    const stage = Math.floor((S.W || 0) / 25);
+    if (stage <= (S.wStage || 0)) return;
+    S.wStage = stage;
+    if (S.phase === 1) { enemy.chipHat(); if (stage >= 3) enemy.chipHat(); } else enemy.crackMask();
+    Sound.gasp();
+    S.flinch = { t0: S.gt, amt: 1.5, side: S.r() < 0.5 ? -1 : 1 };
+    S.slowUntil = performance.now() + 220; S.slowScale = 0.35;
+    kickSnow(enemy.hipWorld, 0.9);
+    pushLog('深手', '', `傷 ${Math.round(S.W)}`);
   }
 
   function enemyDeflect(forceCounter) {
@@ -1878,7 +1942,7 @@
     if (m === 'broken' && gt >= S.modeUntil) { S.B = 62; setMode('retreatStart', 0); pushLog('立ち直り', '', '一閃の機会を逃した'); }
     if (m === 'falling' && gt >= S.modeUntil) {
       if (S.phase === 1) {
-        S.phase = 2; S.B = 0; S.P = Math.max(0, S.P - 40);
+        S.phase = 2; S.B = 0; S.W = 0; S.wStage = 0; S.P = Math.max(0, S.P - 40);
         enemy.bladeMat.emissive.set(0x3a0c10);
         setMode('stalk', 1200); S.queue = [];
         glyphAtScreen('弐', 'phase', 0.5, 0.42);
@@ -2025,6 +2089,11 @@
       if (load > 0.72 && m !== 'attack') { const k = (load - 0.72) / 0.28; out.hand.y -= k * 0.3; out.sword.y -= k * 1.6; out.sword.normalize(); }
       if (gt < (S.buckleUntil || 0)) { const u = 1 - (S.buckleUntil - gt) / 450; const k = Math.sin(u * Math.PI); out.crouch += 0.26 * k; out.pitch += 0.18 * k; }
     }
+    if (S.flinch && gt - S.flinch.t0 < 520) {
+      const u = (gt - S.flinch.t0) / 520, k = Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) * (1 - smooth(u)) * S.flinch.amt;
+      out.yaw += S.flinch.side * 0.6 * k; out.pitch -= 0.34 * k; out.roll += S.flinch.side * 0.14 * k;
+      out.hand.y -= 0.24 * k; out.hand.x += S.flinch.side * 0.12 * k; out.crouch += 0.12 * k; out.hipZ -= 0.1 * k;
+    }
     out.hipX += S.stagger.x * 0.35; out.yaw += -S.stagger.x * 0.6; out.pitch += S.stagger.p * 0.35; out.hand.x += S.stagger.x * 0.4;
     return out;
   }
@@ -2057,7 +2126,7 @@
   }
 
   function updateBodies(dtGame) {
-    if (!['broken', 'falling', 'victory'].includes(S.mode) && S.gt - S.lastPressure > CFG.enemyRecoverDelay) S.B = Math.max(0, S.B - CFG.enemyRecoverRate * dtGame / 1000);
+    if (!['broken', 'falling', 'victory'].includes(S.mode) && S.gt - S.lastPressure > CFG.enemyRecoverDelay) S.B = Math.max(S.W || 0, S.B - CFG.enemyRecoverRate * dtGame / 1000);
     if (S.mode !== 'defeat' && S.gt - S.lastHit > CFG.playerRecoverDelay) S.P = Math.max(0, S.P - CFG.playerRecoverRate * dtGame / 1000);
     const k = 38, dmp = 9, dt = Math.min(dtGame, 50) / 1000;
     S.stagger.vx += (-k * S.stagger.x - dmp * S.stagger.vx) * dt; S.stagger.x += S.stagger.vx * dt;
@@ -2162,6 +2231,7 @@
     const t = performance.now();
     camera.position.set(camPos.x + Math.sin(t * 0.091) * S.shake, camPos.y + Math.sin(t * 0.077) * S.shake * 0.7, camPos.z + Math.cos(t * 0.083) * S.shake * 0.5);
     camera.lookAt(camLook);
+    scenery.forEach((g) => { const dx = g.position.x - camera.position.x, dz = g.position.z - camera.position.z; g.visible = dx * dx + dz * dz > 3.6 * 3.6; });
     S.fovKick = Math.max(0, S.fovKick - dt * 18);
     const base = camera.aspect < 1 ? 54 : 40;
     const fov = base - S.fovKick;
@@ -2238,7 +2308,7 @@
   }
   function begin(fromPhase) {
     Object.assign(S, {
-      started: true, phase: fromPhase, B: 0, P: 0, action: null, queue: [], pa: null, bufferU: false, comboStep: 0,
+      started: true, phase: fromPhase, B: 0, P: 0, W: 0, wStage: 0, flinch: null, action: null, queue: [], pa: null, bufferU: false, comboStep: 0,
       guardStart: -1e9, lastGuard: -1e9, dodgeStart: -1e9, stompStart: -1e9, counterUntil: 0, playerLockUntil: 0,
       guardUntil: 0, enemyDeflects: 0, lastPressure: S.gt, lastHit: -9999, chain: 0, cine: null, slowScale: 0.3,
       habit: { guard: 0, attack: 0, dodge: 0 },
@@ -2293,7 +2363,7 @@
   });
 
   window.__kaeshi = {
-    get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, gt: S.gt, d: dist(), chain: S.chain, pa: S.pa && S.pa.kind, counter: S.gt < S.counterUntil, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0, O: S.action.O } }; },
+    get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, W: S.W, wStage: S.wStage, gt: S.gt, d: dist(), chain: S.chain, pa: S.pa && S.pa.kind, counter: S.gt < S.counterUntil, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0, O: S.action.O } }; },
     setSpeed(v) { S.speed = v; },
     setAuto(v) { S.auto = v; },
     force(token) { S.queue = []; S.action = null; startAction(token); },
@@ -2303,6 +2373,7 @@
     input(dir) { doInput(dir, S.gt); },
     setB(v) { S.B = v; S.lastPressure = S.gt + 1e6; },
     addTearTest() { enemy.addTear(); },
+    flashTest() { enemy.flashHit(1); },
   };
 })();
 </script>
