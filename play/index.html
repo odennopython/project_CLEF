@@ -180,7 +180,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.4</p>
+    <p class="kicker">Kaeshi · 試作 0.5</p>
     <h1>返し</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -219,14 +219,14 @@
 
   // ───────────────────────── 調整値 ─────────────────────────
   const CFG = {
-    perfectGuard: 160,      // 下を入れてから、この時間内に刃が届けば「弾き」
-    spamGuard: 70,          // 連打すると弾きの時間が短くなる
+    perfectGuard: 200,      // 下を入れてから、この時間内に刃が届けば「弾き」
+    spamGuard: 90,          // 連打すると弾きの時間が短くなる
     spamGap: 380,
     guardWin: 450,          // それ以降は「受け」
     perfectDodge: 180,      // 左右を入れてから、この時間内に刃が届けば「見切り」
     dodgeWin: 320,
     stompWin: 300,          // 危険な突きに、上で踏み込める時間
-    lateGrace: 55,          // 刃が届いた後の入力も、少しだけ認める
+    lateGrace: 80,          // 刃が届いた後の入力も、少しだけ認める
     counterParry: 950, counterMikiri: 1300,
     brk: { parry: 11, block: 2, counter: 17, counterMikiri: 21, debana: 16, stomp: 25, cut: 4, cutOpen: 5, cutHeavy: 8, deflected: 1, windupHit: 2 },
     enemyRecoverDelay: 2100, enemyRecoverRate: 9,
@@ -381,8 +381,8 @@
 
   // ───────────────────────── 描画の準備 ─────────────────────────
   const stage = document.getElementById('stage');
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: /[?&]capture/.test(location.search) });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputEncoding = THREE.sRGBEncoding;
   stage.appendChild(renderer.domElement);
 
@@ -569,6 +569,19 @@
     return m;
   }
   const SPH = new THREE.SphereGeometry(1, 16, 12);
+  // ひだのある筒：周りに沿って半径を波打たせる。裾ほど深い。
+  function pleatGeometry(rTop, rBot, h, pleats, depth) {
+    const g = new THREE.CylinderGeometry(rTop, rBot, h, pleats * 4, 3, true);
+    const pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) {
+      const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
+      const th = Math.atan2(z, x), down = clamp(0.5 - y / h, 0, 1);
+      const k = 1 + depth * down * Math.abs(Math.sin(th * pleats));
+      pa.setX(i, x * k); pa.setZ(i, z * k);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
   const sphere = (mat, sx, sy, sz, thick) => { const m = inked(SPH, mat, thick || 0.07); m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); return m; };
 
   // 反りのある刀身（平らな刃を両面で描く）
@@ -624,11 +637,15 @@
     const mSash = toon(sash), mWrap = toon(wrap), mTabi = toon(0xe4e6ec), mDark = toon(0x16141c), mTasuki = toon(tasuki);
     const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.95, roughness: 0.16, emissive: 0x1a2230, side: THREE.DoubleSide });
 
+    let hat = null, hatFall = null;
+    const tears = [];
     // 骨盤 → 腰 → 胸 → 首 → 頭
     const hips = new THREE.Group(); root.add(hips);
     hips.add(sphere(mH, 0.175, 0.125, 0.135));
     const obi = inked(new THREE.CylinderGeometry(0.2, 0.205, 0.085, 18), mSash, 0.05); obi.position.y = 0.07; obi.scale.z = 0.8; hips.add(obi);
-    const skirt = inked(new THREE.CylinderGeometry(0.19, 0.27, 0.26, 18, 1, true), mH, 0.04); skirt.position.y = -0.08; skirt.scale.z = 0.86; hips.add(skirt);
+    const skirt = inked(pleatGeometry(0.19, 0.28, 0.28, 7, 0.12), mH, 0.04); skirt.position.y = -0.09; skirt.scale.z = 0.86; hips.add(skirt);
+    // 帯の結び目（背中）
+    [-1, 1].forEach((sx) => { const lobe = sphere(mSash, 0.06, 0.04, 0.03, 0.08); lobe.position.set(sx * 0.055, 0.07, -0.18); lobe.rotation.z = sx * 0.5; hips.add(lobe); });
     const waist = new THREE.Group(); waist.position.y = 0.1; hips.add(waist);
     const abd = inked(new THREE.CylinderGeometry(0.165, 0.155, 0.26, 16), mK, 0.05); abd.position.y = 0.11; abd.scale.z = 0.78; waist.add(abd);
     const chestG = new THREE.Group(); chestG.position.y = 0.24; waist.add(chestG);
@@ -637,6 +654,9 @@
     // 襟（前）とたすき（背中で交差）
     const lapel = new THREE.BoxGeometry(0.045, 0.34, 0.02);
     [-1, 1].forEach((s) => { const l = new THREE.Mesh(lapel, mSash); l.position.set(s * 0.055, 0.2, 0.17); l.rotation.z = s * 0.45; l.rotation.x = -0.18; chestG.add(l); });
+    const inner = new THREE.BoxGeometry(0.03, 0.3, 0.02), mWhite = toon(0xe8e6e0);
+    [-1, 1].forEach((s) => { const l = new THREE.Mesh(inner, mWhite); l.position.set(s * 0.03, 0.23, 0.175); l.rotation.z = s * 0.45; l.rotation.x = -0.18; chestG.add(l); });
+    [-1, 1].forEach((s) => { const tr = sphere(mK, 0.11, 0.05, 0.09, 0.05); tr.position.set(s * 0.1, 0.35, -0.01); tr.rotation.z = -s * 0.35; chestG.add(tr); });
     const cord = new THREE.BoxGeometry(0.035, 0.52, 0.02);
     [-1, 1].forEach((s) => { const c = new THREE.Mesh(cord, mTasuki); c.position.set(0, 0.17, -0.18); c.rotation.z = s * 0.62; c.rotation.x = 0.12; chestG.add(c); });
     const neckG = new THREE.Group(); neckG.position.y = 0.37; chestG.add(neckG);
@@ -644,8 +664,11 @@
     const headG = new THREE.Group(); headG.position.y = 0.155; neckG.add(headG);
     headG.add(sphere(mS, 0.105, 0.125, 0.115, 0.05));
     if (kind === 'enemy') {
-      const kasa = inked(new THREE.ConeGeometry(0.5, 0.2, 28, 1, true), toon(0x9c8a5f, { side: THREE.DoubleSide }), 0.03); kasa.position.y = 0.11; headG.add(kasa);
-      const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 28), new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide })); under.rotation.x = Math.PI / 2; under.position.y = 0.015; headG.add(under);
+      const menpo = sphere(toon(0x5a1a1c), 0.095, 0.075, 0.06, 0.06); menpo.position.set(0, -0.035, 0.07); headG.add(menpo);
+      const brow = sphere(toon(0x0d0f14), 0.11, 0.06, 0.11, 0.05); brow.position.set(0, 0.06, -0.01); headG.add(brow);
+      hat = new THREE.Group(); hat.position.y = 0.11; headG.add(hat);
+      const kasa = inked(new THREE.ConeGeometry(0.5, 0.2, 28, 1, true), toon(0x9c8a5f, { side: THREE.DoubleSide }), 0.03); hat.add(kasa);
+      const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 28), new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide })); under.rotation.x = Math.PI / 2; under.position.y = -0.095; hat.add(under);
     } else {
       const hair = sphere(toon(0x0d0f14), 0.112, 0.105, 0.12, 0.05); hair.position.set(0, 0.035, -0.015); headG.add(hair);
       const knot = sphere(toon(0x0d0f14), 0.045, 0.045, 0.06, 0.1); knot.position.set(0, 0.11, -0.08); headG.add(knot);
@@ -653,11 +676,13 @@
 
     // 脚：太もも（袴）→ 膝 → 脛（脚絆）→ 足首 → 足
     const legs = [0, 1].map(() => {
-      const thigh = inked(new THREE.CylinderGeometry(0.1, 0.078, 1, 12), mH, 0.04);
+      const thigh = inked(pleatGeometry(0.1, 0.085, 1, 5, 0.18), mH, 0.04);
       const kneeB = sphere(mH, 0.075, 0.075, 0.075, 0.05);
       const shin = inked(new THREE.CylinderGeometry(0.066, 0.046, 1, 10), mWrap, 0.06);
       const ankle = sphere(mWrap, 0.045, 0.045, 0.045, 0.06);
       const foot = sphere(mTabi, 0.048, 0.034, 0.12, 0.1);
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.35, 1.05), toon(0x6e5f45)); sole.position.y = -0.85; foot.add(sole);
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.3, 0.12), toon(0x3a2f24)); strap.position.set(0, 0.6, 0.2); foot.add(strap);
       [thigh, kneeB, shin, ankle, foot].forEach((m) => root.add(m));
       return { thigh, kneeB, shin, ankle, foot };
     });
@@ -670,6 +695,7 @@
       const fore = inked(new THREE.CylinderGeometry(0.046, 0.034, 1, 10), mS, 0.08);
       const wrist = sphere(mS, 0.034, 0.034, 0.034, 0.08);
       const hand = inked(new THREE.BoxGeometry(0.075, 0.09, 0.05), mS, 0.1);
+      const thumb = sphere(mS, 0.022, 0.035, 0.022, 0.12); thumb.position.set(0.03, 0.03, 0.035); hand.add(thumb);
       [shoulder, puff, upper, elbow, fore, wrist, hand].forEach((m) => root.add(m));
       return { shoulder, puff, upper, elbow, fore, wrist, hand };
     });
@@ -825,9 +851,47 @@
         ch.c.update(tA, tC, T, wind);
       });
     }
+    const tearMat = toon(0xb8a898), tearGeo = new THREE.BoxGeometry(0.13, 0.014, 0.012);
     return {
       root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd,
       resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
+      // 斬られた跡：着物が裂け、その跡は残り続ける（どれだけ斬ったかが体に残る）
+      addTear() {
+        if (tears.length >= 16) return;
+        const front = Math.random() < 0.75;
+        const th = (Math.random() - 0.5) * 2.2 + (front ? 0 : Math.PI);
+        const onChest = Math.random() < 0.6;
+        const m = new THREE.Mesh(tearGeo, tearMat);
+        const r = onChest ? 0.225 : 0.17;
+        m.position.set(Math.sin(th) * r, onChest ? 0.06 + Math.random() * 0.24 : 0.04 + Math.random() * 0.16, Math.cos(th) * r * (onChest ? 0.74 : 0.8));
+        m.rotation.set(0, th, (Math.random() - 0.5) * 1.6);
+        (onChest ? chestG : waist).add(m); tears.push(m);
+      },
+      clearTears() { tears.forEach((m) => m.parent && m.parent.remove(m)); tears.length = 0; },
+      // 前半の一閃で、笠が斬り飛ばされる
+      dropHat() {
+        if (!hat || hatFall) return;
+        hat.updateMatrixWorld(true);
+        const wp = V(0, 0, 0), wq = new THREE.Quaternion(), ws = V(0, 0, 0);
+        hat.matrixWorld.decompose(wp, wq, ws);
+        headG.remove(hat); scene.add(hat);
+        hat.position.copy(wp); hat.quaternion.copy(wq); hat.scale.copy(ws);
+        hatFall = { v: V((Math.random() - 0.5) * 2, 3.2, (Math.random() - 0.5) * 2).addScaledVector(fwd, -1.2), spin: V(6 + Math.random() * 4, Math.random() * 8, 3), rest: false };
+      },
+      updateHat(dt) {
+        if (!hatFall || hatFall.rest || dt <= 0) return;
+        hatFall.v.y -= 6 * dt;
+        hat.position.addScaledVector(hatFall.v, dt);
+        hat.rotation.x += hatFall.spin.x * dt; hat.rotation.y += hatFall.spin.y * dt; hat.rotation.z += hatFall.spin.z * dt;
+        if (hat.position.y < 0.12 * scale) { hat.position.y = 0.12 * scale; hatFall.rest = true; hat.rotation.set(Math.PI * 0.08, hat.rotation.y, Math.PI * 0.05); kickSnow(hat.position, 0.8); }
+      },
+      resetHat() {
+        if (!hat || !hatFall) return;
+        scene.remove(hat); headG.add(hat);
+        hat.position.set(0, 0.11, 0); hat.rotation.set(0, 0, 0); hat.scale.set(1, 1, 1);
+        hatFall = null;
+      },
+      hatOn: () => !!hat && !hatFall,
     };
   }
 
@@ -847,7 +911,7 @@
     mesh.frustumCulled = false; scene.add(mesh);
     const samples = [];
     return {
-      color: { r, g, b },
+      color: { r, g, b }, samples,
       update(active, fig, now) {
         if (active) samples.unshift({ tip: fig.tip.clone(), mid: fig.mid.clone(), t: now });
         while (samples.length > n || (samples.length && now - samples[samples.length - 1].t > 240)) samples.pop();
@@ -865,25 +929,252 @@
   const enemyTrail = makeTrail(20, 0.78, 0.84, 0.98);
   const playerTrail = makeTrail(16, 0.95, 0.62, 0.55);
 
-  const SPARK_N = 220;
+  // 火花：速度の向きに伸びた光の線として描く（点ではなく「線」の火花）
+  const SPARK_N = 260;
   const sparkGeo = new THREE.BufferGeometry();
-  const sparkPos = new Float32Array(SPARK_N * 3), sparkCol = new Float32Array(SPARK_N * 3);
+  const sparkPos = new Float32Array(SPARK_N * 4 * 3), sparkCol = new Float32Array(SPARK_N * 4 * 3);
+  const sparkIdx = [];
+  for (let i = 0; i < SPARK_N; i++) { const a = i * 4; sparkIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  sparkGeo.setIndex(sparkIdx);
   sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
   sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
-  const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 0.075, map: softTex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const sparks = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   sparks.frustumCulled = false; scene.add(sparks);
-  const sparkState = Array.from({ length: SPARK_N }, () => ({ life: 0, max: 1, p: V(0, -10, 0), v: V(0, 0, 0), c: new THREE.Color() }));
+  const sparkState = Array.from({ length: SPARK_N }, () => ({ life: 0, max: 1, p: V(0, -10, 0), v: V(0, 0, 0), c: new THREE.Color(), w: 0.01 }));
   let sparkCursor = 0;
+  // tint: hot（弾きの熱い火花）/ dull（受けの鈍い火花）/ cool（青白い）/ warm
   function burst(at, count, power, tint) {
     for (let i = 0; i < count; i++) {
       const s = sparkState[sparkCursor]; sparkCursor = (sparkCursor + 1) % SPARK_N;
       s.p.copy(at);
-      const a = Math.random() * Math.PI * 2, b = (Math.random() - 0.3) * Math.PI;
-      const sp = power * (0.6 + Math.random() * 0.9);
-      s.v.set(Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 0.8, Math.sin(a) * Math.cos(b) * sp);
-      s.max = s.life = 0.25 + Math.random() * 0.5;
-      if (tint === 'warm') s.c.setRGB(1, 0.78, 0.5); else if (tint === 'red') s.c.setRGB(1, 0.35, 0.3); else s.c.setRGB(1, 0.94, 0.85);
+      const a = Math.random() * Math.PI * 2, b = (Math.random() - 0.25) * Math.PI;
+      const sp = power * (0.7 + Math.random() * 1.1);
+      s.v.set(Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 1.0, Math.sin(a) * Math.cos(b) * sp);
+      s.max = s.life = 0.22 + Math.random() * (tint === 'dull' ? 0.2 : 0.55);
+      s.w = tint === 'hot' ? 0.014 : 0.009;
+      if (tint === 'hot') s.c.setRGB(1.6, 1.05, 0.55);
+      else if (tint === 'dull') s.c.setRGB(0.8, 0.42, 0.18);
+      else if (tint === 'warm') s.c.setRGB(1.3, 0.85, 0.5);
+      else if (tint === 'red') s.c.setRGB(1.0, 0.75, 0.6);
+      else s.c.setRGB(1.1, 1.15, 1.35);
     }
+  }
+  const _sd = V(0, 0, 0), _ss = V(0, 0, 0), _cv = V(0, 0, 0);
+  function updateSparks(dt) {
+    camera.getWorldDirection(_cv);
+    for (let i = 0; i < SPARK_N; i++) {
+      const s = sparkState[i], o = i * 12;
+      if (s.life <= 0) { sparkCol.fill(0, o, o + 12); continue; }
+      s.life -= dt; s.v.y -= 7 * dt; s.v.multiplyScalar(1 - 1.2 * dt); s.p.addScaledVector(s.v, dt);
+      if (s.p.y < 0.02) { s.p.y = 0.02; s.v.y *= -0.3; s.v.x *= 0.6; s.v.z *= 0.6; }
+      const f = Math.max(0, s.life / s.max);
+      const len = clamp(s.v.length() * 0.045, 0.02, 0.32);
+      _sd.copy(s.v).normalize();
+      _ss.copy(_sd).cross(_cv).normalize().multiplyScalar(s.w * (0.5 + f));
+      const hx = s.p.x, hy = s.p.y, hz = s.p.z, tx = hx - _sd.x * len, ty = hy - _sd.y * len, tz = hz - _sd.z * len;
+      sparkPos.set([hx + _ss.x, hy + _ss.y, hz + _ss.z, hx - _ss.x, hy - _ss.y, hz - _ss.z, tx + _ss.x * 0.2, ty + _ss.y * 0.2, tz + _ss.z * 0.2, tx - _ss.x * 0.2, ty - _ss.y * 0.2, tz - _ss.z * 0.2], o);
+      const r = s.c.r * f, g = s.c.g * f, b = s.c.b * f;
+      sparkCol.set([r, g, b, r, g, b, r * 0.15, g * 0.1, b * 0.05, r * 0.15, g * 0.1, b * 0.05], o);
+    }
+    sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
+  }
+
+  // 星形の光（弾きの瞬間）
+  const flareTex = (() => {
+    const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.08, 'rgba(255,240,215,0.9)'); grd.addColorStop(0.3, 'rgba(255,200,140,0.18)'); grd.addColorStop(1, 'rgba(255,200,140,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, s, s);
+    g.globalCompositeOperation = 'lighter';
+    [[s, 3], [3, s * 0.6]].forEach(([w, h]) => {
+      const lg = w > h ? g.createLinearGradient(0, 0, s, 0) : g.createLinearGradient(0, 0, 0, s);
+      lg.addColorStop(0, 'rgba(255,240,220,0)'); lg.addColorStop(0.5, 'rgba(255,250,240,1)'); lg.addColorStop(1, 'rgba(255,240,220,0)');
+      g.fillStyle = lg; g.fillRect((s - w) / 2, (s - h) / 2, w, h);
+    });
+    return new THREE.CanvasTexture(c);
+  })();
+  const flares = Array.from({ length: 5 }, () => {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: flareTex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    m.visible = false; m.renderOrder = 10; scene.add(m);
+    return { m, t0: 0, dur: 200, size: 1 };
+  });
+  let flareCursor = 0;
+  function flare(at, size, dur, color) {
+    const f = flares[flareCursor]; flareCursor = (flareCursor + 1) % flares.length;
+    f.m.position.copy(at); f.t0 = performance.now(); f.dur = dur; f.size = size; f.m.visible = true;
+    f.m.material.rotation = (Math.random() - 0.5) * 0.5;
+    f.m.material.color.set(color || 0xffffff);
+  }
+
+  // 斬撃の線：刃が通った跡に残る、白く鋭い三日月
+  const arcs = Array.from({ length: 4 }, () => {
+    const n = 14, geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 2 * 3), col = new Float32Array(n * 2 * 3), idx = [];
+    for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+    m.frustumCulled = false; m.visible = false; m.renderOrder = 9; scene.add(m);
+    return { m, geo, pos, col, n, t0: 0, pts: [], center: V(0, 0, 0) };
+  });
+  let arcCursor = 0;
+  function slashArc(points, center, big) {
+    if (points.length < 3) return;
+    const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
+    A.pts = points.slice(0, A.n).map((p) => p.clone());
+    A.center.copy(center); A.t0 = performance.now(); A.big = big; A.m.visible = true;
+  }
+  function updateArcs(now) {
+    camera.getWorldDirection(_cv);
+    arcs.forEach((A) => {
+      if (!A.m.visible) return;
+      const dur = A.big ? 360 : 240, u = (now - A.t0) / dur;
+      if (u >= 1) { A.m.visible = false; return; }
+      const n = Math.min(A.n, A.pts.length);
+      for (let i = 0; i < A.n; i++) {
+        const p = A.pts[Math.min(i, n - 1)], q = A.pts[Math.min(i + 1, n - 1)];
+        _sd.copy(q).sub(p); if (_sd.lengthSq() < 1e-8) _sd.set(1, 0, 0);
+        _ss.copy(_sd).cross(_cv).normalize();
+        const t = i / (n - 1);
+        const w = (A.big ? 0.05 : 0.03) * Math.sin(Math.PI * clamp(t, 0, 1)) * (1 - u * 0.6);
+        // 中心からわずかに外へ広がる
+        _sd.copy(p).sub(A.center).multiplyScalar(u * 0.25).add(p);
+        A.pos.set([_sd.x + _ss.x * w, _sd.y + _ss.y * w, _sd.z + _ss.z * w, _sd.x - _ss.x * w, _sd.y - _ss.y * w, _sd.z - _ss.z * w], i * 6);
+        const f = (1 - u) * (1 - u) * 1.6;
+        A.col.set([f, f, f * 1.1, f * 0.5, f * 0.7, f], i * 6);
+      }
+      A.geo.attributes.position.needsUpdate = true; A.geo.attributes.color.needsUpdate = true;
+    });
+  }
+
+  // 裂けた布の切れ端
+  const shreds = Array.from({ length: 48 }, () => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.035), new THREE.MeshBasicMaterial({ color: 0x1a1720, side: THREE.DoubleSide, transparent: true, opacity: 0 }));
+    m.visible = false; scene.add(m);
+    return { m, v: V(0, 0, 0), spin: V(0, 0, 0), life: 0, max: 1 };
+  });
+  let shredCursor = 0;
+  function shred(at, count, color) {
+    for (let i = 0; i < count; i++) {
+      const s = shreds[shredCursor]; shredCursor = (shredCursor + 1) % shreds.length;
+      s.m.position.copy(at); s.m.material.color.set(color || 0x1a1720);
+      s.v.set((Math.random() - 0.5) * 2.4, 0.6 + Math.random() * 1.6, (Math.random() - 0.5) * 2.4);
+      s.spin.set(Math.random() * 14, Math.random() * 14, Math.random() * 14);
+      s.max = s.life = 0.8 + Math.random() * 0.8; s.m.visible = true;
+    }
+  }
+  function updateShreds(dt) {
+    shreds.forEach((s) => {
+      if (!s.m.visible) return;
+      s.life -= dt;
+      if (s.life <= 0) { s.m.visible = false; return; }
+      s.v.y -= 3.2 * dt; s.v.multiplyScalar(1 - 1.6 * dt);
+      s.m.position.addScaledVector(s.v, dt);
+      if (s.m.position.y < 0.02) { s.m.position.y = 0.02; s.v.set(0, 0, 0); s.spin.multiplyScalar(0.5); }
+      s.m.rotation.x += s.spin.x * dt; s.m.rotation.y += s.spin.y * dt; s.m.rotation.z += s.spin.z * dt;
+      s.m.material.opacity = Math.min(1, s.life / s.max * 2.5);
+    });
+  }
+
+  // ───────────────────────── 後処理（画面全体のエフェクト） ─────────────────────────
+  // 光のにじみ、衝撃波の揺らぎ、色のにじみ、中心へ向かう速度のぼかし、色を抜く、視界の端の暗さ
+  const FX = { shock: { t0: -1e9, c: new THREE.Vector2(0.5, 0.5), dur: 420, amp: 0 }, aberr: 0, zoom: 0, zoomC: new THREE.Vector2(0.5, 0.5), desat: 0, flash: new THREE.Color(0, 0, 0), vig: 0.35 };
+  const Post = (() => {
+    const gl2 = renderer.capabilities.isWebGL2;
+    const MS = gl2 && THREE.WebGLMultisampleRenderTarget;
+    const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: gl2 ? THREE.HalfFloatType : THREE.UnsignedByteType };
+    let main = null, bA = null, bB = null;
+    const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    const bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uThresh: { value: 0.72 } }, vertexShader: VS,
+      fragmentShader: 'uniform sampler2D tDiffuse; uniform float uThresh; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(uThresh, uThresh + 0.35, l), 1.0); }', depthTest: false, depthWrite: false });
+    const blur = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2(1, 0) } }, vertexShader: VS,
+      fragmentShader: 'uniform sampler2D tDiffuse; uniform vec2 uDir; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb * 0.227; c += (texture2D(tDiffuse, vUv + uDir * 1.385).rgb + texture2D(tDiffuse, vUv - uDir * 1.385).rgb) * 0.316; c += (texture2D(tDiffuse, vUv + uDir * 3.231).rgb + texture2D(tDiffuse, vUv - uDir * 3.231).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }', depthTest: false, depthWrite: false });
+    const comp = new THREE.ShaderMaterial({
+      uniforms: { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uShock: { value: new THREE.Vector4(0.5, 0.5, 0, 0) }, uAberr: { value: 0 }, uZoom: { value: 0 }, uZoomC: { value: new THREE.Vector2(0.5, 0.5) }, uDesat: { value: 0 }, uFlash: { value: new THREE.Vector3() }, uVig: { value: 0.35 }, uBloom: { value: 0.9 }, uCold: { value: 0 } },
+      vertexShader: VS, depthTest: false, depthWrite: false,
+      fragmentShader: `
+        uniform sampler2D tScene, tBloom; uniform vec2 uRes, uZoomC; uniform vec4 uShock;
+        uniform float uAberr, uZoom, uDesat, uVig, uBloom, uCold; uniform vec3 uFlash; varying vec2 vUv;
+        vec3 toSRGB(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+        void main(){
+          vec2 uv = vUv;
+          vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+          vec2 d = (uv - uShock.xy) * asp; float r = length(d);
+          float ring = smoothstep(uShock.z - 0.09, uShock.z, r) * (1.0 - smoothstep(uShock.z, uShock.z + 0.09, r));
+          uv -= (d / max(r, 1e-4)) / asp * ring * uShock.w * 0.04;
+          vec3 col = vec3(0.0);
+          vec2 zd = uv - uZoomC;
+          float n = uZoom > 0.001 ? 8.0 : 1.0;
+          for (int i = 0; i < 8; i++) {
+            if (float(i) >= n) break;
+            vec2 suv = uv - zd * (float(i) / 7.0) * uZoom;
+            vec2 ca = (suv - 0.5) * (uAberr + ring * uShock.w * 0.02);
+            col += vec3(texture2D(tScene, suv + ca).r, texture2D(tScene, suv).g, texture2D(tScene, suv - ca).b);
+          }
+          col /= n;
+          col += texture2D(tBloom, uv).rgb * uBloom;
+          float l = dot(col, vec3(0.299, 0.587, 0.114));
+          col = mix(col, vec3(l) * vec3(0.86, 0.95, 1.12), uDesat);
+          col = mix(col, col * vec3(0.8, 0.92, 1.18), uCold);
+          col += uFlash;
+          float v = smoothstep(0.95, 0.2, length((vUv - 0.5) * vec2(1.0, 1.15)));
+          col *= mix(1.0, v, uVig);
+          gl_FragColor = vec4(toSRGB(col), 1.0);
+        }` });
+    const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), comp);
+    quad.frustumCulled = false;
+    const qScene = new THREE.Scene(); qScene.add(quad);
+    let enabled = true;
+    function size(w, h) {
+      [main, bA, bB].forEach((t) => t && t.dispose());
+      main = MS ? new THREE.WebGLMultisampleRenderTarget(w, h, opts) : new THREE.WebGLRenderTarget(w, h, opts);
+      if (MS) main.samples = 4;
+      const bw = Math.max(1, Math.floor(w / 4)), bh = Math.max(1, Math.floor(h / 4));
+      bA = new THREE.WebGLRenderTarget(bw, bh, opts); bB = new THREE.WebGLRenderTarget(bw, bh, opts);
+      comp.uniforms.uRes.value.set(w, h);
+      blur.userData = { bw, bh };
+    }
+    function pass(mat, target) { quad.material = mat; renderer.setRenderTarget(target); renderer.render(qScene, quadCam); }
+    function render() {
+      if (!enabled || !main) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+      renderer.setRenderTarget(main); renderer.render(scene, camera);
+      bright.uniforms.tDiffuse.value = main.texture; pass(bright, bA);
+      blur.uniforms.tDiffuse.value = bA.texture; blur.uniforms.uDir.value.set(1 / blur.userData.bw, 0); pass(blur, bB);
+      blur.uniforms.tDiffuse.value = bB.texture; blur.uniforms.uDir.value.set(0, 1 / blur.userData.bh); pass(blur, bA);
+      const u = comp.uniforms, now = performance.now();
+      const st = (now - FX.shock.t0) / FX.shock.dur;
+      u.uShock.value.set(FX.shock.c.x, FX.shock.c.y, st < 1 ? easeOut(st) * 0.55 : 0, st < 1 ? FX.shock.amp * (1 - st) : 0);
+      u.uAberr.value = FX.aberr; u.uZoom.value = FX.zoom; u.uZoomC.value.copy(FX.zoomC);
+      u.uDesat.value = FX.desat; u.uFlash.value.set(FX.flash.r, FX.flash.g, FX.flash.b); u.uVig.value = FX.vig; u.uCold.value = FX.cold || 0;
+      u.tScene.value = main.texture; u.tBloom.value = bA.texture;
+      pass(comp, null);
+    }
+    return { size, render, set enabled(v) { enabled = v; } };
+  })();
+  // 刃と刃が噛み合う点：二本の刀の中ほどの、さらに中間。胸から頭の高さに収める。
+  function clashPoint(out) {
+    out.copy(enemy.mid).lerp(player.mid, 0.5);
+    out.y = clamp(out.y, 0.95, 1.75);
+    return out;
+  }
+  const _pj = V(0, 0, 0);
+  function toUv(world, out) { _pj.copy(world).project(camera); out.set((_pj.x + 1) / 2, (_pj.y + 1) / 2); return out; }
+  function fxShock(world, amp) { toUv(world, FX.shock.c); FX.shock.t0 = performance.now(); FX.shock.amp = amp; FX.shock.dur = 380 + amp * 160; }
+  function fxKick(aberr, zoom, world) { FX.aberr = Math.max(FX.aberr, aberr); FX.zoom = Math.max(FX.zoom, zoom); if (world) toUv(world, FX.zoomC); }
+  function fxFlash(r, g, b) { FX.flash.setRGB(Math.max(FX.flash.r, r), Math.max(FX.flash.g, g), Math.max(FX.flash.b, b)); }
+  function updateFX(dt) {
+    FX.aberr = Math.max(0, FX.aberr - dt * 0.06);
+    FX.zoom = Math.max(0, FX.zoom - dt * 0.9);
+    FX.flash.multiplyScalar(Math.max(0, 1 - dt * 7));
+    const slow = performance.now() < S.slowUntil && S.slowScale < 0.5;
+    // 見切りの間は、色が抜けて冷たくなる。自分が追い詰められると、視界の端が暗く、色が抜ける。
+    const load = S.P / 100;
+    const targetDesat = Math.max(S.mikiriFx && slow ? 0.85 : 0, clamp((load - 0.45) * 1.1, 0, 0.6));
+    FX.desat = lerp(FX.desat, targetDesat, 1 - Math.exp(-dt * (targetDesat > FX.desat ? 18 : 5)));
+    FX.cold = lerp(FX.cold || 0, S.mikiriFx && slow ? 1 : 0, 1 - Math.exp(-dt * 10));
+    FX.vig = lerp(FX.vig, 0.35 + load * 0.6 + (S.mikiriFx && slow ? 0.25 : 0), 1 - Math.exp(-dt * 6));
+    if (!slow) S.mikiriFx = false;
   }
   // 打ち合いの光
   const clashLight = new THREE.PointLight(0xfff1dc, 0, 7, 2);
@@ -1007,7 +1298,17 @@
         else { bell(1480 * k * 0.8, 1.8, 0.32); bell(740 * k * 0.8, 1.2, 0.12, [1, 3.01]); noise(0.05, 'highpass', 6000, 0.7, 0.16); }
       },
       clash() { bell(420, 0.35, 0.2, [1, 1.93, 3.7]); noise(0.12, 'bandpass', 1800, 0.8, 0.26); },
-      cut() { noise(0.18, 'bandpass', 2600, 0.9, 0.22, 900); tone(220, 90, 0.18, 0.12, 'triangle'); },
+      // 弾き：高く澄んで長く響く金属音に、低い芯を重ねる。連続するほど音階が上がる。
+      kin(chain) {
+        const k = Math.pow(2, PENTA[Math.min(chain, PENTA.length - 1)] / 12);
+        bell(1320 * k * 0.8, 1.6, 0.34); bell(2640 * k * 0.8, 0.9, 0.1, [1, 1.51]);
+        tone(190, 80, 0.22, 0.32); noise(0.05, 'highpass', 5500, 0.7, 0.3); noise(0.25, 'bandpass', 7000, 2, 0.06);
+      },
+      clank() { tone(260, 150, 0.12, 0.22, 'triangle'); noise(0.1, 'bandpass', 1200, 1.1, 0.22); },
+      clashLow() { bell(330, 0.5, 0.24, [1, 1.93, 3.1]); noise(0.12, 'bandpass', 1500, 0.8, 0.28); tone(120, 70, 0.2, 0.2); },
+      mikiri() { tone(60, 48, 0.5, 0.45); setTimeout(() => tone(58, 46, 0.4, 0.32), 320); noise(0.6, 'bandpass', 420, 0.8, 0.12, 180); },
+      rip() { noise(0.16, 'bandpass', 3200, 1.6, 0.16, 1400); noise(0.08, 'highpass', 4000, 0.8, 0.08); },
+      cut(big) { noise(big ? 0.3 : 0.18, 'bandpass', 2600, 0.9, big ? 0.32 : 0.22, 700); tone(big ? 150 : 220, 60, big ? 0.3 : 0.18, big ? 0.3 : 0.14, 'triangle'); },
       hit() { tone(150, 42, 0.32, 0.55); noise(0.18, 'lowpass', 900, 0.7, 0.35); },
       whiff() { noise(0.16, 'bandpass', 700, 2, 0.12, 2400); },
       dodge() { noise(0.2, 'bandpass', 500, 1.2, 0.1, 1800); },
@@ -1239,22 +1540,30 @@
     if (label === '斬') S.stats.cut++;
     S.enemyDeflects = 0;
     addChain();
-    Sound.cut(); if (big) Sound.parry('tai', S.chain);
-    burst(tA, big ? 40 : 18, big ? 2.6 : 1.6, 'red');
-    lightAt(tA, big ? 4.5 : 2.5, 0xffb08a);
-    S.freezeUntil = performance.now() + (big ? 110 : 55);
-    glyphAt(label, cls, tA);
+    Sound.cut(big); Sound.rip();
+    const pts = playerTrail.samples.map((q) => q.tip);
+    slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big);
+    shred(tA, big ? 14 : 7);
+    kickSnow(enemy.hipWorld, big ? 0.8 : 0.35);
+    lightAt(tA, big ? 3 : 1.4, 0xe8f0ff);
+    fxShock(tA, big ? 0.7 : 0.3); fxKick(big ? 0.008 : 0.003, big ? 0.09 : 0, tA);
+    S.freezeUntil = performance.now() + (big ? 115 : 62);
+    enemy.addTear();
     S.stagger.vp += -0.9 * (big ? 1.7 : 1);
     const f = dirPE();
     tween(S.e, S.e.x + f.x * (big ? 0.8 : 0.3), S.e.z + f.z * (big ? 0.8 : 0.3), big ? 320 : 200);
-    if (big) { ring(S.e.x, S.e.z, 3.2, 0xffb08a); S.fovKick = Math.max(S.fovKick, 6); S.shake = Math.max(S.shake, 0.07); flash(0.18); }
+    if (big) { ring(S.e.x, S.e.z, 3.2, 0xe8f0ff); S.fovKick = Math.max(S.fovKick, 6); S.shake = Math.max(S.shake, 0.07); fxFlash(0.12, 0.13, 0.16); }
     pushLog(label, '', `崩し ${Math.round(amount)}`);
     if (S.B >= 100) breakEnemy();
   }
 
   function enemyDeflect(forceCounter) {
-    Sound.clash(); burst(tA, 14, 1.6, 'cool'); lightAt(tA, 2.2);
+    // 斬りを弾かれた：火花、低い金属音、自分がのけぞる
+    clashPoint(tA);
+    Sound.clashLow(); burst(tA, 20, 2.2, 'hot'); flare(tA, 0.8, 160); lightAt(tA, 3, 0xffe2c0);
     S.guardUntil = S.gt + 260;
+    { const f = dirPE(); tween(S.p, S.p.x - f.x * 0.45, S.p.z - f.z * 0.45, 200); }
+    if (S.pa) S.pa.recoil = S.gt;
     S.B = clamp(S.B + CFG.brk.deflected, 0, 100);
     S.P = clamp(S.P + 3, 0, 100); S.lastHit = S.gt;
     S.enemyDeflects++;
@@ -1295,13 +1604,17 @@
     S.stats.parry++; addChain();
     const amt = CFG.brk.parry * a.move.w;
     S.B = clamp(S.B + amt, 0, 100); S.lastPressure = S.gt;
-    Sound.parry('tai', S.chain);
-    S.freezeUntil = performance.now() + 90; flash(0.18);
-    tA.copy(enemy.tip).lerp(enemy.mid, 0.35);
-    burst(tA, 32, 2.4, 'cool'); lightAt(tA, 4.2, 0xe6eeff);
-    ring((S.e.x + S.p.x) / 2, (S.e.z + S.p.z) / 2, 2.8);
-    glyphAt('弾き', 'tai', tA);
-    S.fovKick = Math.max(S.fovKick, 4);
+    // 弾き：時間が止まり、熱い火花が飛び、星形の光、衝撃波、高く長く響く金属音
+    Sound.kin(S.chain);
+    S.freezeUntil = performance.now() + 115;
+    clashPoint(tA);
+    burst(tA, 48, 3.6, 'hot'); burst(tA, 12, 1.8, 'cool');
+    flare(tA, 1.9, 260);
+    lightAt(tA, 7, 0xffe2c0);
+    fxShock(tA, 1.0); fxKick(0.014, 0.07, tA); fxFlash(0.22, 0.2, 0.16);
+    ring((S.e.x + S.p.x) / 2, (S.e.z + S.p.z) / 2, 3.0, 0xffe2c0);
+    S.fovKick = Math.max(S.fovKick, 5); S.shake = Math.max(S.shake, 0.05);
+    if (S.B > 62) S.buckleUntil = S.gt + 450;
     if (S.pa && S.pa.kind === 'deflect') S.pa.snap = S.gt;
     S.counterUntil = S.gt + CFG.counterParry; S.counterKind = 'parry';
     S.stagger.vx += (S.r() < 0.5 ? -1 : 1) * 1.3 * a.move.w; S.stagger.vp -= 0.9 * a.move.w;
@@ -1318,9 +1631,10 @@
     S.stats.block++;
     S.P = clamp(S.P + CFG.blockDamage(a.move.w), 0, 100); S.lastHit = S.gt;
     S.B = clamp(S.B + CFG.brk.block, 0, 100);
-    Sound.clash();
-    tA.copy(enemy.tip).lerp(enemy.mid, 0.4); burst(tA, 10, 1.2, 'cool');
-    glyphAt('受け', 'miss', tA);
+    // 受け：止まらない。鈍い火花と鈍い音、自分が押される
+    Sound.clank();
+    clashPoint(tA); burst(tA, 9, 1.1, 'dull');
+    S.shake = Math.max(S.shake, 0.06);
     const f = dirPE();
     tween(S.p, S.p.x - f.x * 0.35, S.p.z - f.z * 0.35, 180);
     pushLog('受け', `${Math.round(a.T - S.guardStart)}ms`, '早すぎた。弾きは刃が届く直前');
@@ -1331,10 +1645,11 @@
     a.resolved = true; a.missed = true;
     S.stats.mikiri++; addChain();
     S.queue = [];
-    Sound.parry('sen', S.chain); Sound.dodge();
-    S.slowUntil = performance.now() + 950; S.slowScale = 0.3;
-    flash(0.2, '#cfe0ff');
-    glyphAt('見切り', 'sen', player.chestWorld);
+    // 見切り：時間がゆっくりになり、色が抜けて冷たくなる。中心へ向かう速度の線、低い鼓動
+    Sound.mikiri(); Sound.dodge();
+    S.slowUntil = performance.now() + 950; S.slowScale = 0.3; S.mikiriFx = true;
+    fxKick(0.006, 0.24, player.chestWorld);
+    tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.9, 420, 0xbfd8ff);
     S.counterUntil = S.gt + CFG.counterMikiri; S.counterKind = 'mikiri';
     S.fovKick = Math.max(S.fovKick, 5);
     pushLog('見切り', `${Math.round(a.T - S.dodgeStart)}ms`, '反撃の機会');
@@ -1344,11 +1659,11 @@
     a.resolved = true; S.queue = []; S.action = null;
     S.stats.stomp++; addChain();
     S.B = clamp(S.B + CFG.brk.stomp, 0, 100); S.lastPressure = S.gt;
-    Sound.parry('sen', S.chain); Sound.clash();
-    S.slowUntil = performance.now() + 420;
+    Sound.kin(S.chain + 2); Sound.hit();
+    S.slowUntil = performance.now() + 420; S.slowScale = 0.3;
     tA.copy(enemy.tip).lerp(player.chestWorld, 0.5);
-    burst(tA, 40, 2.6, 'warm'); lightAt(tA, 5, 0xffd2a0); ring(tA.x, tA.z, 3.4, 0xffd2a0);
-    glyphAt('見切り踏み', 'sen', tA);
+    burst(tA, 56, 3.4, 'hot'); flare(tA, 2.2, 300); lightAt(tA, 7, 0xffd2a0); ring(tA.x, tA.z, 3.6, 0xffd2a0);
+    fxShock(tA, 1.2); fxKick(0.012, 0.12, tA); kickSnow(tA, 1.2);
     S.counterUntil = S.gt + 1100; S.counterKind = 'mikiri';
     pushLog('踏み', '', `危険な突きを踏みつけた　崩し ${CFG.brk.stomp}`);
     if (S.B >= 100) breakEnemy(); else setMode('staggered', 1000);
@@ -1363,8 +1678,11 @@
     S.shake = 0.18;
     S.playerLockUntil = S.gt + 300;
     startPA('hit');
-    flash(0.1, '#ff6a4a');
-    tA.copy(player.chestWorld); burst(tA, 16, 1.6, 'red');
+    // 斬られた：血は出さない。世界が一瞬色を失い、視界が揺れ、自分の着物が裂ける
+    FX.desat = Math.max(FX.desat, 0.7); FX.vig = Math.max(FX.vig, 0.9);
+    tA.copy(player.chestWorld); shred(tA, 8, 0x2d3a4f); kickSnow(player.hipWorld, 0.6);
+    player.addTear();
+    fxShock(tA, 0.4);
     const f = dirPE();
     tween(S.p, S.p.x - f.x * 0.6, S.p.z - f.z * 0.6, 200);
     if (guardBreak) glyphAt('崩', 'miss', player.chestWorld);
@@ -1393,7 +1711,8 @@
     S.slowUntil = performance.now() + 1500; S.slowScale = 0.3;
     startPA('issen');
     Sound.issen();
-    flash(0.6);
+    fxFlash(0.55, 0.55, 0.6); fxShock(enemy.chestWorld, 1.4); fxKick(0.016, 0.2, enemy.chestWorld);
+    if (S.phase === 1) enemy.dropHat();
     const sl = document.getElementById('slash');
     sl.classList.remove('on'); void sl.offsetWidth; sl.classList.add('on');
     tA.copy(enemy.chestWorld);
@@ -1417,28 +1736,11 @@
   // ───────────────────────── 画面上の表現 ─────────────────────────
   const glyphs = document.getElementById('glyphs');
   const projV = V(0, 0, 0);
-  function glyphAt(text, cls, world) {
-    projV.copy(world).project(camera);
-    glyphAtScreen(text, cls, (projV.x + 1) / 2, (1 - projV.y) / 2);
-  }
-  function glyphAtScreen(text, cls, nx, ny) {
-    const el = document.createElement('div');
-    el.className = `glyph ${cls}`;
-    el.textContent = text;
-    el.style.left = `${clamp(nx, 0.08, 0.92) * 100}%`;
-    el.style.top = `${clamp(ny, 0.08, 0.92) * 100}%`;
-    glyphs.appendChild(el);
-    setTimeout(() => el.remove(), cls === 'phase' ? 2000 : 950);
-  }
-  const flashEl = document.getElementById('flash');
-  function flash(strength, color) {
-    flashEl.style.transition = 'none';
-    flashEl.style.background = color || '#fff';
-    flashEl.style.opacity = String(strength);
-    void flashEl.offsetWidth;
-    flashEl.style.transition = 'opacity 260ms ease-out';
-    flashEl.style.opacity = '0';
-  }
+  // 画面に文字は出さない（没入感を守る）。結果は手応えの組み合わせで伝える。
+  function glyphAt() {}
+  function glyphAtScreen() {}
+  const _fc = new THREE.Color();
+  function flash(strength, color) { _fc.set(color || '#ffffff'); fxFlash(_fc.r * strength * 0.7, _fc.g * strength * 0.7, _fc.b * strength * 0.7); }
 
   const logEl = document.getElementById('log');
   const logBtn = document.getElementById('logBtn');
@@ -1644,10 +1946,15 @@
     if (gt < S.guardUntil) blend(out, GUARD, 0.85, out);
     const load = S.B / 100;
     if (m !== 'falling' && m !== 'victory') {
-      out.crouch += 0.012 * Math.sin(gt / breathPeriod(S.B) * Math.PI * 2) + load * 0.1;
+      // 落ち着き → 苦しい（肩で息をし、刀が下がる）→ 崩れる寸前（刀先が雪を引きずる）
+      const heave = Math.sin(gt / breathPeriod(S.B) * Math.PI * 2);
+      out.crouch += (0.012 + load * 0.03) * heave + load * 0.1;
+      out.pitch += load * load * 0.12 + heave * load * 0.03;
       out.roll += Math.sin(gt * 0.0031) * load * 0.07;
       out.hand.y -= load * 0.12;
       out.hand.x += Math.sin(gt * 0.047) * load * load * 0.02;
+      if (load > 0.72 && m !== 'attack') { const k = (load - 0.72) / 0.28; out.hand.y -= k * 0.3; out.sword.y -= k * 1.6; out.sword.normalize(); }
+      if (gt < (S.buckleUntil || 0)) { const u = 1 - (S.buckleUntil - gt) / 450; const k = Math.sin(u * Math.PI); out.crouch += 0.26 * k; out.pitch += 0.18 * k; }
     }
     out.hipX += S.stagger.x * 0.35; out.yaw += -S.stagger.x * 0.6; out.pitch += S.stagger.p * 0.35; out.hand.x += S.stagger.x * 0.4;
     return out;
@@ -1671,7 +1978,7 @@
         const u = S.gt - pa.snap;
         blend(out, PL.deflectSnap, clamp(u < 60 ? easeOut(u / 60) : 1 - smooth((u - 60) / 280), 0, 1), out);
       }
-      if (pa.kind === 'dodge') { out.roll += -(pa.side || 1) * 0.0; }
+      if (pa.recoil) { const u = S.gt - pa.recoil; const k = u < 80 ? easeOut(u / 80) : 1 - smooth((u - 80) / 300); blend(out, PL.hit, clamp(k, 0, 1) * 0.7, out); }
     } else blend(P_BASE, P_BASE, 0, out);
     const load = S.P / 100;
     out.crouch += 0.01 * Math.sin(S.gt / breathPeriod(S.P) * Math.PI * 2) + load * 0.08;
@@ -1700,16 +2007,19 @@
 
   function updateEffects(dtReal) {
     const dt = dtReal / 1000, now = performance.now();
-    for (let i = 0; i < SPARK_N; i++) {
-      const s = sparkState[i];
-      if (s.life > 0) {
-        s.life -= dt; s.v.y -= 6 * dt; s.p.addScaledVector(s.v, dt);
-        const f = Math.max(0, s.life / s.max);
-        sparkCol[i * 3] = s.c.r * f; sparkCol[i * 3 + 1] = s.c.g * f; sparkCol[i * 3 + 2] = s.c.b * f;
-      } else { sparkCol[i * 3] = sparkCol[i * 3 + 1] = sparkCol[i * 3 + 2] = 0; }
-      sparkPos[i * 3] = s.p.x; sparkPos[i * 3 + 1] = s.p.y; sparkPos[i * 3 + 2] = s.p.z;
-    }
-    sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
+    updateSparks(dt);
+    updateArcs(now);
+    updateShreds(dt);
+    updateFX(dt);
+    enemy.updateHat(dt);
+    flares.forEach((f) => {
+      if (!f.m.visible) return;
+      const u = (now - f.t0) / f.dur;
+      if (u >= 1) { f.m.visible = false; return; }
+      const sz = f.size * (0.5 + easeOut(Math.min(1, u * 3)) * 0.8);
+      f.m.scale.set(sz, sz, 1);
+      f.m.material.opacity = u < 0.15 ? u / 0.15 : (1 - u) / 0.85;
+    });
     for (const b of puffs) {
       if (!b.m.visible) continue;
       b.life -= dt;
@@ -1747,7 +2057,9 @@
     enemyTrail.color = a && a.peril ? { r: 1, g: 0.35, b: 0.32 } : { r: 0.78, g: 0.84, b: 0.98 };
     enemyTrail.update(a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F, enemy, now);
     const pa = S.pa;
-    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'issen'].includes(pa.kind) && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
+    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen'].includes(pa.kind) && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
+    if (a && !a.feint && !a.peril && !a.resolved && !a.glinted && S.mode === 'attack' && S.gt >= a.T - 175) { a.glinted = true; tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.5, 170, 0xdfe9ff); }
+    if (enemy.tip.y < 0.14 && S.B > 70 && now - (S.lastDrag || 0) > 70 && S.mode !== 'falling' && S.mode !== 'victory') { S.lastDrag = now; footprint(enemy.tip.x, enemy.tip.z, S.e.yaw + 1.2); }
     // 危険な技の赤い光：起こりから振り始めまで
     const perilOn = a && a.peril && S.mode === 'attack' && S.gt < a.T - a.S;
     glint.material.opacity = perilOn ? 0.55 + Math.sin(now * 0.03) * 0.25 : Math.max(0, glint.material.opacity - dt * 4);
@@ -1786,11 +2098,14 @@
     const fov = base - S.fovKick;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
+  const _db = new THREE.Vector2();
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    renderer.getDrawingBufferSize(_db);
+    Post.size(_db.x, _db.y);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -1834,7 +2149,7 @@
     updateBodies(dtGame);
     updateEffects(dtReal * (scale === 0 ? 0.15 : scale));
     updateCamera(dtReal);
-    renderer.render(scene, camera);
+    Post.render();
     if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
     requestAnimationFrame(frame);
   }
@@ -1859,6 +2174,8 @@
     });
     S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.p.x = 0; S.p.z = 2.1; S.p.tw = null;
     enemy.resetFeet(); player.resetFeet();
+    if (fromPhase === 1) { enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
+    else if (enemy.hatOn()) enemy.dropHat();
     enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
     S.r = rng((Date.now() ^ (fromPhase * 7919)) >>> 0);
     setMode('stalk', 1800);
@@ -1888,6 +2205,8 @@
     force(token) { S.queue = []; S.action = null; startAction(token); },
     forceMode(m, dur) { S.action = null; S.queue = []; S.counterUntil = 0; S.P = 0; setMode(m, dur); },
     input(dir) { doInput(dir, S.gt); },
+    setB(v) { S.B = v; S.lastPressure = S.gt + 1e6; },
+    addTearTest() { enemy.addTear(); },
   };
 })();
 </script>
