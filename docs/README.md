@@ -16,6 +16,7 @@
 | [12-prototype-plan.md](12-prototype-plan.md) | 試作 0.1〜0.3 の計画と検証結果 |
 | [13-combat-v2.md](13-combat-v2.md) | 戦闘システム v2（試作 0.4）：上＝斬る、下＝弾く、左右＝避ける |
 | [14-feedback-language.md](14-feedback-language.md) | 手応えの文法と、文字やバーを使わない状態の表し方（試作 0.5） |
+| [15-road-to-sekiro.md](15-road-to-sekiro.md) | SEKIROの完成度に届くために必要なもの（提案・判断待ち） |
 
 ## ここまでの流れ
 
