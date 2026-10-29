@@ -8,6 +8,7 @@
 | [04-laws-and-understanding.md](04-laws-and-understanding.md) | 「世界の法則を読む」とは何か。物理法則と理解の層 |
 | [05-vision.md](05-vision.md) | 方針の上下関係、北極星（世界のすべての法則）と戦略 |
 | [06-emergent-world.md](06-emergent-world.md) | 創発世界の設計（①②③と洗練から導く） |
+| [07-interaction.md](07-interaction.md) | プレイヤーの操作（議論中） |
 
 ## ここまでの流れ
 
