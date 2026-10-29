@@ -10,6 +10,7 @@
 | [06-emergent-world.md](06-emergent-world.md) | 創発世界の設計（①②③と洗練から導く） |
 | [07-interaction.md](07-interaction.md) | プレイヤーの操作と、操作の核 |
 | [08-concepts.md](08-concepts.md) | ゲームデザイン案 20（不採用。失敗の理由と、先に答えるべき問い） |
+| [09-checklist-and-concepts.md](09-checklist-and-concepts.md) | 面白さのチェック項目22と、全項目に合格した20案（オーナーが選ぶ） |
 
 ## ここまでの流れ
 
