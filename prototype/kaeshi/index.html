@@ -151,7 +151,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.2</p>
+    <p class="kicker">Kaeshi · 試作 0.3</p>
     <h1>返し</h1>
     <p>操作は、はじくだけ。<br>相手の刃が届く瞬間なら、刃を返す。<br>それ以外なら、体が動く。</p>
     <details>
@@ -240,17 +240,17 @@
   const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.05, pitch: 0, yaw: 0, roll: 0 }, o);
 
   // 姿勢は「前＝+z」のローカル座標。相手の x は画面の右。
-  const NEUTRAL = pose({ hand: V(0.05, 1.22, 0.4), sword: V(0, 0.38, 1).normalize(), crouch: 0.07 });
+  const NEUTRAL = pose({ hand: V(0.05, 1.2, 0.42), sword: V(0, 0.38, 1).normalize(), crouch: 0.13, pitch: 0.05 });
   const KEY = {
     R: {
-      wind: pose({ hand: V(-0.6, 1.62, 0.02), sword: V(-0.75, 0.5, -0.35).normalize(), hipX: -0.14, crouch: 0.13, yaw: 0.6, roll: 0.05 }),
-      hit:  pose({ hand: V(0.05, 1.3, 0.8), sword: V(1, 0.05, 0.3).normalize(), hipX: 0.03, crouch: 0.1, yaw: -0.05 }),
-      follow: pose({ hand: V(0.62, 1.08, 0.42), sword: V(0.8, -0.3, -0.45).normalize(), hipX: 0.13, crouch: 0.12, yaw: -0.6 }),
+      wind: pose({ hand: V(-0.62, 1.64, 0.0), sword: V(-0.72, 0.52, -0.42).normalize(), hipX: -0.16, crouch: 0.22, yaw: 0.95, roll: 0.08, pitch: -0.05 }),
+      hit:  pose({ hand: V(0.05, 1.3, 0.82), sword: V(1, 0.05, 0.3).normalize(), hipX: 0.04, crouch: 0.2, yaw: -0.3, pitch: 0.12 }),
+      follow: pose({ hand: V(0.66, 1.02, 0.36), sword: V(0.76, -0.34, -0.5).normalize(), hipX: 0.2, crouch: 0.22, yaw: -1.05, pitch: 0.15, roll: -0.06 }),
     },
     D: {
-      wind: pose({ hand: V(0.02, 2.05, -0.08), sword: V(0, 0.55, -0.83).normalize(), hipZ: -0.13, crouch: 0.05, pitch: -0.24 }),
-      hit:  pose({ hand: V(0.02, 1.42, 0.75), sword: V(0, -0.3, 1).normalize(), hipZ: 0.05, crouch: 0.14, pitch: 0.12 }),
-      follow: pose({ hand: V(0.02, 0.9, 0.64), sword: V(0, -0.92, 0.38).normalize(), hipZ: 0.13, crouch: 0.24, pitch: 0.36 }),
+      wind: pose({ hand: V(0.02, 2.08, -0.12), sword: V(0, 0.5, -0.87).normalize(), hipZ: -0.16, crouch: 0.08, pitch: -0.36 }),
+      hit:  pose({ hand: V(0.02, 1.4, 0.78), sword: V(0, -0.3, 1).normalize(), hipZ: 0.08, crouch: 0.22, pitch: 0.26 }),
+      follow: pose({ hand: V(0.02, 0.86, 0.66), sword: V(0, -0.92, 0.38).normalize(), hipZ: 0.18, crouch: 0.34, pitch: 0.52 }),
     },
     U: {
       wind: pose({ hand: V(0.1, 0.76, 0.12), sword: V(0.15, -0.75, -0.45).normalize(), hipZ: -0.06, crouch: 0.25, pitch: 0.22 }),
@@ -258,9 +258,9 @@
       follow: pose({ hand: V(-0.05, 1.95, 0.3), sword: V(0, 0.95, -0.2).normalize(), crouch: 0.03, pitch: -0.2 }),
     },
     T: {
-      wind: pose({ hand: V(0.16, 1.28, -0.3), sword: V(0, 0.05, 1).normalize(), hipZ: -0.17, crouch: 0.15, yaw: 0.25 }),
-      hit:  pose({ hand: V(0.02, 1.3, 1.15), sword: V(0, 0.02, 1).normalize(), hipZ: 0.22, crouch: 0.12, yaw: -0.05 }),
-      follow: pose({ hand: V(0.02, 1.26, 1.02), sword: V(0, 0.0, 1).normalize(), hipZ: 0.2, crouch: 0.12 }),
+      wind: pose({ hand: V(0.18, 1.28, -0.34), sword: V(0, 0.05, 1).normalize(), hipZ: -0.24, crouch: 0.24, yaw: 0.45, pitch: -0.05 }),
+      hit:  pose({ hand: V(0.02, 1.3, 1.18), sword: V(0, 0.02, 1).normalize(), hipZ: 0.32, crouch: 0.22, yaw: -0.1, pitch: 0.2 }),
+      follow: pose({ hand: V(0.02, 1.24, 1.05), sword: V(0, 0.0, 1).normalize(), hipZ: 0.3, crouch: 0.22, pitch: 0.18 }),
     },
     S: {
       wind: pose({ hand: V(0.62, 0.78, -0.02), sword: V(0.8, -0.42, -0.42).normalize(), hipX: 0.12, crouch: 0.34, yaw: -0.65, pitch: 0.18 }),
@@ -276,20 +276,39 @@
   const BAIT = pose({ hand: V(0.3, 0.98, 0.32), sword: V(0.35, -0.62, 0.7).normalize(), crouch: 0.17, hipZ: -0.11, pitch: 0.06 });
   const GUARD = pose({ hand: V(0.05, 1.42, 0.5), sword: V(0.75, 0.66, 0.1).normalize(), crouch: 0.1, yaw: -0.15 });
 
+  // 手と刀は、直線ではなく肩の前の支点を中心に弧を描いて動く
+  const PIVOT = V(0, 1.36, 0.05);
+  const _ua = V(0, 0, 0), _ub = V(0, 0, 0), _qa = new THREE.Quaternion(), _qi = new THREE.Quaternion();
+  function slerpDir(a, b, t, out) {
+    _ua.copy(a).normalize(); _ub.copy(b).normalize();
+    if (_ua.dot(_ub) < -0.999) { out.copy(_ua).lerp(_ub, t).normalize(); return out; }
+    _qa.setFromUnitVectors(_ua, _ub);
+    _qi.identity().slerp(_qa, t);
+    return out.copy(_ua).applyQuaternion(_qi);
+  }
+  const _ha = V(0, 0, 0), _hb = V(0, 0, 0), _sa = V(0, 0, 0), _sb = V(0, 0, 0);
+  function blendArms(a, b, t, out) {
+    _ha.copy(a.hand).sub(PIVOT); _hb.copy(b.hand).sub(PIVOT);
+    const la = _ha.length(), lb = _hb.length();
+    _sa.copy(a.sword); _sb.copy(b.sword);
+    slerpDir(_ha, _hb, t, out.hand).multiplyScalar(lerp(la, lb, t)).add(PIVOT);
+    slerpDir(_sa, _sb, t, out.sword).normalize();
+  }
   function blend(a, b, t, out) {
     out = out || pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
-    out.hand.copy(a.hand).lerp(b.hand, t);
-    out.sword.copy(a.sword).lerp(b.sword, t).normalize();
-    out.hipX = lerp(a.hipX, b.hipX, t); out.hipZ = lerp(a.hipZ, b.hipZ, t);
-    out.crouch = lerp(a.crouch, b.crouch, t);
-    out.pitch = lerp(a.pitch, b.pitch, t); out.yaw = lerp(a.yaw, b.yaw, t); out.roll = lerp(a.roll, b.roll, t);
+    const hipX = lerp(a.hipX, b.hipX, t), hipZ = lerp(a.hipZ, b.hipZ, t), crouch = lerp(a.crouch, b.crouch, t);
+    const pitch = lerp(a.pitch, b.pitch, t), yaw = lerp(a.yaw, b.yaw, t), roll = lerp(a.roll, b.roll, t);
+    blendArms(a, b, t, out);
+    out.hipX = hipX; out.hipZ = hipZ; out.crouch = crouch; out.pitch = pitch; out.yaw = yaw; out.roll = roll;
     return out;
   }
   // 体（腰）と腕（刀）を別々の割合で混ぜる。本物の起こりは腰が先に動く。
   function blendSplit(a, b, tBody, tArm, out) {
-    out = blend(a, b, tBody, out);
-    out.hand.copy(a.hand).lerp(b.hand, tArm);
-    out.sword.copy(a.sword).lerp(b.sword, tArm).normalize();
+    out = out || pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    const hipX = lerp(a.hipX, b.hipX, tBody), hipZ = lerp(a.hipZ, b.hipZ, tBody), crouch = lerp(a.crouch, b.crouch, tBody);
+    const pitch = lerp(a.pitch, b.pitch, tBody), yaw = lerp(a.yaw, b.yaw, tBody), roll = lerp(a.roll, b.roll, tBody);
+    blendArms(a, b, tArm, out);
+    out.hipX = hipX; out.hipZ = hipZ; out.crouch = crouch; out.pitch = pitch; out.yaw = yaw; out.roll = roll;
     return out;
   }
   const clonePose = (p) => blend(p, p, 0);
@@ -390,6 +409,8 @@
   }
 
   // ───────────────────────── 布（ベルレ積分） ─────────────────────────
+  let TOON_CACHE = null;
+  const TOON_REF = () => TOON_CACHE;
   function makeChain(n, segLen, width, color, opacity) {
     const pts = Array.from({ length: n }, () => ({ p: V(0, -10, 0), o: V(0, -10, 0) }));
     const geo = new THREE.BufferGeometry();
@@ -398,7 +419,9 @@
     for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     geo.setIndex(idx);
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide, transparent: opacity < 1, opacity }));
+    const chainMat = new THREE.MeshToonMaterial({ color, gradientMap: TOON_REF(), side: THREE.DoubleSide, transparent: opacity < 1, opacity });
+    chainMat.color.convertSRGBToLinear();
+    const mesh = new THREE.Mesh(geo, chainMat);
     mesh.frustumCulled = false;
     scene.add(mesh);
     let ready = false;
@@ -440,7 +463,9 @@
   }
 
   // ───────────────────────── 人物 ─────────────────────────
-  const UP = V(0, 1, 0);
+  // 形：先細りの胴、継ぎ目の見えない肩と肘、膝を隠す袴、広い袖、反りのある刀。
+  // 墨の輪郭線と、三段階の影で、デフォルメを「意図した形」に見せる。
+  const UP = V(0, 1, 0), DOWN = V(0, -1, 0);
   const tA = V(0, 0, 0), tB = V(0, 0, 0), tC = V(0, 0, 0), tD = V(0, 0, 0), tE = V(0, 0, 0);
   function placeLimb(mesh, a, b) {
     tC.copy(b).sub(a);
@@ -449,7 +474,6 @@
     mesh.scale.set(1, len, 1);
     mesh.quaternion.setFromUnitVectors(UP, tC.normalize());
   }
-  // 二関節の逆運動学。bend は関節が曲がる向き。
   function ik(root, target, l1, l2, bend, outJoint) {
     tD.copy(target).sub(root);
     let d = tD.length();
@@ -462,9 +486,44 @@
     return outJoint;
   }
 
+  const TOON = (() => {
+    const t = new THREE.DataTexture(new Uint8Array([70, 70, 70, 150, 150, 150, 255, 255, 255]), 3, 1, THREE.RGBFormat);
+    t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+    TOON_CACHE = t;
+    return t;
+  })();
+  const INK = new THREE.MeshBasicMaterial({ color: 0x03050a, side: THREE.BackSide });
+  // 色は見た目どおりの色（sRGB）で指定し、描画用に変換する
+  const toon = (color, extra) => { const m = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: TOON }, extra || {})); m.color.convertSRGBToLinear(); return m; };
+  function inked(geo, mat, thick) {
+    const m = new THREE.Mesh(geo, mat);
+    const o = new THREE.Mesh(geo, INK);
+    o.scale.setScalar(1 + (thick || 0.08));
+    m.add(o);
+    return m;
+  }
+
+  // 反りのある刀身（平らな刃を両面で描く）
+  function katanaGeometry(len, w0, w1, sori) {
+    const n = 18, pos = [], idx = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, y = 0.01 + t * len;
+      const c = sori * t * t;
+      let w = lerp(w0, w1, t);
+      if (t > 0.9) w *= Math.max(0, 1 - (t - 0.9) / 0.1) * 0.85 + 0.15 * (1 - (t - 0.9) / 0.1);
+      pos.push(c, y, 0, c + w, y, 0);
+      if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+  const bladeCurve = (t, len, sori) => sori * t * t;
+
   // 足跡
   const prints = Array.from({ length: 110 }, () => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.26), new THREE.MeshBasicMaterial({ map: footTex, transparent: true, depthWrite: false, opacity: 0 }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.26), new THREE.MeshBasicMaterial({ map: footTex, transparent: true, depthWrite: false, opacity: 0 }));
     m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m);
     return { m, born: 0 };
   });
@@ -476,133 +535,200 @@
     p.m.visible = true; p.born = performance.now();
   }
 
-  function makeFigure({ scale, body, cloth, blade, sash, kind }) {
+  // 二次の動き（ばね）：目標の姿勢に、行き過ぎて戻りながら追いつく
+  function so() { return { y: null, yd: 0, xp: 0 }; }
+  function soStep(s, x, T, f, z, r) {
+    if (s.y === null) { s.y = x; s.xp = x; s.yd = 0; return x; }
+    if (T <= 0) return s.y;
+    const k1 = z / (Math.PI * f), k2 = 1 / ((2 * Math.PI * f) * (2 * Math.PI * f)), k3 = r * z / (2 * Math.PI * f);
+    const xd = (x - s.xp) / T; s.xp = x;
+    const k2s = Math.max(k2, T * T / 2 + T * k1 / 2, T * k1);
+    s.y += T * s.yd;
+    s.yd += T * (x + k3 * xd - s.y - k1 * s.yd) / k2s;
+    return s.y;
+  }
+  const CHANNELS = ['hx', 'hy', 'hz', 'sx', 'sy', 'sz', 'hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll'];
+
+  function makeFigure({ scale, kimono, hakamaColor, skin, blade, sash, kind }) {
     const root = new THREE.Group();
     root.scale.setScalar(scale);
     scene.add(root);
-    const matBody = new THREE.MeshStandardMaterial({ color: body, roughness: 0.85 });
-    const matCloth = new THREE.MeshStandardMaterial({ color: cloth, roughness: 0.95, side: THREE.DoubleSide });
-    const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.9, roughness: 0.2, emissive: 0x1a2230 });
-    const matHilt = new THREE.MeshStandardMaterial({ color: 0x15131a, roughness: 0.7 });
+    const matKimono = toon(kimono), matHakama = toon(hakamaColor, { side: THREE.DoubleSide }), matSkin = toon(skin);
+    const matSash = toon(sash), matDark = toon(0x16141c);
+    const matBlade = new THREE.MeshStandardMaterial({ color: blade, metalness: 0.95, roughness: 0.16, emissive: 0x1a2230, side: THREE.DoubleSide });
 
+    // 腰
     const hips = new THREE.Group(); root.add(hips);
-    const obi = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.26, 0.1, 14), new THREE.MeshStandardMaterial({ color: sash, roughness: 0.8 }));
-    obi.position.y = 0.06; hips.add(obi);
-    const hakama = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.43, 0.6, 14, 1, true), matCloth);
-    hakama.position.y = -0.28; hips.add(hakama);
+    const pelvis = inked(new THREE.SphereGeometry(1, 16, 12), matHakama, 0.06); pelvis.scale.set(0.23, 0.15, 0.17); hips.add(pelvis);
+    const obi = inked(new THREE.CylinderGeometry(0.235, 0.245, 0.1, 18), matSash, 0.05); obi.position.y = 0.07; obi.scale.z = 0.78; hips.add(obi);
+    const skirt = inked(new THREE.CylinderGeometry(0.24, 0.36, 0.38, 18, 1, true), matHakama, 0.04); skirt.position.y = -0.15; skirt.scale.z = 0.82; hips.add(skirt);
+    // 胴：腰は細く、胸と肩は広い
     const torso = new THREE.Group(); hips.add(torso);
-    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.62, 12), matBody);
-    chest.position.y = 0.38; torso.add(chest);
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.12, 12), matCloth);
-    collar.position.y = 0.72; torso.add(collar);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 14), matBody);
-    head.position.y = 0.9; torso.add(head);
+    const prof = [[0.0, 0.0], [0.2, 0.0], [0.205, 0.1], [0.24, 0.26], [0.285, 0.44], [0.3, 0.54], [0.24, 0.63], [0.12, 0.68], [0.0, 0.69]].map(([r, y]) => new THREE.Vector2(r, y));
+    const chest = inked(new THREE.LatheGeometry(prof, 18), matKimono, 0.045); chest.scale.z = 0.7; chest.position.y = 0.02; torso.add(chest);
+    const lapelGeo = new THREE.BoxGeometry(0.05, 0.42, 0.02);
+    [-1, 1].forEach((s) => { const l = new THREE.Mesh(lapelGeo, matSash); l.position.set(s * 0.06, 0.48, 0.2); l.rotation.z = s * 0.42; l.rotation.x = -0.12; torso.add(l); });
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.12, 10), matSkin); neck.position.y = 0.74; torso.add(neck);
+    const headG = new THREE.Group(); headG.position.y = 0.86; torso.add(headG);
+    const head = inked(new THREE.SphereGeometry(1, 20, 16), matSkin, 0.05); head.scale.set(0.12, 0.135, 0.125); headG.add(head);
     if (kind === 'enemy') {
-      const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.2, 22), new THREE.MeshStandardMaterial({ color: 0x8b7a55, roughness: 0.95 }));
-      kasa.position.y = 1.05; torso.add(kasa);
+      const kasa = inked(new THREE.ConeGeometry(0.5, 0.2, 28, 1, true), toon(0x9c8a5f, { side: THREE.DoubleSide }), 0.03); kasa.position.y = 0.12; headG.add(kasa);
+      const under = new THREE.Mesh(new THREE.CircleGeometry(0.49, 28), new THREE.MeshBasicMaterial({ color: 0x07080c, side: THREE.DoubleSide })); under.rotation.x = Math.PI / 2; under.position.y = 0.025; headG.add(under);
     } else {
-      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), matBody);
-      knot.position.set(0, 1.0, -0.1); torso.add(knot);
+      const hair = inked(new THREE.SphereGeometry(1, 16, 12), toon(0x0d0f14), 0.05); hair.scale.set(0.125, 0.11, 0.13); hair.position.set(0, 0.04, -0.015); headG.add(hair);
+      const knot = inked(new THREE.SphereGeometry(0.05, 10, 8), toon(0x0d0f14), 0.08); knot.position.set(0, 0.11, -0.09); headG.add(knot);
     }
-    const thighGeo = new THREE.CylinderGeometry(0.08, 0.07, 1, 8), shinGeo = new THREE.CylinderGeometry(0.065, 0.05, 1, 8);
-    const legs = [0, 1].map(() => ({ thigh: new THREE.Mesh(thighGeo, matCloth), shin: new THREE.Mesh(shinGeo, matCloth), foot: new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.22), matHilt) }));
-    legs.forEach((l) => { root.add(l.thigh); root.add(l.shin); root.add(l.foot); });
-    const upperGeo = new THREE.CylinderGeometry(0.06, 0.05, 1, 8), foreGeo = new THREE.CylinderGeometry(0.05, 0.04, 1, 8);
-    const arms = [0, 1].map(() => ({ upper: new THREE.Mesh(upperGeo, matBody), fore: new THREE.Mesh(foreGeo, matBody) }));
-    arms.forEach((a) => { root.add(a.upper); root.add(a.fore); });
+
+    // 脚：袴が膝を隠し、裾が広がる
+    const legs = [0, 1].map(() => {
+      const trouser = inked(new THREE.CylinderGeometry(0.1, 0.2, 1, 14, 1, true), matHakama, 0.03);
+      const foot = inked(new THREE.SphereGeometry(1, 10, 8), toon(0xe6e8ee), 0.12); foot.scale.set(0.05, 0.035, 0.11);
+      root.add(trouser); root.add(foot);
+      return { trouser, foot };
+    });
+    // 腕：肩と肘は球で継ぎ目を隠し、広い袖が遅れてなびく
+    const arms = [0, 1].map(() => {
+      const shoulder = inked(new THREE.SphereGeometry(0.085, 12, 10), matKimono, 0.06);
+      const upper = inked(new THREE.CylinderGeometry(0.058, 0.05, 1, 10), matKimono, 0.07);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), matSkin);
+      const fore = inked(new THREE.CylinderGeometry(0.047, 0.036, 1, 10), matSkin, 0.08);
+      const hand = inked(new THREE.SphereGeometry(0.046, 10, 8), matSkin, 0.1);
+      const sleeve = inked(new THREE.CylinderGeometry(0.07, 0.17, 1, 12, 1, true), toon(kimono, { side: THREE.DoubleSide }), 0.03);
+      [shoulder, upper, elbow, fore, hand, sleeve].forEach((m) => root.add(m));
+      return { shoulder, upper, elbow, fore, hand, sleeve, sdir: V(0, -1, 0) };
+    });
+    // 刀
+    const BL = 0.98, SORI = 0.045;
     const sword = new THREE.Group(); root.add(sword);
-    const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.26, 0.035), matHilt); hilt.position.y = -0.06; sword.add(hilt);
-    const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.016, 12), matHilt); guard.position.y = 0.08; sword.add(guard);
-    const bladeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.022, 1.05, 0.05), matBlade); bladeMesh.position.y = 0.6; sword.add(bladeMesh);
+    const bladeMesh = new THREE.Mesh(katanaGeometry(BL, 0.03, 0.022, SORI), matBlade); sword.add(bladeMesh);
+    const tsuba = inked(new THREE.CylinderGeometry(0.048, 0.048, 0.012, 16), matDark, 0.08); sword.add(tsuba);
+    const tsuka = inked(new THREE.CylinderGeometry(0.019, 0.021, 0.27, 8), toon(0x1b2030), 0.12); tsuka.position.y = -0.14; sword.add(tsuka);
 
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
     scene.add(shadow);
 
-    // 布
     const chains = [];
     if (kind === 'enemy') {
-      for (let i = 0; i < 5; i++) chains.push({ c: makeChain(5, 0.17, 0.15, 0x1f2333, 1), anchor: V(-0.24 + i * 0.12, 0.66, -0.16) });
+      for (let i = 0; i < 5; i++) chains.push({ c: makeChain(5, 0.18, 0.15, 0x1c1f2b, 1), anchor: V(-0.24 + i * 0.12, 0.62, -0.15) });
     } else {
-      chains.push({ c: makeChain(10, 0.14, 0.1, 0xa8323a, 1), anchor: V(0.06, 0.74, -0.12), scarf: true });
+      chains.push({ c: makeChain(11, 0.14, 0.11, 0xb02e3a, 1), anchor: V(0.05, 0.7, -0.13), head: false });
+      chains.push({ c: makeChain(4, 0.07, 0.045, 0x0d0f14, 1), anchor: V(0, 0.12, -0.12), head: true });
     }
 
-    // 足：雪の上に置かれ、体が離れると一歩ずつ踏み出す
-    const feet = [0, 1].map((i) => ({ pos: V(0, 0, 0), from: V(0, 0, 0), to: V(0, 0, 0), t: 1, stepping: false, side: i === 0 ? -1 : 1 }));
+    const feet = [0, 1].map(() => ({ pos: V(0, 0, 0), from: V(0, 0, 0), to: V(0, 0, 0), t: 1, stepping: false }));
     let feetReady = false;
     const tip = V(0, 0, 0), mid = V(0, 0, 0), headWorld = V(0, 0, 0), hipWorld = V(0, 0, 0), chestWorld = V(0, 0, 0);
     const right = V(0, 0, 0), fwd = V(0, 0, 0);
-    const local = V(0, 0, 0), joint = V(0, 0, 0), bendL = V(0, 0, 0), sh = V(0, 0, 0), hand = V(0, 0, 0);
+    const local = V(0, 0, 0), joint = V(0, 0, 0), bendL = V(0, 0, 0), sh = V(0, 0, 0), hand = V(0, 0, 0), knee = V(0, 0, 0);
+    const springs = {}; CHANNELS.forEach((c) => { springs[c] = so(); });
+    const sm = pose({ hand: V(0, 0, 0), sword: V(0, 0, 1) });
+    let lastX = null, lastZ = 0;
+    const vel = V(0, 0, 0);
 
     function idealFoot(i, p, out) {
-      const sx = (i === 0 ? -1 : 1) * (0.28 + p.crouch * 0.35);
-      out.set(sx, 0, i === 0 ? 0.1 : -0.08);
+      const sx = (i === 0 ? -1 : 1) * (0.25 + p.crouch * 0.4);
+      out.set(sx, 0, i === 0 ? 0.14 : -0.12);
       return root.localToWorld(out);
     }
 
-    function apply(p, wx, wz, yaw, dtMs, onStep) {
+    // 目標の姿勢を、ばねを通して滑らかにする。fast は振りの最中（遅れを小さく、しなりを大きく）。
+    function animate(p, T, fast) {
+      const H = fast ? [15, 0.5, 1.7] : [6.2, 0.62, 1.3];
+      const Sw = fast ? [13, 0.42, 2.0] : [5.4, 0.5, 1.6];
+      const Bd = fast ? [9, 0.6, 1.25] : [4.2, 0.72, 1.05];
+      sm.hand.set(soStep(springs.hx, p.hand.x, T, ...H), soStep(springs.hy, p.hand.y, T, ...H), soStep(springs.hz, p.hand.z, T, ...H));
+      sm.sword.set(soStep(springs.sx, p.sword.x, T, ...Sw), soStep(springs.sy, p.sword.y, T, ...Sw), soStep(springs.sz, p.sword.z, T, ...Sw)).normalize();
+      sm.hipX = soStep(springs.hipX, p.hipX, T, ...Bd); sm.hipZ = soStep(springs.hipZ, p.hipZ, T, ...Bd);
+      sm.crouch = soStep(springs.crouch, p.crouch, T, ...Bd);
+      sm.pitch = soStep(springs.pitch, p.pitch, T, ...Bd); sm.yaw = soStep(springs.yaw, p.yaw, T, ...Bd); sm.roll = soStep(springs.roll, p.roll, T, ...Bd);
+      return sm;
+    }
+
+    function apply(target, wx, wz, yaw, dtMs, onStep, opts) {
+      const T = dtMs / 1000;
       root.position.set(wx, 0, wz);
       root.rotation.y = yaw;
-      hips.position.set(p.hipX, 1.0 - p.crouch, p.hipZ);
-      torso.rotation.set(p.pitch, p.yaw, p.roll);
       root.updateMatrixWorld(true);
       right.set(1, 0, 0).applyQuaternion(root.quaternion);
       fwd.set(0, 0, 1).applyQuaternion(root.quaternion);
+      // 動く向きへ体を傾ける
+      if (lastX === null || T <= 0) vel.set(0, 0, 0);
+      else vel.set((wx - lastX) / T, 0, (wz - lastZ) / T);
+      lastX = wx; lastZ = wz;
+      const vf = clamp(vel.dot(fwd), -6, 6), vs = clamp(vel.dot(right), -6, 6);
+      const lean = clonePose(target);
+      lean.pitch += vf * 0.045; lean.roll -= vs * 0.05; lean.crouch += Math.min(0.08, (Math.abs(vf) + Math.abs(vs)) * 0.012);
+      const p = animate(lean, T, opts && opts.fast);
+
+      hips.position.set(p.hipX, 1.0 - p.crouch, p.hipZ);
+      hips.rotation.set(p.pitch * 0.35, p.yaw * 0.4, p.roll * 0.4);
+      torso.rotation.set(p.pitch * 0.65, p.yaw * 0.6, p.roll * 0.6);
+      const breathe = 1 + Math.sin(performance.now() * 0.0026) * 0.012;
+      chest.scale.set(1, breathe, 0.7);
+      if (opts && opts.look) { headG.lookAt(opts.look); }
+      root.updateMatrixWorld(true);
 
       // 足の踏み出し
-      if (!feetReady) { feet.forEach((f, i) => { idealFoot(i, p, f.pos); f.t = 1; }); feetReady = true; }
+      if (!feetReady) { feet.forEach((f, i) => { idealFoot(i, p, f.pos); f.pos.y = 0; f.t = 1; }); feetReady = true; }
       const anyStepping = feet.some((f) => f.stepping);
       feet.forEach((f, i) => {
-        // 速く動いて足が置いていかれたら、すぐに踏み出す。遠すぎれば足を引き寄せる。
         idealFoot(i, p, tA);
         const lag = tA.distanceTo(f.pos);
         if (lag > 0.8 * scale) { f.pos.copy(tA); f.pos.y = 0; f.stepping = false; f.t = 1; return; }
-        if (!f.stepping && dtMs > 0 && lag > 0.42 * scale) {
-          f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA); f.to.y = 0;
-        }
+        if (!f.stepping && dtMs > 0 && lag > 0.42 * scale) { f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA); f.to.y = 0; }
         if (f.stepping) {
-          f.t += dtMs / 140;
-          const u = smooth(f.t);
-          f.pos.copy(f.from).lerp(f.to, u);
-          f.pos.y = Math.sin(clamp(f.t, 0, 1) * Math.PI) * 0.1 * scale;
+          f.t += dtMs / 130;
+          f.pos.copy(f.from).lerp(f.to, smooth(f.t));
+          f.pos.y = Math.sin(clamp(f.t, 0, 1) * Math.PI) * 0.09 * scale;
           if (f.t >= 1) { f.stepping = false; f.pos.copy(f.to); f.pos.y = 0; footprint(f.to.x, f.to.z, yaw); if (onStep) onStep(f.to); }
-        } else if (!anyStepping && dtMs > 0) {
-          idealFoot(i, p, tA);
-          if (tA.distanceTo(f.pos) > 0.2 * scale) {
-            f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA);
-            tB.copy(tA).sub(f.pos).multiplyScalar(0.25); f.to.add(tB); f.to.y = 0;
-          }
+        } else if (!anyStepping && dtMs > 0 && lag > 0.18 * scale) {
+          f.stepping = true; f.t = 0; f.from.copy(f.pos); f.to.copy(tA);
+          tB.copy(tA).sub(f.pos).multiplyScalar(0.25); f.to.add(tB); f.to.y = 0;
         }
       });
 
-      // 脚（膝の逆運動学）
+      // 脚：袴の筒は腰から足首へ。膝は前へ曲がる。
       bendL.set(0, 0, 1);
       for (let i = 0; i < 2; i++) {
-        tA.set(i === 0 ? -0.13 : 0.13, -0.08, 0); hips.localToWorld(tA); root.worldToLocal(tA);
+        tA.set(i === 0 ? -0.12 : 0.12, -0.06, 0); hips.localToWorld(tA); root.worldToLocal(tA);
         local.copy(feet[i].pos); root.worldToLocal(local); local.y += 0.05;
         tB.copy(local).sub(tA);
         if (tB.length() > 1.0) local.copy(tA).addScaledVector(tB.normalize(), 1.0);
-        ik(tA, local, 0.52, 0.5, bendL, joint);
-        placeLimb(legs[i].thigh, tA, joint);
-        placeLimb(legs[i].shin, joint, local);
-        legs[i].foot.position.set(local.x, local.y - 0.03, local.z + 0.05);
+        ik(tA, local, 0.52, 0.5, bendL, knee);
+        // 筒の中心線は、膝の方へ少しふくらませる
+        tB.copy(tA).lerp(local, 0.5).lerp(knee, 0.35);
+        tC.copy(local).sub(tA);
+        legs[i].trouser.position.copy(tA).lerp(local, 0.5).lerp(knee, 0.25);
+        legs[i].trouser.scale.set(1, tC.length() * 1.02, 1);
+        legs[i].trouser.quaternion.setFromUnitVectors(UP, tC.normalize());
+        legs[i].foot.position.set(local.x, local.y - 0.03, local.z + 0.04);
       }
-      // 腕（肘の逆運動学）
+      // 腕
+      const dt = Math.max(0, T);
       for (let i = 0; i < 2; i++) {
-        const sgn = i === 0 ? -1 : 1;
-        sh.set(sgn * 0.25, 0.62, 0); torso.localToWorld(sh); root.worldToLocal(sh);
-        hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.05 : 0.07);
-        bendL.set(sgn * 0.7, -0.6, -0.35);
-        ik(sh, hand, 0.34, 0.32, bendL, joint);
-        placeLimb(arms[i].upper, sh, joint);
-        placeLimb(arms[i].fore, joint, hand);
+        const sgn = i === 0 ? -1 : 1, A = arms[i];
+        sh.set(sgn * 0.27, 0.58, 0); torso.localToWorld(sh); root.worldToLocal(sh);
+        hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.06 : 0.07);
+        bendL.set(sgn * 0.75, -0.55, -0.35);
+        ik(sh, hand, 0.33, 0.31, bendL, joint);
+        A.shoulder.position.copy(sh);
+        placeLimb(A.upper, sh, joint);
+        A.elbow.position.copy(joint);
+        placeLimb(A.fore, joint, hand);
+        A.hand.position.copy(hand);
+        // 袖：上腕に沿いながら重さで垂れ、動きに遅れてついてくる
+        tA.copy(joint).sub(sh).normalize().multiplyScalar(0.5).addScaledVector(DOWN, 0.55).normalize();
+        A.sdir.lerp(tA, 1 - Math.exp(-dt * 11)).normalize();
+        tB.copy(sh).addScaledVector(A.sdir, 0.42);
+        placeLimb(A.sleeve, sh, tB);
       }
       sword.position.copy(p.hand);
       sword.quaternion.setFromUnitVectors(UP, p.sword);
       root.updateMatrixWorld(true);
-      tip.set(0, 1.12, 0); sword.localToWorld(tip);
-      mid.set(0, 0.45, 0); sword.localToWorld(mid);
-      headWorld.set(0, 0.9, 0.13); torso.localToWorld(headWorld);
+      tip.set(bladeCurve(1, BL, SORI), BL, 0); sword.localToWorld(tip);
+      mid.set(bladeCurve(0.45, BL, SORI), BL * 0.45, 0); sword.localToWorld(mid);
+      headWorld.set(0, 0, 0.13); headG.localToWorld(headWorld);
       chestWorld.set(0, 0.4, 0); torso.localToWorld(chestWorld);
       hipWorld.set(0, 0, 0); hips.localToWorld(hipWorld);
       shadow.position.set(hipWorld.x, 0.012, hipWorld.z);
@@ -610,36 +736,37 @@
       shadow.scale.set(s, s * 0.8, 1);
       shadow.rotation.z = -yaw;
 
-      // 布
-      const dt = dtMs / 1000;
       const wind = tB.set(Math.sin(performance.now() * 0.0007) * 1.2 + 0.6, 0, Math.cos(performance.now() * 0.0005) * 0.6);
       chains.forEach((ch) => {
-        tA.copy(ch.anchor); torso.localToWorld(tA);
+        tA.copy(ch.anchor); (ch.head ? headG : torso).localToWorld(tA);
         tC.copy(right);
-        ch.c.update(tA, tC, dt, wind);
+        ch.c.update(tA, tC, T, wind);
       });
     }
-    return { root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd, resetFeet() { feetReady = false; chains.forEach((c) => c.c.reset()); } };
+    return {
+      root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd,
+      resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
+    };
   }
 
-  const enemy = makeFigure({ scale: 1.25, body: 0x2b2731, cloth: 0x2e2633, blade: 0xdfe7f2, sash: 0xc9b48a, kind: 'enemy' });
-  const player = makeFigure({ scale: 0.95, body: 0x33404f, cloth: 0x222a36, blade: 0xe8eef7, sash: 0x7f93ad, kind: 'player' });
+  const enemy = makeFigure({ scale: 1.25, kimono: 0x2a2433, hakamaColor: 0x3b3541, skin: 0x6e5a52, blade: 0xdfe7f2, sash: 0xd2c08f, kind: 'enemy' });
+  const player = makeFigure({ scale: 0.95, kimono: 0x2d3a4f, hakamaColor: 0x1f2633, skin: 0x9f8577, blade: 0xe8eef7, sash: 0x8fa3bf, kind: 'player' });
 
   // 自分の構え（ローカル：前＝+z。画面の右はローカルの -x）
-  const P_GUARD = pose({ hand: V(-0.08, 1.12, 0.38), sword: V(-0.12, 0.62, 0.78).normalize(), crouch: 0.08 });
+  const P_GUARD = pose({ hand: V(-0.08, 1.1, 0.4), sword: V(-0.12, 0.62, 0.78).normalize(), crouch: 0.14, pitch: 0.06 });
   function playerParryPose(dir) {
     const sx = dir === 'R' ? -1 : dir === 'L' ? 1 : 0;
     const sy = dir === 'U' ? 1 : dir === 'D' ? -1 : 0;
     return pose({
       hand: V(0.12 * sx, 1.28 + 0.12 * sy, 0.58),
       sword: V(0.95 * sx, 0.25 + 0.7 * sy + (sx === 0 && sy === 0 ? 0.6 : 0), 0.35).normalize(),
-      crouch: 0.12, yaw: -0.4 * sx, pitch: 0.08,
+      crouch: 0.2, yaw: -0.75 * sx, pitch: 0.12, hipX: -0.06 * sx,
     });
   }
   const P_HIT = pose({ hand: V(-0.15, 1.0, 0.2), sword: V(-0.3, 0.4, 0.6).normalize(), crouch: 0.18, pitch: -0.28, hipZ: -0.12 });
   const P_KNEEL = pose({ hand: V(-0.2, 0.62, 0.42), sword: V(-0.2, -0.9, 0.3).normalize(), crouch: 0.44, pitch: 0.45 });
   const P_CUT_WIND = pose({ hand: V(0.05, 1.75, 0.15), sword: V(0.1, 0.8, -0.55).normalize(), crouch: 0.1, pitch: -0.15 });
-  const P_CUT_HIT = pose({ hand: V(0.0, 1.12, 0.8), sword: V(0.05, -0.35, 1).normalize(), crouch: 0.2, pitch: 0.2, hipZ: 0.12 });
+  const P_CUT_HIT = pose({ hand: V(0.0, 1.1, 0.82), sword: V(0.05, -0.35, 1).normalize(), crouch: 0.3, pitch: 0.32, hipZ: 0.2 });
   const P_LOW = pose({ hand: V(-0.1, 1.0, 0.4), sword: V(-0.2, 0.4, 0.85).normalize(), crouch: 0.22, pitch: 0.12 });
 
   // ───────────────────────── 効果 ─────────────────────────
@@ -1456,9 +1583,12 @@
         blend(K.wind, K.wind, 0, out);
         out.hand.x += Math.sin(gt * 0.09) * 0.006; out.hand.y += Math.sin(gt * 0.13) * 0.006;
       } else if (gt <= a.T) {
-        blend(K.wind, K.hit, easeIn((gt - (a.T - a.S)) / a.S), out);
+        // 振り：腰と胴が先に回り、腕と刀が後から追いつく
+        const u = (gt - (a.T - a.S)) / a.S;
+        blendSplit(K.wind, K.hit, easeOut(clamp(u * 1.35, 0, 1)), easeIn(u), out);
       } else if (gt <= a.T + a.F) {
-        blend(K.hit, K.follow, easeOut((gt - a.T) / a.F), out);
+        const u = (gt - a.T) / a.F;
+        blendSplit(K.hit, K.follow, easeOut(clamp(u * 1.2, 0, 1)), easeOut(u), out);
       } else {
         blend(K.follow, NEUTRAL, smooth((gt - a.T - a.F) / a.R), out);
       }
@@ -1550,8 +1680,12 @@
     const k = 38, dmp = 9, dt = Math.min(dtGame, 50) / 1000;
     S.stagger.vx += (-k * S.stagger.x - dmp * S.stagger.vx) * dt; S.stagger.x += S.stagger.vx * dt;
     S.stagger.vp += (-k * S.stagger.p - dmp * S.stagger.vp) * dt; S.stagger.p += S.stagger.vp * dt;
-    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw, dtGame, () => Sound.step(0.5));
-    player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, null);
+    const act = S.action;
+    const eFast = S.mode === 'attack' && act && !act.feint && S.gt >= act.T - act.S - 40 && S.gt <= act.T + act.F;
+    const pa = S.playerAnim;
+    const pFast = pa && ['parry', 'cut', 'issen', 'hit'].includes(pa.kind) && S.gt - pa.t0 < 260;
+    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw, dtGame, () => Sound.step(0.5), { fast: eFast, look: player.headWorld });
+    player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, null, { fast: pFast, look: enemy.headWorld });
 
     const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
     const eb = Math.floor(S.gt / ep), pb = Math.floor(S.gt / pp);
