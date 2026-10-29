@@ -134,6 +134,8 @@
     border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer;
   }
   .card button:focus-visible { outline: 2px solid var(--lantern); outline-offset: 3px; }
+  .card button.ghost { background: transparent; color: var(--mist); border: 1px solid rgba(154, 166, 186, 0.4); font-size: 14px; letter-spacing: 0.08em; padding: 10px 20px; }
+  #teleBox { width: 100%; box-sizing: border-box; background: rgba(0, 0, 0, 0.35); color: var(--mist); border: 1px solid rgba(154, 166, 186, 0.3); border-radius: 8px; font: 11px/1.4 ui-monospace, Menlo, monospace; padding: 8px; }
   .end h2 { font-family: var(--display); font-size: clamp(40px, 12vw, 64px); margin: 0; letter-spacing: 0.1em; }
   .cross { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, auto); gap: 6px; max-width: 18em; }
   .cross .k { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border: 1px solid rgba(154, 166, 186, 0.3); border-radius: 10px; font-size: 13px; color: var(--mist); }
@@ -168,7 +170,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.5</p>
+    <p class="kicker">Kaeshi · 試作 0.6</p>
     <h1>返し</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -196,7 +198,10 @@
   <div class="card end">
     <h2 id="endTitle">勝負あり</h2>
     <p id="endText" class="note"></p>
+    <p id="endSummary" class="note"></p>
     <button id="againBtn" type="button">もう一度</button>
+    <button id="copyBtn" type="button" class="ghost">試遊の記録を写す</button>
+    <textarea id="teleBox" hidden readonly rows="4" aria-label="試遊の記録"></textarea>
   </div>
 </div>
 
@@ -245,19 +250,26 @@
   }
 
   // ───────────────────────── 技 ─────────────────────────
+  // 起こり O・溜め W・振り S・残心 F・戻り R（ミリ秒）。刃が届く瞬間 T = 起こり＋溜め＋振り。
   const MOVES = {
-    cutR:   { key: 'R', w: 1.0, reach: 2.9, lunge: 0.5, name: '右薙ぎ' },
-    cutL:   { key: 'L', w: 1.0, reach: 2.9, lunge: 0.5, name: '左薙ぎ' },
-    over:   { key: 'D', w: 1.6, reach: 3.0, lunge: 0.6, name: '振り下ろし' },
-    rise:   { key: 'U', w: 1.1, reach: 2.85, lunge: 0.45, name: '斬り上げ' },
-    thrust: { key: 'T', w: 1.2, reach: 3.2, lunge: 0.8, name: '突き' },
-    quickR: { key: 'R', w: 0.6, reach: 2.8, lunge: 0.35, name: '小薙ぎ' },
-    quickL: { key: 'L', w: 0.6, reach: 2.8, lunge: 0.35, name: '小薙ぎ' },
-    dash:   { key: 'T', w: 1.3, reach: 3.2, lunge: 0, dash: true, name: '突進突き' },
-    sweep:  { key: 'S', w: 1.4, reach: 3.0, lunge: 0.45, peril: 'sweep', name: '危：薙ぎ払い' },
-    pierce: { key: 'T', w: 1.5, reach: 3.4, lunge: 0.95, peril: 'pierce', name: '危：突き' },
-    counterR: { key: 'R', w: 0.75, reach: 2.9, lunge: 0.5, fast: true, name: '反撃' },
-    counterL: { key: 'L', w: 0.75, reach: 2.9, lunge: 0.5, fast: true, name: '反撃' },
+    kesa:   { key: 'KS', O: 300, W: 500, S: 180, F: 360, R: 650, w: 1.0, reach: 2.9, lunge: 0.5, name: '袈裟斬り' },
+    gyaku:  { key: 'KG', O: 300, W: 480, S: 170, F: 340, R: 620, w: 1.0, reach: 2.9, lunge: 0.5, name: '逆袈裟' },
+    cutR:   { key: 'R', O: 300, W: 550, S: 190, F: 370, R: 680, w: 1.0, reach: 2.9, lunge: 0.5, name: '右薙ぎ' },
+    cutL:   { key: 'L', O: 300, W: 550, S: 190, F: 370, R: 680, w: 1.0, reach: 2.9, lunge: 0.5, name: '左薙ぎ' },
+    over:   { key: 'D', O: 390, W: 750, S: 230, F: 460, R: 860, w: 1.6, reach: 3.0, lunge: 0.6, name: '振り下ろし' },
+    thrust: { key: 'T', O: 330, W: 620, S: 200, F: 400, R: 740, w: 1.2, reach: 3.2, lunge: 0.8, name: '突き' },
+    quickR: { key: 'R', O: 240, W: 420, S: 160, F: 300, R: 560, w: 0.6, reach: 2.8, lunge: 0.35, name: '小薙ぎ' },
+    quickL: { key: 'L', O: 240, W: 420, S: 160, F: 300, R: 560, w: 0.6, reach: 2.8, lunge: 0.35, name: '小薙ぎ' },
+    dash:   { key: 'T', O: 230, W: 380, S: 300, F: 260, R: 520, w: 1.3, reach: 3.2, lunge: 0, dash: true, name: '突進突き' },
+    sweep:  { key: 'S', O: 360, W: 680, S: 220, F: 420, R: 800, w: 1.4, reach: 3.0, lunge: 0.45, peril: 'sweep', name: '危：足払い' },
+    counterR: { key: 'R', O: 80, W: 140, S: 110, F: 230, R: 440, w: 0.75, reach: 2.9, lunge: 0.5, fixed: true, name: '反撃' },
+    counterL: { key: 'L', O: 80, W: 140, S: 110, F: 230, R: 440, w: 0.75, reach: 2.9, lunge: 0.5, fixed: true, name: '反撃' },
+    // 後半の技
+    leap:   { key: 'LP', O: 320, W: 520, S: 220, F: 480, R: 900, w: 1.7, reach: 3.0, lunge: 0, leap: true, name: '跳び斬り' },
+    spin1:  { key: 'SP1', O: 280, W: 420, S: 180, F: 120, R: 0, w: 1.1, reach: 2.9, lunge: 0.4, name: '回転斬り・一' },
+    spin2:  { key: 'SP2', O: 40, W: 140, S: 170, F: 380, R: 720, w: 1.1, reach: 2.9, lunge: 0.5, fixed: true, name: '回転斬り・二' },
+    pierce: { key: 'T', O: 360, W: 700, S: 210, F: 420, R: 800, w: 1.5, reach: 3.4, lunge: 0.95, peril: 'pierce', name: '危：突き' },
+    tackle: { key: 'TK', O: 300, W: 520, S: 200, F: 500, R: 900, w: 1.6, reach: 2.6, lunge: 1.6, peril: 'tackle', name: '危：体当たり' },
   };
 
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -295,6 +307,43 @@
     },
   };
   KEY.L = { wind: mirrorX(KEY.R.wind), hit: mirrorX(KEY.R.hit), follow: mirrorX(KEY.R.follow) };
+  // 袈裟斬り：右肩の上から、斜めに斬り下ろす
+  KEY.KS = {
+    wind: pose({ hand: V(-0.55, 1.95, -0.12), sword: N(-0.5, 0.72, -0.48), hipX: -0.12, crouch: 0.2, yaw: 0.9, pitch: -0.15, roll: 0.12 }),
+    hit:  pose({ hand: V(0.05, 1.25, 0.86), sword: N(0.72, -0.35, 0.6), hipX: 0.04, crouch: 0.26, yaw: -0.3, pitch: 0.22 }),
+    follow: pose({ hand: V(0.62, 0.78, 0.42), sword: N(0.7, -0.62, -0.32), hipX: 0.18, crouch: 0.34, yaw: -1.1, pitch: 0.35, roll: -0.1 }),
+  };
+  // 逆袈裟：左下から、斜めに斬り上げる
+  KEY.KG = {
+    wind: pose({ hand: V(-0.55, 0.72, 0.08), sword: N(-0.62, -0.6, -0.45), hipX: -0.12, crouch: 0.36, yaw: 0.85, pitch: 0.25 }),
+    hit:  pose({ hand: V(0.05, 1.42, 0.84), sword: N(0.74, 0.46, 0.5), crouch: 0.2, yaw: -0.3, pitch: 0.05 }),
+    follow: pose({ hand: V(0.55, 2.0, 0.22), sword: N(0.5, 0.82, -0.3), hipX: 0.12, crouch: 0.08, yaw: -1.1, pitch: -0.25, lift: 0.08 }),
+  };
+  // 跳び斬り：身を沈めて跳び上がり、落ちながら振り下ろす
+  KEY.LP = {
+    wind: pose({ hand: V(0.02, 2.25, -0.2), sword: N(0, 0.42, -0.9), hipZ: -0.1, crouch: 0.1, pitch: -0.5, lift: 0.9 }),
+    hit:  pose({ hand: V(0.02, 1.2, 0.85), sword: N(0, -0.45, 1), hipZ: 0.15, crouch: 0.45, pitch: 0.5 }),
+    follow: pose({ hand: V(0.02, 0.7, 0.75), sword: N(0, -0.92, 0.4), hipZ: 0.2, crouch: 0.5, pitch: 0.7 }),
+  };
+  // 回転斬り：背を見せるほど回り込んでから、二度薙ぐ
+  KEY.SP1 = {
+    wind: pose({ hand: V(-0.7, 1.35, -0.35), sword: N(-0.6, 0.2, -0.78), hipX: -0.15, crouch: 0.28, yaw: 1.85, roll: 0.08 }),
+    hit:  pose({ hand: V(0.05, 1.3, 0.88), sword: N(1, 0.04, 0.3), crouch: 0.26, yaw: -0.3, pitch: 0.12 }),
+    follow: pose({ hand: V(0.72, 1.25, 0.1), sword: N(0.75, 0.0, -0.66), hipX: 0.15, crouch: 0.26, yaw: -1.7, roll: -0.08 }),
+  };
+  KEY.SP2 = {
+    wind: KEY.SP1.follow,
+    hit:  pose({ hand: V(-0.05, 1.1, 0.88), sword: N(-1, -0.08, 0.3), crouch: 0.3, yaw: 0.35, pitch: 0.18 }),
+    follow: pose({ hand: V(-0.72, 0.95, 0.3), sword: N(-0.75, -0.4, -0.5), hipX: -0.2, crouch: 0.32, yaw: 1.4, pitch: 0.2 }),
+  };
+  // 体当たり：刀を引き、肩から突っ込む
+  KEY.TK = {
+    wind: pose({ hand: V(0.3, 1.1, -0.32), sword: N(0.3, 0.3, -0.9), hipZ: -0.28, crouch: 0.38, yaw: 0.65, pitch: 0.2 }),
+    hit:  pose({ hand: V(0.32, 1.05, -0.05), sword: N(0.3, 0.2, -0.93), hipZ: 0.5, crouch: 0.3, yaw: 0.4, pitch: 0.48 }),
+    follow: pose({ hand: V(0.3, 1.05, 0.05), sword: N(0.3, 0.2, -0.93), hipZ: 0.45, crouch: 0.3, yaw: 0.3, pitch: 0.4 }),
+  };
+  // 一礼
+  const BOW = pose({ hand: V(0.25, 0.85, 0.3), sword: N(0.25, -0.75, 0.6), crouch: 0.04, pitch: 0.55 });
   const KNEEL = pose({ hand: V(0.25, 0.7, 0.55), sword: N(0.3, -0.85, 0.4), crouch: 0.46, pitch: 0.55, hipZ: -0.05 });
   // 本物の隙：腰が伸び、力が抜けている。誘い：見た目は似ているが、腰が沈んで溜まっている。
   const OPEN = pose({ hand: V(0.32, 0.96, 0.32), sword: N(0.35, -0.62, 0.7), crouch: 0.0, hipZ: 0.03, pitch: 0.08 });
@@ -1333,7 +1382,7 @@
     stalkDir: 1, chain: 0, bestChain: 0,
     breathE: 0, breathP: 0, shake: 0, fovKick: 0, cine: null,
     habit: { guard: 0, attack: 0, dodge: 0 }, lastDodge: -9999,
-    log: [], r: rng(1234), auto: false, touch: null,
+    log: [], r: rng(1234), auto: false, touch: null, tele: [], lastResult: null,
     stats: { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: 0 },
   };
 
@@ -1342,24 +1391,30 @@
   function tween(actor, tx, tz, dur, easing) { actor.tw = { fx: actor.x, fz: actor.z, tx, tz, t0: S.gt, dur, easing: easing || easeOut }; }
 
   function timing(move) {
-    const k = S.phase === 2 ? 0.9 : 1, w = move.w;
-    if (move.fast) return { O: 80, W: 140, S: 110, F: 230, R: 440 };
-    if (move.dash) return { O: 230 * k, W: 380 * k, S: 300, F: 260, R: 520 };
-    return { O: (150 + 150 * w) * k, W: (220 + 330 * w) * k, S: 115 + 75 * w, F: 220 + 150 * w, R: 380 + 300 * w };
+    const k = S.phase === 2 && !move.fixed ? 0.92 : 1;
+    return { O: move.O * k, W: move.W * k, S: move.S, F: move.F, R: move.R };
   }
 
+  // 連撃。{ if: 'parry', then, else } は、直前の技への応じ方で次の技が変わる分岐。
   const PATTERNS = {
-    1: [['over'], ['cutR'], ['cutL'], ['cutL', 'cutR'], ['over', 'cutR'], ['rise'], ['cutR', 'cutL'], ['thrust'], ['sweep']],
-    2: [['quickR', 'quickL', 'quickR'], ['thrust'], ['over*'], ['~', 'quickR'], ['~', 'over'], ['cutL', 'thrust'],
-        ['rise', 'over*'], ['quickL', 'quickR', 'cutL'], ['~', 'thrust'], ['cutR', 'cutL', 'over'], ['sweep'], ['cutR', 'pierce'], ['quickL', 'sweep'], ['pierce']],
+    1: [['kesa'], ['gyaku'], ['cutR'], ['over'], ['thrust'], ['cutL', 'cutR'],
+        ['kesa', { if: 'parry', then: 'gyaku', else: 'over' }],
+        ['quickR', 'quickL', { if: 'parry', then: 'thrust', else: 'kesa' }],
+        ['sweep'], ['gyaku', 'thrust'], ['cutR', 'sweep']],
+    2: [['leap'], ['spin1', 'spin2'], ['quickR', 'quickL', 'quickR', 'over*'], ['~', 'kesa'], ['~', 'tackle'],
+        ['kesa', 'gyaku', { if: 'parry', then: 'pierce', else: ['spin1', 'spin2'] }],
+        ['cutR', 'sweep'], ['over*'], ['pierce'], ['tackle'], ['gyaku', 'kesa', 'over'], ['~', 'spin1', 'spin2'],
+        ['quickL', { if: 'parry', then: 'tackle', else: 'kesa' }]],
   };
   function pickPattern() {
     const list = PATTERNS[S.phase];
-    // 相手はこちらの癖を学ぶ：下の連打が多いと、虚と溜めを増やす。避けてばかりだと、危険な技を増やす。
+    // 相手はこちらの癖を突く：下の連打には虚と溜めと体当たり、避けてばかりなら危険な技
     const weights = list.map((p) => {
-      const tricky = p.some((t) => t === '~' || t.endsWith('*'));
-      const peril = p.some((t) => t === 'sweep' || t === 'pierce');
-      return 1 + (tricky ? S.habit.guard * 0.6 : 0) + (peril ? S.habit.dodge * 0.35 : 0);
+      const flat = p.map((t) => (typeof t === 'string' ? t : 'x'));
+      const tricky = flat.some((t) => t === '~' || t.endsWith('*'));
+      const peril = flat.some((t) => t === 'sweep' || t === 'pierce' || t === 'tackle');
+      const tackle = flat.includes('tackle');
+      return 1 + (tricky ? S.habit.guard * 0.6 : 0) + (peril ? S.habit.dodge * 0.35 : 0) + (tackle ? S.habit.guard * 0.5 : 0);
     });
     let r = S.r() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < list.length; i++) { r -= weights[i]; if (r <= 0) return list[i].slice(); }
@@ -1376,19 +1431,27 @@
     if (S.queue.length) { startAction(S.queue.shift()); return; }
     Object.keys(S.habit).forEach((k) => { S.habit[k] *= 0.93; });
     const r = S.r();
-    if (d > 3.8 && S.gt - S.lastDodge < 1500 && r < 0.6) { startAction('dash'); return; }
+    if (S.phase === 2 && d > 3.6 && r < 0.5) { startAction('leap'); return; }
+    if (d > 3.8 && S.gt - S.lastDodge < 1500 && r < 0.6) { startAction(S.phase === 2 ? 'leap' : 'dash'); return; }
     if (d > 4.8) { if (r < 0.55) startAction('dash'); else setMode('approach', 4000); return; }
     if (d > 3.0) { if (r < 0.6) setMode('approach', 4000); else setMode('stalk', 700 + S.r() * 900); return; }
-    if (r < 0.15) { setMode('stalk', 600 + S.r() * 700); return; }
+    if (r < (S.phase === 1 ? 0.18 : 0.08)) { setMode('stalk', 600 + S.r() * 700); return; }
     S.queue = pickPattern();
     startAction(S.queue.shift());
   }
   function startAction(token) {
+    // 分岐：直前の技を弾かれたかどうかで、次の技を選ぶ
+    if (token && typeof token === 'object' && !Array.isArray(token)) {
+      const pick = S.lastResult === token.if ? token.then : token.else;
+      if (Array.isArray(pick)) { S.queue.unshift(...pick.slice(1)); token = pick[0]; } else token = pick;
+    }
     const feint = token === '~';
     const delayed = token.endsWith('*');
     const key = token.replace('*', '');
-    const move = feint ? { key: ['R', 'L', 'D'][Math.floor(S.r() * 3)], w: 1.2, reach: 2.9, lunge: 0, name: '虚' } : MOVES[key];
+    // 虚：腕と刀だけが動く起こり（腰は動かない）。起こりの長さは本物と同じにして、腰でしか見分けられないようにする。
+    const move = feint ? { key: ['R', 'L', 'D', 'KS'][Math.floor(S.r() * 4)], O: 330, W: 500, S: 180, F: 300, R: 500, w: 1.2, reach: 2.9, lunge: 0, name: '虚' } : MOVES[key];
     if (!move) { setMode('stalk', 600); return; }
+    S.lastResult = null;
     const tm = timing(move);
     const D = delayed ? 380 + S.r() * 380 : 0;
     const a = { move, feint, t0: S.gt, ...tm, D, resolved: false, parried: false, lunged: false, peril: move.peril || null };
@@ -1481,7 +1544,12 @@
   function resolvePlayerHit(pa) {
     const d = dist();
     tA.copy(enemy.chestWorld).lerp(player.tip, 0.45);
-    if (d > CFG.reachPlayer) { Sound.whiff(); return; }
+    if (d > CFG.reachPlayer) {
+      Sound.whiff();
+      // 届かない斬りは隙になる。相手はすかさず咎める。
+      if (['stalk', 'approach', 'open'].includes(S.mode) && d < 4.4 && S.r() < 0.7) { S.queue = []; startAction(d > 3.2 ? 'dash' : 'thrust'); }
+      return;
+    }
     const m = S.mode, a = S.action;
     if (m === 'broken') { issen(); return; }
     if (pa.kind === 'counter') {
@@ -1578,6 +1646,9 @@
   }
 
   function applyImpact(a, res) {
+    S.lastResult = res;
+    const near = (t) => (Math.abs(a.T - t) < 1000 ? Math.round(a.T - t) : null);
+    S.tele.push({ t: Math.round(S.gt / 100) / 10, ph: S.phase, m: a.move.name, r: res, guard: near(S.guardStart), dodge: near(S.dodgeStart), B: Math.round(S.B), P: Math.round(S.P) });
     if (res === 'parry') parry(a);
     else if (res === 'block') block(a);
     else if (res === 'mikiri') mikiri(a);
@@ -1787,6 +1858,7 @@
   // ───────────────────────── 相手の進行 ─────────────────────────
   function updateAI() {
     const gt = S.gt, m = S.mode, f = dirPE();
+    if (m === 'intro') { S.e.vx = S.e.vz = 0; if (gt >= S.modeUntil) setMode('stalk', 600); return; }
     if (m === 'stalk') {
       const pref = S.phase === 1 ? 3.6 : 3.2;
       const radial = clamp((f.d - pref) * 1.2, -0.9, 0.9);
@@ -1823,6 +1895,12 @@
       if (a.feint) {
         if (gt >= a.end) { S.action = null; if (S.queue.length) startAction(S.queue.shift()); else setMode('stalk', 500); }
         return;
+      }
+      if (a.move.leap && !a.leapt && gt >= a.t0 + a.O) {
+        a.leapt = true;
+        const go = Math.max(0, f.d - 1.75);
+        tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, a.W + a.S, (u) => smooth(u));
+        kickSnow(enemy.hipWorld, 1.3); Sound.swing(1.6);
       }
       if (!a.lunged && gt >= a.T - a.S) {
         a.lunged = true;
@@ -1920,6 +1998,9 @@
       } else {
         blend(K.follow, NEUTRAL, smooth((gt - a.T - a.F) / a.R), out);
       }
+    } else if (m === 'intro') {
+      const u = since < 900 ? smooth(since / 900) : since < 1500 ? 1 : 1 - smooth((since - 1500) / 800);
+      blend(NEUTRAL, BOW, u, out);
     } else if (m === 'open') blend(S.actionFrom, OPEN, smooth(since / 220), out);
     else if (m === 'bait') blend(S.actionFrom, BAIT, smooth(since / 220), out);
     else if (m === 'broken') blend(S.actionFrom, KNEEL, easeOut(since / 380), out);
@@ -2103,16 +2184,18 @@
     if (!S.auto) return;
     const fire = (dir) => doInput(dir, S.gt);
     if (S.mode === 'broken' && S.gt > S.modeStart + 250) { fire('U'); return; }
-    if (S.gt < S.counterUntil && !S.autoCountered && (!S.pa || ['deflect', 'dodge', 'stomp'].includes(S.pa.kind))) { S.autoCountered = true; fire('U'); return; }
+    const plain = S.auto === 'plain';
+    if (!plain && S.gt < S.counterUntil && !S.autoCountered && (!S.pa || ['deflect', 'dodge', 'stomp'].includes(S.pa.kind))) { S.autoCountered = true; fire('U'); return; }
     if (S.gt >= S.counterUntil) S.autoCountered = false;
     const a = S.action;
-    if ((S.mode === 'open' || S.mode === 'staggered') && dist() < CFG.reachPlayer && (!S.pa || S.gt - S.pa.t0 > (S.pa.def.cancel || S.pa.def.dur))) {
+    if (!plain && (S.mode === 'open' || S.mode === 'staggered') && dist() < CFG.reachPlayer && (!S.pa || S.gt - S.pa.t0 > (S.pa.def.cancel || S.pa.def.dur))) {
       if (!S.autoCutAt || S.gt - S.autoCutAt > 250) { S.autoCutAt = S.gt; fire('U'); }
       return;
     }
     if (!a || a.resolved || a.feint || a.autoDone) return;
     if (a.peril === 'sweep') { if (S.gt >= a.T - 90) { a.autoDone = true; fire('R'); } return; }
     if (a.peril === 'pierce') { if (S.gt >= a.T - 140) { a.autoDone = true; fire('U'); } return; }
+    if (a.peril === 'tackle') { if (S.gt >= a.T - 100) { a.autoDone = true; fire('L'); } return; }
     if (S.auto === 'debana' && a.move.w >= 1.4 && S.gt >= a.t0 + a.O * 0.4) { a.autoDone = true; fire('U'); return; }
     if (S.gt >= a.T - 70) { a.autoDone = true; fire('D'); }
   }
@@ -2166,7 +2249,8 @@
     else if (enemy.hatOn()) enemy.dropHat();
     enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
     S.r = rng((Date.now() ^ (fromPhase * 7919)) >>> 0);
-    setMode('stalk', 1800);
+    if (fromPhase === 1) setMode('intro', 2400); else setMode('stalk', 1400);
+    S.tele = S.tele && fromPhase !== 1 ? S.tele : [];
     S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt };
     S.bestChain = 0;
     S.log = []; renderLog();
@@ -2180,17 +2264,41 @@
     document.getElementById('endText').textContent = won
       ? `${secs}秒。弾き ${st.parry}・見切り ${st.mikiri}・反撃 ${st.counter}・出鼻 ${st.debana}・踏み ${st.stomp}・斬り ${st.cut}・被弾 ${st.hits}・最高 ${S.bestChain}連`
       : `${S.phase === 1 ? '前半' : '後半'}から、すぐにやり直せます。`;
+    document.getElementById('endSummary').textContent = teleSummary();
     document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
     endEl.hidden = false;
     S.lastWon = won;
   }
   document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; begin(S.lastWon ? 1 : S.phase); });
+  // 試遊の記録：刃が届くたびの結果と、入力のずれ（刃が届く何ミリ秒前に入れたか）
+  function teleSummary() {
+    const T = S.tele;
+    if (!T.length) return '';
+    const parried = T.filter((e) => e.r === 'parry'), blocked = T.filter((e) => e.r === 'block');
+    const guardTries = T.filter((e) => e.guard !== null && e.guard > -100 && e.guard < 700 && ['parry', 'block', 'hit'].includes(e.r));
+    const avg = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+    const rate = guardTries.length ? Math.round(parried.length / guardTries.length * 100) : null;
+    const early = avg(blocked.map((e) => e.guard));
+    const worst = {};
+    T.filter((e) => e.r === 'hit' || e.r === 'guardBreak').forEach((e) => { worst[e.m] = (worst[e.m] || 0) + 1; });
+    const w = Object.entries(worst).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k}（${v}回）`).join('、');
+    return [rate !== null ? `弾きの成功 ${rate}%（${parried.length}/${guardTries.length}）` : '', early !== null ? `受けになった時は、平均 ${early}ms 早い` : '', w ? `よく斬られた技：${w}` : ''].filter(Boolean).join('。');
+  }
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const data = JSON.stringify({ v: '0.6', ua: navigator.userAgent.slice(0, 80), summary: teleSummary(), stats: S.stats, log: S.tele });
+    const box = document.getElementById('teleBox');
+    box.hidden = false; box.value = data; box.select();
+    const done = () => { document.getElementById('copyBtn').textContent = '写しました'; };
+    try { navigator.clipboard.writeText(data).then(done, () => { document.execCommand && document.execCommand('copy'); done(); }); } catch (e) { done(); }
+  });
 
   window.__kaeshi = {
     get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, gt: S.gt, d: dist(), chain: S.chain, pa: S.pa && S.pa.kind, counter: S.gt < S.counterUntil, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0, O: S.action.O } }; },
     setSpeed(v) { S.speed = v; },
     setAuto(v) { S.auto = v; },
     force(token) { S.queue = []; S.action = null; startAction(token); },
+    forcePattern(list) { S.action = null; S.queue = list.slice(1); startAction(list[0]); },
+    setPhase(n) { S.phase = n; },
     forceMode(m, dur) { S.action = null; S.queue = []; S.counterUntil = 0; S.P = 0; setMode(m, dur); },
     input(dir) { doInput(dir, S.gt); },
     setB(v) { S.B = v; S.lastPressure = S.gt + 1e6; },
