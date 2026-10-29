@@ -170,7 +170,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 0.8</p>
+    <p class="kicker">Kaeshi · 試作 0.9</p>
     <h1>返し</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -1446,16 +1446,30 @@
   snow.frustumCulled = false; scene.add(snow);
 
   // ───────────────────────── 音 ─────────────────────────
+  // 結果ごとに「別の楽器」を割り当てる：弾き＝澄んで長く響く金属とご褒美の和音、受け＝詰まった金属、
+  // 斬り＝空気を裂いて布を断つ音と腹に響く低音、見切り＝吸い込む風とガラスの一音。雪の野外の残響と、左右の定位。
   const Sound = (() => {
-    let ctx = null, master = null, wind = null, noiseBuf = null;
+    let ctx = null, master = null, verbIn = null, wind = null, noiseBuf = null;
+    let panVal = 0, panUntil = 0;
+    function makeIR(seconds) {
+      const len = Math.floor(ctx.sampleRate * seconds), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        const d = ir.getChannelData(c); let lp = 0;
+        for (let i = 0; i < len; i++) { lp = lp * 0.6 + (Math.random() * 2 - 1) * 0.4; d[i] = lp * Math.pow(1 - i / len, 3.2); }
+      }
+      return ir;
+    }
     function init() {
       if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       ctx = new AC();
-      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-      master = ctx.createGain(); master.gain.value = 0.9;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 5; comp.attack.value = 0.002; comp.release.value = 0.15;
+      master = ctx.createGain(); master.gain.value = 0.95;
       master.connect(comp); comp.connect(ctx.destination);
+      const verb = ctx.createConvolver(); verb.buffer = makeIR(2.4);
+      const verbOut = ctx.createGain(); verbOut.gain.value = 0.32;
+      verbIn = ctx.createGain(); verbIn.connect(verb); verb.connect(verbOut); verbOut.connect(master);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -1469,74 +1483,104 @@
       src.start(); lfo.start();
     }
     const now = () => ctx.currentTime;
-    function noise(dur, type, freq, q, gain, sweepTo) {
+    // 出口：左右の定位をかけ、残響へも送る
+    function out(node, verbAmt) {
+      let n = node;
+      if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = performance.now() < panUntil ? panVal : 0; n.connect(p); n = p; }
+      n.connect(master);
+      if (verbAmt) { const g = ctx.createGain(); g.gain.value = verbAmt; n.connect(g); g.connect(verbIn); }
+    }
+    function env(g, t, attack, peak, decay) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    }
+    function noise(dur, type, freq, q, gain, sweepTo, verb, attack, delay) {
       if (!ctx) return;
-      const t = now();
+      const t = now() + (delay || 0);
       const s = ctx.createBufferSource(); s.buffer = noiseBuf;
       const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
       if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      s.connect(f); f.connect(g); g.connect(master);
-      s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+      const g = ctx.createGain(); env(g, t, attack || 0.006, gain, dur);
+      s.connect(f); f.connect(g); out(g, verb);
+      s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.1);
     }
-    function bell(base, decay, gain, ratios) {
+    function tone(f0, f1, dur, gain, type, verb, attack, delay) {
+      if (!ctx) return;
+      const t = now() + (delay || 0);
+      const o = ctx.createOscillator(); o.type = type || 'sine';
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+      const g = ctx.createGain(); env(g, t, attack || 0.01, gain, dur);
+      o.connect(g); out(g, verb); o.start(t); o.stop(t + dur + 0.1);
+    }
+    // 金属の響き：調和しない倍音を、高いものほど早く消す
+    function metal(base, ratios, decay, gain, verb) {
       if (!ctx) return;
       const t = now();
-      (ratios || [1, 2.76, 5.4, 8.93]).forEach((r, i) => {
+      ratios.forEach((r, i) => {
         const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = base * r;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain / (1 + i * 1.3), t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + decay / (1 + i * 0.5));
-        o.connect(g); g.connect(master); o.start(t); o.stop(t + decay + 0.1);
+        const g = ctx.createGain(); env(g, t, 0.002, gain / (1 + i * 0.9), decay / (1 + i * 0.45));
+        o.connect(g); out(g, verb); o.start(t); o.stop(t + decay + 0.2);
       });
     }
-    function tone(f0, f1, dur, gain, type) {
-      if (!ctx) return;
-      const t = now();
-      const o = ctx.createOscillator(); o.type = type || 'sine';
-      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
-    }
-    return {
+    const step12 = (chain) => Math.pow(2, PENTA[Math.min(chain, PENTA.length - 1)] / 12);
+    const api = {
       init,
-      parry(tier, chain) {
-        const k = Math.pow(2, PENTA[Math.min(chain, PENTA.length - 1)] / 12);
-        if (tier === 'go') { bell(1240 * k * 0.8, 0.35, 0.22); noise(0.04, 'bandpass', 5200, 1.2, 0.18); }
-        else if (tier === 'tai') { bell(980 * k * 0.8, 0.9, 0.3); bell(1960 * k * 0.8, 0.5, 0.08, [1, 2.4]); noise(0.06, 'bandpass', 4200, 1, 0.24); }
-        else { bell(1480 * k * 0.8, 1.8, 0.32); bell(740 * k * 0.8, 1.2, 0.12, [1, 3.01]); noise(0.05, 'highpass', 6000, 0.7, 0.16); }
-      },
-      clash() { bell(420, 0.35, 0.2, [1, 1.93, 3.7]); noise(0.12, 'bandpass', 1800, 0.8, 0.26); },
-      // 弾き：高く澄んで長く響く金属音に、低い芯を重ねる。連続するほど音階が上がる。
+      // 次に鳴らす音の左右の位置（画面の左なら左から聞こえる）
+      at(world) { _pj.copy(world).project(camera); panVal = clamp(_pj.x * 0.7, -0.8, 0.8); panUntil = performance.now() + 60; },
+      // 弾き：鋭い立ち上がり、澄んで長く響く金属、低い芯、そしてご褒美の和音。続けて弾くほど音が上がる。
       kin(chain) {
-        const k = Math.pow(2, PENTA[Math.min(chain, PENTA.length - 1)] / 12);
-        bell(1320 * k * 0.8, 1.6, 0.34); bell(2640 * k * 0.8, 0.9, 0.1, [1, 1.51]);
-        tone(190, 80, 0.22, 0.32); noise(0.05, 'highpass', 5500, 0.7, 0.3); noise(0.25, 'bandpass', 7000, 2, 0.06);
+        const k = step12(chain);
+        noise(0.012, 'highpass', 6500, 0.7, 0.55);
+        metal(1500 * k * 0.72, [1, 1.48, 2.03, 2.71, 3.56], 1.9, 0.38, 0.4);
+        tone(190, 68, 0.2, 0.42);
+        tone(660 * k * 0.72, 660 * k * 0.72, 1.1, 0.1, 'sine', 0.45, 0.03, 0.05);
+        tone(990 * k * 0.72, 990 * k * 0.72, 1.1, 0.08, 'sine', 0.45, 0.03, 0.05);
       },
-      clank() { tone(260, 150, 0.12, 0.22, 'triangle'); noise(0.1, 'bandpass', 1200, 1.1, 0.22); },
-      clashLow() { bell(330, 0.5, 0.24, [1, 1.93, 3.1]); noise(0.12, 'bandpass', 1500, 0.8, 0.28); tone(120, 70, 0.2, 0.2); },
-      mikiri() { tone(60, 48, 0.5, 0.45); setTimeout(() => tone(58, 46, 0.4, 0.32), 320); noise(0.6, 'bandpass', 420, 0.8, 0.12, 180); },
-      grunt(big) { tone(big ? 150 : 175, big ? 92 : 115, big ? 0.24 : 0.16, big ? 0.22 : 0.15, 'sawtooth'); noise(big ? 0.22 : 0.14, 'bandpass', 520, 3, big ? 0.16 : 0.1); },
-      gasp() { noise(0.55, 'bandpass', 760, 1.2, 0.2, 380); tone(125, 78, 0.45, 0.2, 'sawtooth'); },
-      rip() { noise(0.16, 'bandpass', 3200, 1.6, 0.16, 1400); noise(0.08, 'highpass', 4000, 0.8, 0.08); },
-      cut(big) { noise(big ? 0.3 : 0.18, 'bandpass', 2600, 0.9, big ? 0.32 : 0.22, 700); tone(big ? 150 : 220, 60, big ? 0.3 : 0.18, big ? 0.3 : 0.14, 'triangle'); },
-      hit() { tone(150, 42, 0.32, 0.55); noise(0.18, 'lowpass', 900, 0.7, 0.35); },
-      whiff() { noise(0.16, 'bandpass', 700, 2, 0.12, 2400); },
-      dodge() { noise(0.2, 'bandpass', 500, 1.2, 0.1, 1800); },
+      parry(tier, chain) { api.kin(chain || 0); },
+      // 受け：短く詰まった金属。響かせない（失敗とわかるように、少し不快に）
+      clank() { noise(0.08, 'bandpass', 1100, 2.2, 0.4); tone(310, 170, 0.07, 0.16, 'square'); tone(140, 90, 0.08, 0.2); },
+      // 斬りを弾かれた：低く荒い金属
+      clashLow() { noise(0.01, 'highpass', 4000, 0.7, 0.3); metal(560, [1, 1.33, 2.41, 3.1], 0.55, 0.28, 0.2); noise(0.14, 'bandpass', 1500, 0.9, 0.3); tone(120, 70, 0.18, 0.22); },
+      clash() { api.clashLow(); },
+      // 斬り：空気を裂く音から、布を断つ鋭い音へ。腹に響く低音。
+      cut(big) {
+        noise(0.07, 'bandpass', 900, 1.4, big ? 0.2 : 0.14, 3200, 0, 0.03);
+        noise(big ? 0.18 : 0.12, 'highpass', 2600, 0.8, big ? 0.42 : 0.32, 0, 0.12, 0.003, 0.05);
+        tone(big ? 100 : 130, 42, big ? 0.34 : 0.22, big ? 0.6 : 0.4, 'sine', 0.1, 0.004, 0.05);
+        if (big) { tone(60, 32, 0.6, 0.35, 'sine', 0.25, 0.01, 0.05); metal(220, [1, 2.01, 3.03], 1.4, 0.1, 0.5); }
+      },
+      rip() { noise(0.16, 'bandpass', 3200, 1.6, 0.16, 1400, 0, 0.003, 0.05); },
+      // 自分が斬られた：鈍く、こもった音
+      hit() { tone(90, 38, 0.34, 0.6); noise(0.22, 'lowpass', 600, 0.7, 0.38); noise(0.5, 'lowpass', 200, 0.5, 0.15); },
+      whiff() { noise(0.14, 'bandpass', 800, 2, 0.1, 2600); },
+      dodge() { noise(0.2, 'bandpass', 500, 1.2, 0.12, 1800); },
+      // 見切り：吸い込むような風、ガラスのように澄んだ一音、低い鼓動
+      mikiri() {
+        noise(0.4, 'bandpass', 300, 1, 0.22, 1400, 0.2, 0.22);
+        tone(2637, 2637, 1.3, 0.1, 'sine', 0.6, 0.004, 0.12); tone(3951, 3951, 1.0, 0.06, 'sine', 0.6, 0.004, 0.12);
+        tone(60, 48, 0.5, 0.45); tone(58, 46, 0.4, 0.32, 'sine', 0, 0.01, 0.32);
+      },
       crunch(strength) { noise(0.12 + strength * 0.05, 'bandpass', 1700, 1.4, 0.04 + strength * 0.06); },
       step(strength) { noise(0.07, 'bandpass', 2200, 1.6, 0.012 + strength * 0.02); },
       swing(w) { noise(0.12 + w * 0.06, 'bandpass', 500 + 400 / w, 1.5, 0.05 + 0.04 * w, 1400); },
-      peril() { tone(70, 55, 0.9, 0.35, 'sawtooth'); bell(311, 0.8, 0.08, [1, 1.06]); },
+      peril() { tone(70, 55, 0.9, 0.35, 'sawtooth', 0.3); metal(311, [1, 1.06], 0.8, 0.1, 0.3); },
       breath(strength) { noise(0.45, 'bandpass', 900, 0.8, 0.012 + strength * 0.03); },
-      phase() { tone(55, 41, 2.2, 0.4, 'sawtooth'); bell(130, 2.5, 0.2, [1, 2.0, 3.0]); },
+      grunt(big) { tone(big ? 150 : 175, big ? 92 : 115, big ? 0.24 : 0.16, big ? 0.22 : 0.15, 'sawtooth'); noise(big ? 0.22 : 0.14, 'bandpass', 520, 3, big ? 0.16 : 0.1); },
+      gasp() { noise(0.55, 'bandpass', 760, 1.2, 0.2, 380, 0.2); tone(125, 78, 0.45, 0.2, 'sawtooth'); },
+      phase() { tone(55, 41, 2.2, 0.4, 'sawtooth', 0.4); metal(130, [1, 2.0, 3.0], 2.5, 0.2, 0.5); },
       issen() {
         if (!ctx) return;
         const t = now();
         if (wind) { wind.gain.cancelScheduledValues(t); wind.gain.setValueAtTime(0.0001, t); wind.gain.linearRampToValueAtTime(0.05, t + 3.5); }
-        setTimeout(() => { bell(196, 3.6, 0.36, [1, 2.0, 3.0, 4.17]); bell(2350, 2.2, 0.06, [1, 1.5]); }, 260);
+        setTimeout(() => {
+          metal(196, [1, 2.0, 3.0, 4.17], 3.6, 0.36, 0.6); metal(2350, [1, 1.5], 2.2, 0.06, 0.6);
+          tone(55, 30, 1.2, 0.5, 'sine', 0.4);
+          tone(392, 392, 2.4, 0.1, 'sine', 0.6, 0.05); tone(587, 587, 2.4, 0.08, 'sine', 0.6, 0.05);
+        }, 260);
       },
     };
+    return api;
   })();
 
   // ───────────────────────── 状態 ─────────────────────────
@@ -1777,7 +1821,7 @@
     if (label === '斬') S.stats.cut++;
     S.enemyDeflects = 0;
     addChain();
-    Sound.cut(big); Sound.rip();
+    Sound.at(tA); Sound.cut(big); Sound.rip();
     const pts = playerTrail.samples.map((q) => q.tip);
     slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big);
     shred(tA, big ? 14 : 7);
@@ -1809,7 +1853,7 @@
 
   function enemyDeflect(forceCounter) {
     // 斬りを弾かれた：火花、低い金属音、自分がのけぞる
-    clashPoint(tA);
+    clashPoint(tA); Sound.at(tA);
     Sound.clashLow(); burst(tA, 20, 2.2, 'hot'); flare(tA, 0.8, 160); lightAt(tA, 3, 0xffe2c0);
     S.guardUntil = S.gt + 260;
     { const f = dirPE(); tween(S.p, S.p.x - f.x * 0.45, S.p.z - f.z * 0.45, 200); }
@@ -1858,7 +1902,7 @@
     const amt = CFG.brk.parry * a.move.w;
     S.B = clamp(S.B + amt, 0, 100); S.lastPressure = S.gt;
     // 弾き：時間が止まり、熱い火花が飛び、星形の光、衝撃波、高く長く響く金属音
-    Sound.kin(S.chain);
+    clashPoint(tA); Sound.at(tA); Sound.kin(S.chain);
     S.freezeUntil = performance.now() + 115;
     clashPoint(tA);
     burst(tA, 48, 3.6, 'hot'); burst(tA, 12, 1.8, 'cool');
@@ -1885,7 +1929,7 @@
     S.P = clamp(S.P + CFG.blockDamage(a.move.w), 0, 100); S.lastHit = S.gt;
     S.B = clamp(S.B + CFG.brk.block, 0, 100);
     // 受け：止まらない。鈍い火花と鈍い音、自分が押される
-    Sound.clank();
+    clashPoint(tA); Sound.at(tA); Sound.clank();
     clashPoint(tA); burst(tA, 9, 1.1, 'dull');
     S.shake = Math.max(S.shake, 0.06);
     const f = dirPE();
@@ -1899,7 +1943,7 @@
     S.stats.mikiri++; addChain();
     S.queue = [];
     // 見切り：時間がゆっくりになり、色が抜けて冷たくなる。中心へ向かう速度の線、低い鼓動
-    Sound.mikiri(); Sound.dodge();
+    Sound.at(player.chestWorld); Sound.mikiri(); Sound.dodge();
     S.slowUntil = performance.now() + 950; S.slowScale = 0.3; S.mikiriFx = true;
     fxKick(0.006, 0.24, player.chestWorld);
     tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.9, 420, 0xbfd8ff);
