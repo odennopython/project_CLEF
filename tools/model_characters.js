@@ -11,7 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { skeleton, BONE, PALETTE, pack } = require('./bake_characters.js');
+const { skeleton, BONE, PALETTE, pack, MAT_ID } = require('./bake_characters.js');
 
 // ───────── ベクトル ─────────
 const v = (x, y, z) => [x, y, z];
@@ -215,7 +215,7 @@ function build(kind) {
   const pal = PALETTE[kind];
   const C = (m) => hex(pal[m] || '#ff00ff');
   const M = Mesh();
-  const A = (m, w, extra) => Object.assign({ c: C(m), w, fx: 0, cl: ['skin', 'hair', 'tabi', 'sandal', 'strap', 'glove'].includes(m) ? 0 : m === 'armor' ? 0.5 : 1 }, extra || {});
+  const A = (m, w, extra) => Object.assign({ c: C(m), w, fx: 0, cl: MAT_ID(m) / 16 }, extra || {});
   // 胴の骨の重み（高さで、腰→腹→胸→首へ）
   const spineW = (y) => {
     if (y < 1.16) return W('hips', 1);
@@ -272,6 +272,14 @@ function build(kind) {
       const rings = [];
       doY.forEach((y, k) => { const rx = (0.205 + 0.025 * Math.sin((y - 1.16) / 0.43 * Math.PI)) * sw, rz = 0.15 + 0.012 * Math.sin((y - 1.16) / 0.43 * Math.PI); rings.push(ringPts(v(0, y, 0.008), X, Z, rx, rz, 16)); if (k < doY.length - 1) { rings.push(ringPts(v(0, y + 0.006, 0.008), X, Z, rx * 0.985, rz * 0.98, 16)); rings.push(ringPts(v(0, y + 0.012, 0.008), X, Z, rx, rz, 16)); } });
       const doM = solidLoft(rings, (r, i, p) => A('armor', spineW(p[1])), { openStart: true, openEnd: true });
+      // 縅の紐：板ごとに、前から脇へ縦の紐が並ぶ
+      doY.slice(0, -1).forEach((y) => {
+        for (let k = -6; k <= 6; k++) {
+          const a = k * 0.17, rx = (0.205 + 0.025 * Math.sin((y + 0.026 - 1.16) / 0.43 * Math.PI)) * sw + 0.004, rz = 0.15 + 0.012 * Math.sin((y + 0.026 - 1.16) / 0.43 * Math.PI) + 0.004;
+          const c = v(Math.sin(a) * rx, y + 0.03, Math.cos(a) * rz + 0.008), out = norm(v(Math.sin(a) / rx, 0, Math.cos(a) / rz)), side = norm(cross(Y, out));
+          merge(M, roundBox(c, side, Y, out, 0.004, 0.02, 0.0025, (p) => A('lapel', spineW(p[1]))));
+        }
+      });
       // 板の縁をくっきり
       merge(M, doM);
       // 胸板
@@ -300,6 +308,7 @@ function build(kind) {
         const th = i / n * Math.PI * 2;
         const front = Math.cos(th) > -0.2 ? 1 : 0.5;
         let k = 1 + pleatAmt * (tri(th * 10) - 0.5) * front;
+        k *= 1 + 0.035 * Math.sin(th * 3 + t * 17 + sg) * Math.exp(-Math.pow((t - 0.45) / 0.12, 2));   // 膝のあたりのたるみ
         let x = Math.sin(th) * rad * k, z = Math.cos(th) * rad * 0.9 * k;
         // 内側（相手の脚の側）を、上ほど中心線で平らにする
         const inner = -sg * x;   // 正なら中心線の側
@@ -347,7 +356,7 @@ function build(kind) {
       const rings = ts.map((t, k) => {
         const sag = 0.03 + 0.03 * Math.min(1, t / 0.3);
         const c = add(add(S, mul(dir, t)), mul(hang, sag));
-        return ringPts(c, fwd, hang, 0.056, 0.082 + (k > 0 ? 0.006 : -0.02), 12, (th) => { const a = Math.abs(Math.sin(th)), b = Math.abs(Math.cos(th)); return 1 / Math.pow(Math.pow(a, 4) + Math.pow(b, 4), 0.25); });
+        return ringPts(c, fwd, hang, 0.056, 0.082 + (k > 0 ? 0.006 : -0.02), 12, (th) => { const a = Math.abs(Math.sin(th)), b = Math.abs(Math.cos(th)); return (1 / Math.pow(Math.pow(a, 4) + Math.pow(b, 4), 0.25)) * (1 + 0.05 * Math.sin(th * 5 + k * 2.1) * (k > 0 && k < 5 ? 1 : 0)); });   // 袖のしわ
       });
       merge(M, shellLoft(rings, 0.009, (r, i, p) => A('haori', armW(p), { fx: 0.5 * ts[r] / 0.43 }), (r, i, p) => A('lining', armW(p), { fx: 0.5 * ts[r] / 0.43 }), { closedStart: true }));
       // 黒い籠手：帯を巻いた筋
@@ -361,7 +370,11 @@ function build(kind) {
       [0.05, 0.12, 0.19].forEach((t, k) => merge(M, roundBox(add(add(E, mul(dir, t + 0.02)), mul(fwd, 0.0)), fwd, dir, hang, 0.052 - k * 0.004, 0.03, 0.05 - k * 0.004, (p) => A('armor', W(fa, 1)))));
     }
     // 手：柄を握った拳（丸い箱）と親指
-    const hM = big ? 'glove' : 'skin';
+    const hM = big ? 'glove' : 'guard';   // 主人公の手は布を巻いた手甲
+    if (!big) {
+      // 手甲の布巻きの段
+      [0.02, 0.045, 0.07, 0.095].forEach((t, k) => merge(M, solidLoft([t - 0.008, t, t + 0.008].map((tt, q) => ringPts(add(WR, mul(dir, tt + 0.01)), fwd, hang, 0.037 + (q === 1 ? 0.003 : 0), 0.045 + (q === 1 ? 0.003 : 0), 10, (th) => 1 / Math.pow(Math.pow(Math.abs(Math.sin(th)), 3) + Math.pow(Math.abs(Math.cos(th)), 3), 1 / 3))), (r, i, p) => A('guard', W(hd, 1)), {})));
+    }
     merge(M, roundBox(add(WR, mul(dir, 0.06)), fwd, dir, hang, 0.034, 0.055, 0.042, (p) => A(hM, W(hd, 1))));
     merge(M, solidLoft([0.0, 0.03, 0.05].map((t, k) => ringPts(add(add(WR, mul(dir, 0.04 + t * 0.5)), mul(fwd, 0.035 + t * 0.4)), dir, hang, 0.014 - k * 0.002, 0.013 - k * 0.002, 6)), (r, i, p) => A(hM, W(hd, 1)), {}));
   });
@@ -428,7 +441,7 @@ function packRaw(B) {
 }
 
 if (require.main === module) {
-  const HEAD_CELL = 0.0042;
+  const HEAD_CELL = 0.0034;
   const data = { player: exportMesh('player'), playerHead: pack('player', HEAD_CELL, 'head'), enemy: exportMesh('enemy'), enemyHead: pack('enemy', HEAD_CELL, 'head') };
   const js = 'window.CLEF_CHARS = ' + JSON.stringify(data) + ';';
   const target = path.join(__dirname, '..', 'prototype', 'kaeshi', 'index.html');

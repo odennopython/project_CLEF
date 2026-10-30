@@ -110,6 +110,23 @@ function sculpt(kind) {
   part('skin', 'head', 0.03, (p) => sdEllipsoid(p, v(0, 1.91, 0.044), big ? v(0.036, 0.03, 0.032) : v(0.03, 0.026, 0.03)));
   part('skin', 'head', 0.008, (p) => sdCone(p, v(0, 1.99, 0.094), v(0, 1.966, 0.102), 0.006, big ? 0.009 : 0.008));
   [-1, 1].forEach((s) => part('skin', 'head', 0.012, (p) => sdEllipsoid(p, v(s * 0.094, 1.985, -0.006), v(0.012, 0.024, 0.017))));
+  // 目：まぶたの切れ込み（ここに実行時、本物の眼球を入れる）と、上まぶたのふくらみ
+  const eyeCarve = [];
+  [-1, 1].forEach((s) => {
+    const u = norm(v(1, s * (big ? 0.22 : 0.12), 0)), b3 = [u, v(-u[1], u[0], 0), v(0, 0, 1)];
+    eyeCarve.push({ k: 0.002, d: (p) => sdEllipsoid(p, v(s * 0.032, 1.99, 0.095), v(0.0165, big ? 0.0072 : 0.0082, 0.009), b3) });   // 浅く（深いと、窪みの内側の肌が光って白い縁に見える）
+    part('skin', 'head', 0.006, (p) => sdEllipsoid(p, v(s * 0.032, 1.9995, 0.088), v(0.019, 0.0055, 0.011), b3));
+  });
+  // 口元を覆う：主人公は黒い布の面覆い、相手は黒漆の面頬（鼻と頬当て、喉へ続く）
+  const faceSkin = (p) => smin(smin(sdEllipsoid(p, v(0, 2.02, -0.012), big ? v(0.094, 0.104, 0.104) : v(0.097, 0.105, 0.103)), sdEllipsoid(p, v(0, 1.962, 0.022), big ? v(0.068, 0.074, 0.074) : v(0.07, 0.072, 0.074)), 0.04), sdEllipsoid(p, v(0, 1.91, 0.044), big ? v(0.036, 0.03, 0.032) : v(0.03, 0.026, 0.03)), 0.03);
+  if (!big) {
+    part('mask', 'head', 0.004, (p) => Math.max(faceSkin(p) - 0.0075 - 0.0012 * Math.sin(p[0] * 140 + p[1] * 30), p[1] - (1.972 - Math.abs(p[0]) * 0.12), -0.035 - p[2], 1.87 - p[1]));
+    part('mask', 'neck', 0.01, (p) => Math.max(sdCone(p, v(0, 1.8, 0.0), v(0, 1.93, 0.012), 0.05, 0.046), -p[2] - 0.02, p[1] - 1.93));
+  } else {
+    part('menpo', 'head', 0.004, (p) => Math.max(faceSkin(p) - 0.009, p[1] - (1.975 - Math.abs(p[0]) * 0.18), -0.04 - p[2], 1.88 - p[1]));
+    part('menpo', 'head', 0.003, (p) => sdCone(p, v(0, 1.988, 0.097), v(0, 1.962, 0.113), 0.005, 0.0085));   // 面頬の鼻：細く鋭く
+    [-1, 1].forEach((s) => part('menpo', 'head', 0.006, (p) => sdEllipsoid(p, v(s * 0.06, 1.935, 0.06), v(0.022, 0.03, 0.026))));
+  }
   // 髪：頭を包む髪（額と耳の前を空ける）
   // 相手は額を広く出し、生え際は中央が下がる（富士額）。髪は後ろへ撫でつけた筋
   const hairline = (p) => big ? 2.085 - 0.0 + Math.abs(p[0]) * 0.25 - 0.012 * Math.exp(-p[0] * p[0] / 0.0004) : 2.05;
@@ -269,6 +286,7 @@ function sculpt(kind) {
   // 袴の股の割れ：左右の脚の間を、股の下から裾まで細く割る（一枚のスカートに見えないように。脚を開くと割れが開く）
   const crotch = big ? 0.9 : 0.95;
   const carve = [{ k: 0.012, d: (p) => Math.max(Math.abs(p[0]) - 0.012, p[1] - crotch + Math.abs(p[2]) * 0.3, -p[1] - 1) }];
+  eyeCarve.forEach((c) => carve.push(c));
   return { parts: P, carve, paint: [], bones, J };
 }
 
@@ -276,9 +294,15 @@ function sculpt(kind) {
 // 主人公：黒の和装。黒は青みと赤みで描き分ける（羽織＝青みの黒、着物＝炭色、袴＝灰がかった黒）。差し色は縄の帯の紫と、羽織の裏の深紅。
 // 相手：黒漆の鎧と、深紅の縅と内襟。袴は鈍い紫がかった灰。
 const PALETTE = {
-  player: { skin: '#f0cfb4', hair: '#1c2030', kimono: '#2c2e36', eri: '#1a1b21', haori: '#15171e', haoriEri: '#202330', lining: '#7a1424', sash: '#111216', hakama: '#262830', tabi: '#d9dce2', sandal: '#3a3128', strap: '#3d2a55', guard: '#1d1e24', glove: '#1d1e24', accent: '#7a1424' },
-  enemy: { skin: '#e3bfa2', hair: '#14151b', kimono: '#1c1b21', lapel: '#8c1a26', armor: '#121318', sash: '#2a2730', hakama: '#3a3640', tabi: '#d4d6dc', sandal: '#5e5140', strap: '#2d2620', glove: '#2a2228', accent: '#8c1a26' },
+  player: { mask: '#17181d', skin: '#f0cfb4', hair: '#1c2030', kimono: '#2c2e36', eri: '#1a1b21', haori: '#15171e', haoriEri: '#202330', lining: '#7a1424', sash: '#111216', hakama: '#262830', tabi: '#d9dce2', sandal: '#3a3128', strap: '#3d2a55', guard: '#1d1e24', glove: '#1d1e24', accent: '#7a1424' },
+  enemy: { menpo: '#141519', skin: '#e3bfa2', hair: '#14151b', kimono: '#1c1b21', lapel: '#8c1a26', armor: '#121318', sash: '#2a2730', hakama: '#3a3640', tabi: '#d4d6dc', sandal: '#5e5140', strap: '#2d2620', glove: '#2a2228', accent: '#8c1a26' },
 };
+
+// 素材の番号：描くときの質感（凹凸と光沢）を描き分ける。index.html の DETAIL_GLSL と対応
+// 1 肌、2 髪、3 着物・羽織（綾織り）、4 裏地・内襟（絹）、5 袴（太い綾）、6 帯、7 漆、8 手甲・籠手（布巻き）、9 足袋（木綿）、10 草履・紐（藁）、11 革
+function MAT_ID(m) {
+  return { skin: 1, hair: 2, kimono: 3, eri: 3, haori: 3, haoriEri: 3, lining: 4, lapel: 4, white: 4, hakama: 5, sash: 6, armor: 7, guard: 8, glove: 11, tabi: 9, sandal: 10, strap: 10, accent: 4, eye: 1, mask: 3, menpo: 7 }[m] || 3;
+}
 
 function bake(kind, cell, region) {
   const S = sculpt(kind);
@@ -362,7 +386,7 @@ function bake(kind, cell, region) {
     let occ = 0, wsum = 0;
     [0.012, 0.03, 0.06, 0.1].forEach((h, i) => { const w = 1 / (i + 1); occ += w * clamp((h - dist(add(p, mul(n, h)))) / h, 0, 1); wsum += w; });
     // 陰の焼き込みは弱く（強いと汚れに見える）。肌はさらに弱く。
-    const ao = clamp(1 - occ / wsum * 0.8, part0.m === 'skin' ? 0.8 : 0.55, 1);
+    const ao = clamp(1 - occ / wsum * 0.9, part0.m === 'skin' ? 0.45 : 0.55, 1);   // 目の窪みなど、くぼみは暗く
     let c = [0, 0, 0], cw = 0;
     for (let i = 0; i < parts.length; i++) {
       const di = parts[i].d(p); const w = Math.exp(-(di - f.raw) / 0.0025);
@@ -383,7 +407,7 @@ function bake(kind, cell, region) {
     else if (kind === 'enemy' && m0 === 'kimono' && onArm) fx = 0.35;
     out.fx.push(fx);
     // 布かどうか（布には細かい織り目を描く）
-    out.cl.push(['kimono', 'eri', 'haori', 'haoriEri', 'lining', 'hakama', 'sash', 'lapel'].includes(m0) ? 1 : m0 === 'armor' ? 0.5 : 0);
+    out.cl.push(MAT_ID(m0) / 16);
     // 皮の重み：一番近い部品の骨と、その親・子の骨の間で、骨からの距離に応じて滑らかに分ける
     const b0 = part0.b;
     const cand = [b0, bones[b0][1], ...children[b0]].filter((x) => x >= 0);
@@ -436,7 +460,7 @@ function pack(kind, cell, region) {
   };
 }
 
-module.exports = { skeleton, BONE, PALETTE, pack, sculpt };
+module.exports = { skeleton, BONE, PALETTE, pack, sculpt, MAT_ID };
 
 // 直接動かしたとき：以前の方式（体も頭も焼き出す）。今は tools/model_characters.js が、頭だけをここで焼き出し、体は箱からの造形で作る
 if (require.main === module) {
