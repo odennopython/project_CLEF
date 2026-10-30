@@ -434,7 +434,7 @@
   // ───────────────────────── 描画の準備 ─────────────────────────
   const stage = document.getElementById('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: /[?&]capture/.test(location.search) });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));   // 重さでコマが落ちると、カクついて見える
   renderer.outputEncoding = THREE.sRGBEncoding;
   // 月の光で、人物の本物の影を雪に落とす（丸い影の板だけでは、地に足がついて見えない）
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1011,6 +1011,65 @@
     });
     return grp;
   }
+  // 狐面：古典的な白い狐の面。尖った耳、前へ伸びた鼻先、目の周りと耳の内側の朱の隈取り、細い目の穴、額の宝珠、口の朱の線、黒い髭の点。漆のような艶
+  function makeKitsune() {
+    const grp = new THREE.Group();
+    const W = 512, cv = document.createElement('canvas'); cv.width = cv.height = W; const g = cv.getContext('2d');
+    // 絵の座標：面の x（-0.09..0.09）、y（-0.1..0.08）
+    const X = (x) => (x + 0.09) / 0.18 * W, Y = (y) => (0.08 - y) / 0.18 * W;
+    g.fillStyle = '#f4efe6'; g.fillRect(0, 0, W, W);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    [-1, 1].forEach((s) => {
+      // 目の隈取り：目頭から目尻へ跳ね上がる朱
+      g.fillStyle = '#c4222b'; g.beginPath(); g.moveTo(X(s * 0.012), Y(0.006)); g.quadraticCurveTo(X(s * 0.04), Y(0.03), X(s * 0.075), Y(0.045)); g.quadraticCurveTo(X(s * 0.05), Y(0.012), X(s * 0.016), Y(-0.006)); g.fill();
+      g.fillStyle = '#e2a33a'; g.beginPath(); g.moveTo(X(s * 0.02), Y(0.004)); g.quadraticCurveTo(X(s * 0.042), Y(0.022), X(s * 0.066), Y(0.036)); g.quadraticCurveTo(X(s * 0.045), Y(0.014), X(s * 0.022), Y(-0.001)); g.fill();
+      // 目の穴：細く吊り上がった黒
+      g.fillStyle = '#0a0a0c'; g.beginPath(); g.moveTo(X(s * 0.018), Y(0.0)); g.quadraticCurveTo(X(s * 0.036), Y(0.016), X(s * 0.056), Y(0.024)); g.quadraticCurveTo(X(s * 0.038), Y(0.004), X(s * 0.018), Y(0.0)); g.fill();
+      // 眉の朱の点（麻呂眉）
+      g.fillStyle = '#c4222b'; g.beginPath(); g.ellipse(X(s * 0.03), Y(0.05), 9, 5, s * 0.3, 0, Math.PI * 2); g.fill();
+      // 頬の朱の線と、髭の点
+      g.strokeStyle = '#c4222b'; g.lineWidth = 4; g.beginPath(); g.moveTo(X(s * 0.03), Y(-0.03)); g.quadraticCurveTo(X(s * 0.055), Y(-0.035), X(s * 0.075), Y(-0.025)); g.stroke();
+      g.fillStyle = '#1a1414'; [[0.022, -0.05], [0.032, -0.056], [0.042, -0.052]].forEach(([x, y]) => { g.beginPath(); g.arc(X(s * x), Y(y), 3, 0, Math.PI * 2); g.fill(); });
+    });
+    // 額の宝珠（金と朱の炎）
+    g.fillStyle = '#c4222b'; g.beginPath(); g.moveTo(X(0), Y(0.072)); g.quadraticCurveTo(X(0.016), Y(0.05), X(0), Y(0.034)); g.quadraticCurveTo(X(-0.016), Y(0.05), X(0), Y(0.072)); g.fill();
+    g.fillStyle = '#e2a33a'; g.beginPath(); g.arc(X(0), Y(0.045), 8, 0, Math.PI * 2); g.fill();
+    // 鼻先は黒、口は朱の線
+    g.fillStyle = '#121012'; g.beginPath(); g.ellipse(X(0), Y(-0.045), 13, 9, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#c4222b'; g.lineWidth = 5; g.beginPath(); g.moveTo(X(-0.05), Y(-0.05)); g.quadraticCurveTo(X(-0.025), Y(-0.078), X(0), Y(-0.066)); g.quadraticCurveTo(X(0.025), Y(-0.078), X(0.05), Y(-0.05)); g.stroke();   // 口の端が吊り上がる、狐の笑み
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8;
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.42, metalness: 0, envMapIntensity: 0.9 });
+    // 面：顔を覆う殻。中心から前へ、鼻先が狐の口吻として伸びる
+    const geo = new THREE.SphereGeometry(0.1, 48, 36, Math.PI * 0.12, Math.PI * 0.76, Math.PI * 0.12, Math.PI * 0.72);
+    const pa = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < pa.count; i++) {
+      let x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
+      // 球の前（+z）を顔に。横は少し細く
+      x *= 0.92; z *= 0.95;
+      const snout = Math.exp(-(x * x) / (0.032 * 0.032) - Math.pow((y + 0.035) / 0.042, 2));
+      z += snout * 0.075; y -= snout * 0.012;
+      const cheek = Math.exp(-Math.pow((Math.abs(x) - 0.045) / 0.03, 2) - Math.pow((y + 0.01) / 0.03, 2));
+      z += cheek * 0.006;
+      pa.setXYZ(i, x, y, z);
+      uv.setXY(i, (x + 0.09) / 0.18, (y + 0.1) / 0.18);
+    }
+    geo.computeVertexNormals();
+    const face = new THREE.Mesh(geo, mat); face.castShadow = true; grp.add(face);
+    // 耳：三角の厚い板。内側は朱
+    const earIn = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc4222b).convertSRGBToLinear(), roughness: 0.32 });
+    const earOut = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xf4efe6).convertSRGBToLinear(), roughness: 0.28 });
+    [-1, 1].forEach((sd) => {
+      const sh = new THREE.Shape(); sh.moveTo(-0.028, 0); sh.quadraticCurveTo(-0.012, 0.05, 0.002, 0.075); sh.quadraticCurveTo(0.018, 0.04, 0.03, 0); sh.lineTo(-0.028, 0);
+      const e = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.004, bevelSegments: 2, curveSegments: 10 }), [earOut, earOut]);
+      e.position.set(sd * 0.05, 0.07, 0.0); e.rotation.set(-0.15, sd * 0.2, -sd * 0.22); e.scale.setScalar(1.25); e.castShadow = true; grp.add(e);
+      const ish = new THREE.Shape(); ish.moveTo(-0.016, 0.004); ish.quadraticCurveTo(-0.006, 0.035, 0.002, 0.055); ish.quadraticCurveTo(0.012, 0.03, 0.018, 0.004); ish.lineTo(-0.016, 0.004);
+      const ie = new THREE.Mesh(new THREE.ShapeGeometry(ish, 8), earIn); ie.position.set(0, 0, 0.0165); e.add(ie);
+    });
+    // 結び紐（朱）
+    [-1, 1].forEach((sd) => { const c = new THREE.CatmullRomCurve3([V(sd * 0.088, 0.005, 0.0), V(sd * 0.1, 0.008, -0.05), V(sd * 0.07, 0.01, -0.105), V(0, 0.012, -0.118)]); grp.add(new THREE.Mesh(new THREE.TubeGeometry(c, 14, 0.004, 5), earIn)); });
+    return grp;
+  }
+
   // 相手の笠：黒漆の深い陣笠。縁は深紅、正面に金の小さな印、深紅の顎紐（主人公の明るい編み笠と、ひと目で区別できる）
   function makeJingasa() {
     const grp = new THREE.Group();
@@ -1156,6 +1215,8 @@
     // 体の素の座標 p を、骨 bone の中の位置にする（骨は素の姿勢で回転していない）
     const atBone = (bone, x, y, z) => { const o = D.bones[D.bones.findIndex((q) => q.name === bone.name)].at; return V(x - o[0], y - o[1], z - o[2]); };
     if (!big) {
+      // 狐面：顔を覆う（目の穴の奥は暗い）
+      { const k = makeKitsune(); k.position.copy(atBone(headG, 0, 1.985, 0.012)); k.rotation.x = -0.05; headG.add(k); }
       const kasa = makeKasa(); kasa.traverse((o) => { if (o.isMesh) o.castShadow = true; }); kasa.position.copy(atBone(headG, 0, 2.058, -0.006)); kasa.rotation.x = 0.13; headG.add(kasa);
       // 家紋：羽織の背と、胸の左右
       { const c = crestDecal(0.12); c.position.copy(atBone(chestG, 0, 1.64, -0.172)); c.rotation.y = Math.PI; chestG.add(c); }
@@ -1327,7 +1388,7 @@
         if (wasAir) { f.pos.copy(tA); f.pos.y = 0; footprint(tA.x, tA.z, yaw); if (onStep) onStep(tA, true); return; }
         const lag = tA.distanceTo(f.pos);
         // 大きく離れたら、瞬間移動ではなく速い一歩で追う（瞬間移動はカクッと見える）
-        if (!f.stepping && dtMs > 0 && lag > 0.42 * scale) { f.stepping = true; f.t = 0; f.dur = lag > 0.8 * scale ? 75 : 115; f.from.copy(f.pos); f.to.copy(tA); f.to.y = 0; f.h = Math.min(0.16, 0.06 + lag * 0.12); }
+        if (!f.stepping && dtMs > 0 && lag > 0.42 * scale) { f.stepping = true; f.t = 0; f.dur = lag > 0.8 * scale ? 95 : 140; f.from.copy(f.pos); f.to.copy(tA); f.to.y = 0; f.h = Math.min(0.16, 0.06 + lag * 0.12); }
         if (f.stepping) {
           f.t += dtMs / (f.dur || 125);
           // 一歩の途中でも、体が動けば行き先を追い続ける
@@ -1335,8 +1396,8 @@
           f.pos.copy(f.from).lerp(f.to, smooth(f.t));
           f.pos.y = Math.sin(clamp(f.t, 0, 1) * Math.PI) * (f.h || 0.1) * scale;
           if (f.t >= 1) { f.stepping = false; f.pos.copy(f.to); f.pos.y = 0; footprint(f.to.x, f.to.z, yaw); if (onStep) onStep(f.to, false); }
-        } else if (!anyStepping && dtMs > 0 && lag > 0.17 * scale) {
-          f.stepping = true; f.t = 0; f.dur = 125; f.h = 0.08; f.from.copy(f.pos); f.to.copy(tA);
+        } else if (!anyStepping && dtMs > 0 && lag > 0.3 * scale) {
+          f.stepping = true; f.t = 0; f.dur = 170; f.h = 0.09; f.from.copy(f.pos); f.to.copy(tA);
           tB.copy(tA).sub(f.pos).multiplyScalar(0.25); f.to.add(tB); f.to.y = 0;
         }
       });
@@ -2307,7 +2368,7 @@
   // ───────────────────────── 状態 ─────────────────────────
   const S = {
     started: false, gt: 0, speed: 1,
-    freezeUntil: 0, slowUntil: 0, slowScale: 0.3,
+    freezeUntil: 0, slowUntil: 0, slowScale: 0.3, curScale: 1,
     frameReal: 0, frameGt: 0, frameScale: 1,
     phase: 1, mode: 'stalk', modeStart: 0, modeUntil: 0,
     B: 0, P: 0, lastPressure: 0, lastHit: -9999,
@@ -2364,7 +2425,7 @@
     if (m === 'open' || m === 'bait' || (m === 'staggered' && S.mode !== 'staggered')) S.openHits = 0;
     S.mode = m; S.modeStart = S.gt; S.modeUntil = S.gt + (dur || 0);
     S.actionFrom = clonePose(S.enemyPose);
-    if (m === 'stalk') S.stalkDir = S.r() < 0.5 ? -1 : 1;
+    if (m === 'stalk' && S.r() < 0.35) S.stalkDir = -S.stalkDir;   // 回る向きはたまにしか変えない（何度も切り返すと、ちょこちょこして見える）
   }
   function think() {
     const d = dist();
@@ -2374,8 +2435,8 @@
     if (S.phase === 2 && d > 3.6 && r < 0.5) { startAction('leap'); return; }
     if (d > 3.8 && S.gt - S.lastDodge < 1500 && r < 0.6) { startAction(S.phase === 2 ? 'leap' : 'dash'); return; }
     if (d > 4.8) { if (r < 0.55) startAction('dash'); else setMode('approach', 4000); return; }
-    if (d > 3.0) { if (r < 0.6) setMode('approach', 4000); else setMode('stalk', 700 + S.r() * 900); return; }
-    if (r < (S.phase === 1 ? 0.18 : 0.08)) { setMode('stalk', 600 + S.r() * 700); return; }
+    if (d > 3.0) { if (r < 0.6) setMode('approach', 4000); else setMode('stalk', 1200 + S.r() * 900); return; }
+    if (r < (S.phase === 1 ? 0.18 : 0.08)) { setMode('stalk', 1100 + S.r() * 900); return; }
     S.queue = pickPattern();
     startAction(S.queue.shift());
   }
@@ -2939,8 +3000,12 @@
       actor.x = lerp(tw.fx, tw.tx, k); actor.z = lerp(tw.fz, tw.tz, k);
       if (u >= 1) actor.tw = null;
     } else if (actor.vx !== undefined) {
-      actor.x += actor.vx * dt; actor.z += actor.vz * dt;
+      // 速さは急に変えない：重さのある体のように、加速し、減速する
+      const k = 1 - Math.exp(-dt * 5);
+      actor.cvx = lerp(actor.cvx || 0, actor.vx, k); actor.cvz = lerp(actor.cvz || 0, actor.vz, k);
+      actor.x += actor.cvx * dt; actor.z += actor.cvz * dt;
     }
+    if (actor.tw) { actor.cvx = 0; actor.cvz = 0; }
   }
   function updatePositions(dtGame) {
     const dt = dtGame / 1000;
@@ -3033,6 +3098,9 @@
     const out = S.playerPose, pa = S.pa;
     // 相手が近いほど、構えが低く締まる
     blend(PL.guard, PL.low, clamp((3.6 - dist()) / 1.8, 0, 1) * 0.6, P_BASE);
+    // 構えは止まらない：重心がゆっくり左右に移り、刀先がわずかに円を描く（生きている構え）
+    { const g = S.gt * 0.001; P_BASE.hipX += Math.sin(g * 1.3) * 0.035; P_BASE.yaw += Math.sin(g * 0.9 + 1) * 0.08; P_BASE.crouch += Math.sin(g * 2.1) * 0.015;
+      P_BASE.hand.x += Math.sin(g * 1.7) * 0.02; P_BASE.hand.y += Math.cos(g * 1.7) * 0.015; }
     if (pa) {
       const t = S.gt - pa.t0, keys = pa.def.keys;
       let prev = pa.from, prevT = 0, done = false;
@@ -3225,9 +3293,13 @@
   function frame(now) {
     const dtReal = Math.min(64, now - last);
     last = now;
-    let scale = 1;
-    if (now < S.freezeUntil) scale = 0;
-    else if (now < S.slowUntil) scale = S.slowScale;
+    // 時間の流れ：止めきらず（完全に止めると引っかかって見える）、ゆっくりから滑らかに戻す
+    let target = 1;
+    if (now < S.freezeUntil) target = 0.04;
+    else if (now < S.slowUntil) target = S.slowScale;
+    if (target < S.curScale) S.curScale = target;
+    else S.curScale += (target - S.curScale) * Math.min(1, dtReal / 70);
+    const scale = S.curScale;
     const dtGame = S.started ? dtReal * scale * S.speed : 0;
     if (S.started) {
       S.gt += dtGame;
@@ -3239,7 +3311,7 @@
     }
     const tl0 = performance.now();
     updateBodies(dtGame);
-    updateEffects(dtReal * (scale === 0 ? 0.15 : scale));
+    updateEffects(dtReal * Math.max(0.15, scale));
     updateCamera(dtReal);
     const tl1 = performance.now();
     Post.render();
