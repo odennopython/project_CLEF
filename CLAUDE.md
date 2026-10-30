@@ -3,7 +3,7 @@
 ## このプロジェクトについて
 
 本質的な面白さと洗練を目指すiOSゲーム。現在は設計段階。戦闘の手触りを確かめる試作が `prototype/kaeshi/` にある（1つのHTMLファイル、Three.js r128）。
-人物の形は `tools/bake_characters.js` で彫刻して焼き出し、index.html に埋め込む（形を変えたら `node tools/bake_characters.js 0.0105` を実行）。
+人物の体は `tools/model_characters.js` で箱からの造形で作り、頭は `tools/bake_characters.js` で焼き出して、index.html に埋め込む（形を変えたら `node tools/model_characters.js` を実行）。
 試作を直したら `python3 tools/build_play.py` を実行して `play/index.html`（GitHub Pages で公開する単独のHTML）を作り直してから push する。
 作業を始める前に `docs/README.md` から設計資料を読み、決定事項と設計の柱に沿って進めること。
 

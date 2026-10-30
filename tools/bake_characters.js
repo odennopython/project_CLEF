@@ -6,7 +6,7 @@
 // 4. 各頂点が、どの骨にどれだけついていくか（皮の重み）を計算する
 // 5. 圧縮して、prototype/kaeshi/index.html の中の印の間に埋め込む
 //
-// 使い方：node tools/bake_characters.js
+// 使い方：通常は node tools/model_characters.js（頭をここで焼き出し、体は箱からの造形）。単独で動かすと以前の方式で全部を焼き出す
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -436,14 +436,19 @@ function pack(kind, cell, region) {
   };
 }
 
-const CELL_SIZE = +(process.argv[2] || 0.014);
-const HEAD_CELL = 0.0042;
-const data = { player: pack('player', CELL_SIZE), playerHead: pack('player', HEAD_CELL, 'head'), enemy: pack('enemy', CELL_SIZE), enemyHead: pack('enemy', HEAD_CELL, 'head') };
-const js = 'window.CLEF_CHARS = ' + JSON.stringify(data) + ';';
-const target = path.join(__dirname, '..', 'prototype', 'kaeshi', 'index.html');
-let html = fs.readFileSync(target, 'utf8');
-const A = '<script id="clef-chars">', Bm = '</script><!-- /clef-chars -->';
-if (html.includes(A)) html = html.slice(0, html.indexOf(A)) + A + js + Bm + html.slice(html.indexOf(Bm) + Bm.length);
-else html = html.replace('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', A + js + Bm + '\n<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>');
-fs.writeFileSync(target, html);
-console.log('embedded', (js.length / 1024).toFixed(0), 'KB into', path.relative(process.cwd(), target));
+module.exports = { skeleton, BONE, PALETTE, pack, sculpt };
+
+// 直接動かしたとき：以前の方式（体も頭も焼き出す）。今は tools/model_characters.js が、頭だけをここで焼き出し、体は箱からの造形で作る
+if (require.main === module) {
+  const CELL_SIZE = +(process.argv[2] || 0.014);
+  const HEAD_CELL = 0.0042;
+  const data = { player: pack('player', CELL_SIZE), playerHead: pack('player', HEAD_CELL, 'head'), enemy: pack('enemy', CELL_SIZE), enemyHead: pack('enemy', HEAD_CELL, 'head') };
+  const js = 'window.CLEF_CHARS = ' + JSON.stringify(data) + ';';
+  const target = path.join(__dirname, '..', 'prototype', 'kaeshi', 'index.html');
+  let html = fs.readFileSync(target, 'utf8');
+  const A = '<script id="clef-chars">', Bm = '</script><!-- /clef-chars -->';
+  if (html.includes(A)) html = html.slice(0, html.indexOf(A)) + A + js + Bm + html.slice(html.indexOf(Bm) + Bm.length);
+  else html = html.replace('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', A + js + Bm + '\n<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>');
+  fs.writeFileSync(target, html);
+  console.log('embedded', (js.length / 1024).toFixed(0), 'KB into', path.relative(process.cwd(), target));
+}
