@@ -384,20 +384,26 @@
     hit:     PS({ hand: V(0.16, 1.0, 0.2), sword: N(0.3, 0.4, 0.6), crouch: 0.22, pitch: -0.34, hipZ: -0.16 }),
     kneel:   PS({ hand: V(0.2, 0.62, 0.42), sword: N(0.2, -0.9, 0.3), crouch: 0.46, pitch: 0.5 }),
     issen:   PS({ hand: V(0.58, 1.02, 0.5), sword: N(0.85, -0.35, 0.4), crouch: 0.3, yaw: 0.7, hipZ: 0.16 }),
+    // 振り抜き：打ったあとも刀の勢いで体が回り切り、刀先は背の側まで流れる
+    thruL:   PS({ hand: V(-0.62, 0.92, 0.3), sword: N(-0.7, -0.45, -0.55), yaw: -1.75, crouch: 0.36, pitch: 0.3, hipZ: 0.2, hipX: -0.12 }),
+    thruR:   PS({ hand: V(0.62, 0.92, 0.3), sword: N(0.7, -0.45, -0.55), yaw: 1.75, crouch: 0.36, pitch: 0.3, hipZ: 0.2, hipX: 0.12 }),
+    thruDown: PS({ hand: V(0.1, 0.62, 0.66), sword: N(0.1, -0.9, -0.3), pitch: 0.75, crouch: 0.52, hipZ: 0.22 }),
+    thruRise: PS({ hand: V(-0.55, 2.0, -0.1), sword: N(-0.5, 0.4, -0.75), yaw: -1.9, lift: 0.3, pitch: -0.25, crouch: 0.08 }),
   };
 
   // 振りを大げさに：振りかぶりと振り抜きのひねりを深く、沈みを低く、跳ぶ技は高く
-  ['windR', 'hitL', 'windL', 'hitR', 'windUp', 'hitDown', 'coil', 'rise', 'riseEnd', 'stomp'].forEach((k) => {
-    const q = PL[k]; q.yaw *= 1.25; q.crouch += 0.05; q.lift *= 1.25; q.pitch *= 1.15;
-    const pv = V(0, 1.36, 0.05); q.hand.sub(pv).multiplyScalar(1.08).add(pv);   // 肩の前の支点から、手を少し遠くへ
+  // 動きをダイナミックに：振りかぶりは深くひねって沈み、振り抜きは回り切る。手は支点から遠くへ（大きな弧）
+  ['windR', 'hitL', 'windL', 'hitR', 'windUp', 'hitDown', 'coil', 'rise', 'riseEnd', 'stomp', 'thruL', 'thruR', 'thruDown', 'thruRise'].forEach((k) => {
+    const q = PL[k]; q.yaw *= 1.35; q.crouch += 0.07; q.lift *= 1.35; q.pitch *= 1.2; q.hipZ *= 1.3;
+    const pv = V(0, 1.36, 0.05); q.hand.sub(pv).multiplyScalar(1.14).add(pv);
   });
-  Object.keys(KEY).forEach((k) => { ['wind', 'follow'].forEach((ph) => { const q = KEY[k][ph]; if (!q || q._big) return; q._big = true; q.yaw *= 1.15; q.crouch += 0.03; q.pitch *= 1.1; }); });
+  Object.keys(KEY).forEach((k) => { ['wind', 'follow'].forEach((ph) => { const q = KEY[k][ph]; if (!q || q._big) return; q._big = true; q.yaw *= 1.3; q.crouch += 0.06; q.pitch *= 1.2; q.hipZ *= 1.25; const pv = V(0, 1.36, 0.05); q.hand.sub(pv).multiplyScalar(1.08).add(pv); }); });
   // 自分の技：[時刻ms, 姿勢, そこへ向かう緩急]。最初の姿勢は「始めた時の姿勢」から。
   const PA = {
-    slash1:  { dur: 440, hitAt: 165, cancel: 240, lunge: 1.0, keys: [[110, 'windR', easeOut], [172, 'hitL', easeIn], [440, 'guard', smooth]] },
-    slash2:  { dur: 440, hitAt: 165, cancel: 240, lunge: 1.0, keys: [[110, 'windL', easeOut], [172, 'hitR', easeIn], [440, 'guard', smooth]] },
-    slash3:  { dur: 620, hitAt: 270, cancel: 430, lunge: 1.2, heavy: true, keys: [[140, 'windUp', easeOut], [270, 'hitDown', easeIn], [620, 'guard', smooth]] },
-    counter: { dur: 700, hitAt: 290, cancel: 530, lunge: 2.4, heavy: true, keys: [[120, 'coil', easeOut], [295, 'rise', easeIn], [460, 'riseEnd', easeOut], [700, 'guard', smooth]] },
+    slash1:  { dur: 440, hitAt: 165, cancel: 240, lunge: 1.4, keys: [[110, 'windR', easeOut], [172, 'hitL', easeIn], [250, 'thruL', easeOut], [440, 'guard', smooth]] },
+    slash2:  { dur: 440, hitAt: 165, cancel: 240, lunge: 1.4, keys: [[110, 'windL', easeOut], [172, 'hitR', easeIn], [250, 'thruR', easeOut], [440, 'guard', smooth]] },
+    slash3:  { dur: 620, hitAt: 270, cancel: 430, lunge: 1.6, heavy: true, keys: [[140, 'windUp', easeOut], [270, 'hitDown', easeIn], [370, 'thruDown', easeOut], [620, 'guard', smooth]] },
+    counter: { dur: 700, hitAt: 290, cancel: 530, lunge: 3.0, heavy: true, keys: [[120, 'coil', easeOut], [295, 'rise', easeIn], [400, 'thruRise', easeOut], [520, 'riseEnd', smooth], [700, 'guard', smooth]] },
     deflect: { dur: 470, keys: [[55, 'deflect', easeOut], [340, 'deflect', smooth], [470, 'guard', smooth]] },
     dodge:   { dur: 380, keys: [[80, 'dodge', easeOut], [260, 'dodge', smooth], [380, 'guard', smooth]] },
     stomp:   { dur: 540, keys: [[120, 'stomp', easeOut], [300, 'hitDown', easeIn], [540, 'guard', smooth]] },
@@ -1048,9 +1054,9 @@
     }
     function animate(p, T, fast) {
       // 揺れ戻りの少ないばね（減衰を強く）。行き過ぎて戻る動きは、ゼリーのように見えて気持ち悪い
-      const H = fast ? [14, 0.82, 1.1] : [5.8, 0.9, 1.0];
-      const Sw = fast ? [12.5, 0.78, 1.2] : [5.2, 0.86, 1.05];
-      const Bd = fast ? [8.5, 0.9, 1.0] : [4.2, 0.95, 1.0];
+      const H = fast ? [17, 0.8, 1.1] : [6.2, 0.88, 1.0];
+      const Sw = fast ? [15, 0.76, 1.2] : [5.6, 0.85, 1.05];
+      const Bd = fast ? [10, 0.85, 1.0] : [4.4, 0.92, 1.0];
       sm.hand.set(soStep(springs.hx, p.hand.x, T, ...H), soStep(springs.hy, p.hand.y, T, ...H), soStep(springs.hz, p.hand.z, T, ...H));
       sm.sword.set(soStep(springs.sx, p.sword.x, T, ...Sw), soStep(springs.sy, p.sword.y, T, ...Sw), soStep(springs.sz, p.sword.z, T, ...Sw)).normalize();
       sm.hipX = soStep(springs.hipX, p.hipX, T, ...Bd); sm.hipZ = soStep(springs.hipZ, p.hipZ, T, ...Bd);
@@ -1504,6 +1510,7 @@
     function push(tip, mid, t) { samples.unshift({ tip, mid, t }); }
     const base = { r, g, b };
     let halted = false;
+    const sT = [], sM = [], tmpA = V(0, 0, 0);
     return {
       color: { r, g, b }, samples,
       // 結果に合わせて軌跡の色を変える（残っている軌跡ごと塗り替わる）。stop：その場で軌跡を途切れさせる
@@ -1512,8 +1519,8 @@
         if (!active) { halted = false; }
         else if (!last && !halted) { this.color.r = base.r; this.color.g = base.g; this.color.b = base.b; }
         if (active && !halted) {
-          // 刀の中ほどを軸に、刀先までを半径とする。根元側へ少し伸ばして太い帯にする
-          const mid = fig.mid.clone().lerp(fig.tip, -0.45), tip = fig.tip.clone().lerp(fig.mid, -0.08);
+          // 帯は刀身の外側だけ（柄の側まで伸ばすと、手首を中心に回るとき内側の端が逆に振れて帯がねじれる）
+          const mid = fig.mid.clone().lerp(fig.tip, -0.12), tip = fig.tip.clone().lerp(fig.mid, -0.1);
           if (last) {
             dA.copy(last.tip).sub(last.mid); const LA = dA.length(); dA.normalize();
             dB.copy(tip).sub(mid); const LB = dB.length(); dB.normalize();
@@ -1533,10 +1540,13 @@
         while (samples.length > N || (samples.length && now - samples[samples.length - 1].t > LIFE)) samples.pop();
         const c = this.color, L = samples.length;
         if (L < 2) { col.fill(0); geo.attributes.color.needsUpdate = true; geo.setDrawRange(0, 0); return; }
+        // 点を両隣と均して（2回）、帯の縁を滑らかにする
+        for (let i = 0; i < L; i++) { sT[i] = (sT[i] || V(0, 0, 0)).copy(samples[i].tip); sM[i] = (sM[i] || V(0, 0, 0)).copy(samples[i].mid); }
+        for (let pass = 0; pass < 2; pass++) for (let i = 1; i < L - 1; i++) { tmpA.copy(sT[i - 1]).add(sT[i + 1]).multiplyScalar(0.5); sT[i].lerp(tmpA, 0.5); tmpA.copy(sM[i - 1]).add(sM[i + 1]).multiplyScalar(0.5); sM[i].lerp(tmpA, 0.5); }
         for (let i = 0; i < L; i++) {
-          const sm = samples[i];
+          const sm = samples[i], st = sT[i], sd = sM[i];
           const f = Math.max(0, 1 - (now - sm.t) / LIFE);
-          pos.set([sm.tip.x, sm.tip.y, sm.tip.z, sm.mid.x, sm.mid.y, sm.mid.z], i * 6);
+          pos.set([st.x, st.y, st.z, sd.x, sd.y, sd.z], i * 6);
           uv.set([i / (L - 1), 0, i / (L - 1), 1], i * 4);
           const w = Math.pow(f, 0.7) * Math.min(1, i / 3 + 0.3);
           col.set([c.r * w, c.g * w, c.b * w, c.r * w, c.g * w, c.b * w], i * 6);
@@ -1562,6 +1572,28 @@
     return { m, geo, pos, col, n, t0: 0, pts: [], center: V(0, 0, 0), big: false, tint: [1, 1, 1], gain: 1, delay: 0 };
   });
   let arcCursor = 0;
+  // 刃の通った点から、振りの面と回転の向きを求め、その面に数式で大きな円弧を描く。
+  // 刀より外まで大きく、刀が通っていない部分まで長く伸ばす（点をなぞらないので、どんなに速い振りでも角張らない）
+  function swingArc(pts, c, scaleR, minSweep, extFront, extBack) {
+    const n = V(0, 0, 0), r0 = V(0, 0, 0), r1 = V(0, 0, 0), cr = V(0, 0, 0);
+    for (let i = 0; i + 1 < pts.length; i++) { r0.copy(pts[i]).sub(c); r1.copy(pts[i + 1]).sub(c); n.add(cr.copy(r0).cross(r1)); }
+    if (n.lengthSq() < 1e-8) return null;
+    n.normalize();
+    // 振りの面をカメラの方へ傾ける：面が視線と平行だと、大きな弧は細い楕円につぶれて「く」の字に折れて見える
+    camera.getWorldDirection(_cv);
+    n.addScaledVector(_cv, (n.dot(_cv) >= 0 ? 1 : -1) * 1.3).normalize();
+    const u = pts[0].clone().sub(c); u.addScaledVector(n, -u.dot(n)); if (u.lengthSq() < 1e-8) return null; u.normalize();
+    const w = n.clone().cross(u);
+    let sweep = 0, prev = 0, Rsum = 0;
+    pts.forEach((p) => { r0.copy(p).sub(c); const a = Math.atan2(r0.dot(w), r0.dot(u)); let d = a - prev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; sweep += d; prev = a; Rsum += Math.hypot(r0.dot(u), r0.dot(w)); });
+    sweep = Math.max(0.3, sweep);
+    let a0 = -extBack, a1 = sweep + extFront;
+    if (a1 - a0 < minSweep) { const more = minSweep - (a1 - a0); a0 -= more * 0.35; a1 += more * 0.65; }
+    const R = Rsum / pts.length * scaleR, out = [];
+    for (let i = 0; i < ARC_N; i++) { const t = i / (ARC_N - 1), a = lerp(a0, a1, t), rr = R * (0.9 + 0.2 * t); out.push(c.clone().addScaledVector(u, Math.cos(a) * rr).addScaledVector(w, Math.sin(a) * rr)); }
+    return { pts: out, normal: n };
+  }
+
   // kind：'cut'（斬れた）、'shallow'（浅い）、'broken'（弾かれた：短く折れて跳ね返る）、'slit'（斬り線：体を横切る細く鋭い光）
   function slashArc(points, center, big, tint, kind) {
     if (points.length < 2) return;
@@ -1575,10 +1607,22 @@
         for (let j = 1; j <= 4; j++) pts.push(e.clone().addScaledVector(d, -0.06 * j).addScaledVector(up, 0.05 * j));
       }
       const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
-      A.pts = smoothPath(pts, ARC_N); A.center.copy(center); A.t0 = performance.now(); A.big = big; A.m.visible = true; A.tint = tint; A.gain = 1; A.kind = kind;
+      A.pts = smoothPath(pts, ARC_N); A.normal = null; A.center.copy(center); A.t0 = performance.now(); A.big = big; A.m.visible = true; A.tint = tint; A.gain = 1; A.kind = kind;
       return;
     }
     if (points.length < 3) return;
+    if (kind === 'cut' && slashArc.pivot) {
+      const arc = swingArc(points.slice(0, 80).reverse(), slashArc.pivot, big ? 1.55 : 1.35, big ? 3.6 : 2.9, 0.7, 0.4);
+      if (arc) {
+        [0, 1].forEach((echo) => {
+          const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
+          A.pts = arc.pts.map((p) => p.clone().add(_sd.copy(p).sub(slashArc.pivot).normalize().multiplyScalar(echo * 0.12)));
+          A.center.copy(slashArc.pivot); A.normal = arc.normal; A.t0 = performance.now() + echo * 55; A.big = big; A.m.visible = true;
+          A.tint = tint || [1, 0.55, 0.6]; A.gain = echo ? 0.5 : 1; A.kind = 'cut';
+        });
+        return;
+      }
+    }
     // 刃の通った点（密に補ってある）を、さらに滑らかに並べ直し、少し先まで伸ばして大袈裟にする
     const src = points.slice(0, 60).reverse();
     const path = smoothPath(src, ARC_N);
@@ -1588,7 +1632,7 @@
     [0, 1].forEach((echo) => {
       const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
       A.pts = full.map((p) => p.clone().add(_sd.copy(p).sub(center).normalize().multiplyScalar(echo * 0.09)));
-      A.center.copy(center); A.t0 = performance.now() + echo * 55; A.big = big; A.m.visible = true;
+      A.center.copy(center); A.normal = null; A.t0 = performance.now() + echo * 55; A.big = big; A.m.visible = true;
       A.tint = tint || [1, 0.55, 0.6]; A.gain = (echo ? 0.5 : 1) * (kind === 'shallow' ? 0.45 : 1); A.kind = kind;
       if (kind === 'shallow' && echo) A.m.visible = false;
     });
@@ -1607,12 +1651,13 @@
       for (let i = 0; i < A.n; i++) {
         const p = A.pts[Math.min(i, n - 1)], q = A.pts[Math.min(i + 1, n - 1)], o = A.pts[Math.max(0, i - 1)];
         _sd.copy(q).sub(o); if (_sd.lengthSq() < 1e-8) _sd.set(1, 0, 0);
-        _ss.copy(_sd).cross(_cv).normalize();
+        // 振りの面がこちらを向いていれば、面の中で外向きに幅を取る（平たい三日月）。真横なら画面に向ける
+        if (A.normal && Math.abs(A.normal.dot(_cv)) > 0.3) _ss.copy(p).sub(A.center).normalize(); else _ss.copy(_sd).cross(_cv).normalize();
         const s = i / (A.n - 1);
         const taper = Math.pow(Math.sin(Math.PI * Math.min(1, s * 1.08)), 0.75);
         // 幅：斬れた＝太く広がる、浅い＝細い、弾かれた＝細く縮む、斬り線＝ごく細く鋭い（後半で上下に開いて消える）
         const w = K === 'slit' ? 0.035 * taper * (1 - u) + 0.01 : K === 'broken' ? 0.11 * taper * (1 - u) : K === 'shallow' ? 0.12 * taper * (1 - u * 0.5)
-          : (A.big ? 0.58 : 0.36) * taper * (1 - u * 0.45) * (0.75 + Math.sqrt(u) * 0.6);
+          : (A.big ? 0.66 : 0.44) * taper * (1 - u * 0.45) * (0.75 + Math.sqrt(u) * 0.6);
         _sd.copy(p).sub(A.center).multiplyScalar(K === 'cut' ? u * 0.45 : K === 'slit' ? 0 : u * 0.15).add(p);
         A.pos.set([_sd.x + _ss.x * w, _sd.y + _ss.y * w, _sd.z + _ss.z * w, _sd.x - _ss.x * w, _sd.y - _ss.y * w, _sd.z - _ss.z * w], i * 6);
         const vis = s <= reveal ? 1 : 0;
@@ -2405,8 +2450,10 @@
     Sound.at(tA); Sound.cut(big); Sound.rip();
     // 斬れた：軌跡が白く灼け、太い三日月が体を通り抜け、体を横切る斬り線が一瞬残る
     const pts = playerTrail.samples.map((q) => q.tip);
-    playerTrail.tint(1.7, 1.55, 1.35);
+    playerTrail.tint(1.25, 1.15, 1.05);
+    slashArc.pivot = player.chestWorld.clone().lerp(player.headWorld, 0.2);
     slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big, big ? [1.4, 1.0, 0.55] : [1.2, 0.3, 0.38], 'cut');
+    slashArc.pivot = null;
     cutSlit(pts, big);
     shred(tA, big ? 18 : 9);
     snowBurst(S.e.x, S.e.z, big ? 1.0 : 0.45);
@@ -2746,7 +2793,7 @@
           tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, a.S, easeIn);
           kickSnow(enemy.hipWorld, 1.2);
         } else {
-          const go = Math.min(a.move.lunge, Math.max(0, f.d - CFG.minGap - 0.1));
+          const go = Math.min(a.move.lunge * 1.4, Math.max(0, f.d - CFG.minGap - 0.1));   // 踏み込みを大きく
           tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, a.S + 60, easeOut);
         }
       }
@@ -2973,7 +3020,8 @@
     playerTrail.color = S.pa && S.pa.kind === 'counter' ? { r: 1.5, g: 1.1, b: 0.7 } : { r: 1.3, g: 0.5, b: 0.55 };
     enemyTrail.update(a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F, enemy, now);
     const pa = S.pa;
-    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen'].includes(pa.kind) && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
+    // 軌跡は振り下ろしの間だけ（振りかぶりで刀を引く動きを拾うと、帯が「く」の字に折れる）
+    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen'].includes(pa.kind) && S.gt - pa.t0 >= (pa.def.keys[0][0] || 0) * 0.85 && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
     if (a && !a.feint && !a.peril && !a.resolved && !a.glinted && S.mode === 'attack' && S.gt >= a.T - 175) { a.glinted = true; tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.5, 170, 0xdfe9ff); }
     if (enemy.tip.y < 0.14 && S.B > 70 && now - (S.lastDrag || 0) > 70 && S.mode !== 'falling' && S.mode !== 'victory') { S.lastDrag = now; footprint(enemy.tip.x, enemy.tip.z, S.e.yaw + 1.2); }
     // 危険な技の赤い光：起こりから振り始めまで
