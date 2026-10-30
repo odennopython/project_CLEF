@@ -1490,17 +1490,23 @@
     const dA = V(0, 0, 0), dB = V(0, 0, 0), qa = new THREE.Quaternion(), qf = new THREE.Quaternion(), dTmp = V(0, 0, 0);
     let last = null;
     function push(tip, mid, t) { samples.unshift({ tip, mid, t }); }
+    const base = { r, g, b };
+    let halted = false;
     return {
       color: { r, g, b }, samples,
+      // 結果に合わせて軌跡の色を変える（残っている軌跡ごと塗り替わる）。stop：その場で軌跡を途切れさせる
+      tint(rr, gg, bb, stop) { this.color.r = rr; this.color.g = gg; this.color.b = bb; if (stop) halted = true; },
       update(active, fig, now) {
-        if (active) {
+        if (!active) { halted = false; }
+        else if (!last && !halted) { this.color.r = base.r; this.color.g = base.g; this.color.b = base.b; }
+        if (active && !halted) {
           // 刀の中ほどを軸に、刀先までを半径とする。根元側へ少し伸ばして太い帯にする
           const mid = fig.mid.clone().lerp(fig.tip, -0.45), tip = fig.tip.clone().lerp(fig.mid, -0.08);
           if (last) {
             dA.copy(last.tip).sub(last.mid); const LA = dA.length(); dA.normalize();
             dB.copy(tip).sub(mid); const LB = dB.length(); dB.normalize();
             const ang = Math.acos(clamp(dA.dot(dB), -1, 1));
-            const k = Math.min(16, Math.ceil(ang / 0.05));
+            const k = Math.min(60, Math.ceil(ang / 0.05));
             qa.setFromUnitVectors(dA, dB);
             for (let j = 1; j < k; j++) {
               const f = j / k;
@@ -1529,7 +1535,7 @@
     };
   }
   const enemyTrail = makeTrail(22, 0.7, 0.82, 1.1);
-  const playerTrail = makeTrail(18, 1.3, 0.55, 0.6);
+  const playerTrail = makeTrail(18, 0.75, 0.8, 0.95);   // 振っている間は控えめな色。結果が出た瞬間に塗り替える
 
   // 斬撃の三日月：両端が細く尖り、中ほどが太い。白い芯が色へ冷えながら、外へ広がって消える。少し遅れて追う残像を重ねる
   const ARC_N = 64;
@@ -1544,7 +1550,22 @@
     return { m, geo, pos, col, n, t0: 0, pts: [], center: V(0, 0, 0), big: false, tint: [1, 1, 1], gain: 1, delay: 0 };
   });
   let arcCursor = 0;
-  function slashArc(points, center, big, tint) {
+  // kind：'cut'（斬れた）、'shallow'（浅い）、'broken'（弾かれた：短く折れて跳ね返る）、'slit'（斬り線：体を横切る細く鋭い光）
+  function slashArc(points, center, big, tint, kind) {
+    if (points.length < 2) return;
+    kind = kind || 'cut';
+    if (kind === 'slit' || kind === 'broken') {
+      const pts = kind === 'slit' ? points : points.slice();
+      if (kind === 'broken' && pts.length >= 2) {
+        // 当たった所で折れ、来た向きへ少し跳ね返る
+        const e = pts[pts.length - 1], d = e.clone().sub(pts[Math.max(0, pts.length - 4)]).normalize();
+        const up = V(0, 1, 0).cross(d).normalize();
+        for (let j = 1; j <= 4; j++) pts.push(e.clone().addScaledVector(d, -0.06 * j).addScaledVector(up, 0.05 * j));
+      }
+      const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
+      A.pts = smoothPath(pts, ARC_N); A.center.copy(center); A.t0 = performance.now(); A.big = big; A.m.visible = true; A.tint = tint; A.gain = 1; A.kind = kind;
+      return;
+    }
     if (points.length < 3) return;
     // 刃の通った点（密に補ってある）を、さらに滑らかに並べ直し、少し先まで伸ばして大袈裟にする
     const src = points.slice(0, 60).reverse();
@@ -1556,31 +1577,35 @@
       const A = arcs[arcCursor]; arcCursor = (arcCursor + 1) % arcs.length;
       A.pts = full.map((p) => p.clone().add(_sd.copy(p).sub(center).normalize().multiplyScalar(echo * 0.09)));
       A.center.copy(center); A.t0 = performance.now() + echo * 55; A.big = big; A.m.visible = true;
-      A.tint = tint || [1, 0.55, 0.6]; A.gain = echo ? 0.5 : 1;
+      A.tint = tint || [1, 0.55, 0.6]; A.gain = (echo ? 0.5 : 1) * (kind === 'shallow' ? 0.45 : 1); A.kind = kind;
+      if (kind === 'shallow' && echo) A.m.visible = false;
     });
   }
   function updateArcs(now) {
     camera.getWorldDirection(_cv);
     arcs.forEach((A) => {
       if (!A.m.visible) return;
-      const dur = A.big ? 560 : 380, u = (now - A.t0) / dur;
+      const K = A.kind || 'cut';
+      const dur = K === 'slit' ? 330 : K === 'broken' ? 220 : K === 'shallow' ? 260 : A.big ? 560 : 380, u = (now - A.t0) / dur;
       if (u >= 1) { A.m.visible = false; return; }
       if (u < 0) { A.col.fill(0); A.geo.attributes.color.needsUpdate = true; return; }
       const n = A.pts.length;
       // 現れ方：刃の進む向きに、先端から一気に描かれる（最初の 80ms）
-      const reveal = Math.min(1, (now - A.t0) / 80);
+      const reveal = Math.min(1, (now - A.t0) / (K === 'slit' ? 30 : 80));
       for (let i = 0; i < A.n; i++) {
         const p = A.pts[Math.min(i, n - 1)], q = A.pts[Math.min(i + 1, n - 1)], o = A.pts[Math.max(0, i - 1)];
         _sd.copy(q).sub(o); if (_sd.lengthSq() < 1e-8) _sd.set(1, 0, 0);
         _ss.copy(_sd).cross(_cv).normalize();
         const s = i / (A.n - 1);
         const taper = Math.pow(Math.sin(Math.PI * Math.min(1, s * 1.08)), 0.75);
-        const w = (A.big ? 0.58 : 0.36) * taper * (1 - u * 0.45) * (0.75 + Math.sqrt(u) * 0.6);
-        _sd.copy(p).sub(A.center).multiplyScalar(u * 0.45).add(p);
+        // 幅：斬れた＝太く広がる、浅い＝細い、弾かれた＝細く縮む、斬り線＝ごく細く鋭い（後半で上下に開いて消える）
+        const w = K === 'slit' ? 0.035 * taper * (1 - u) + 0.01 : K === 'broken' ? 0.11 * taper * (1 - u) : K === 'shallow' ? 0.12 * taper * (1 - u * 0.5)
+          : (A.big ? 0.58 : 0.36) * taper * (1 - u * 0.45) * (0.75 + Math.sqrt(u) * 0.6);
+        _sd.copy(p).sub(A.center).multiplyScalar(K === 'cut' ? u * 0.45 : K === 'slit' ? 0 : u * 0.15).add(p);
         A.pos.set([_sd.x + _ss.x * w, _sd.y + _ss.y * w, _sd.z + _ss.z * w, _sd.x - _ss.x * w, _sd.y - _ss.y * w, _sd.z - _ss.z * w], i * 6);
         const vis = s <= reveal ? 1 : 0;
-        const f = Math.pow(1 - u, 1.3) * 2.6 * A.gain * vis * (0.35 + 0.65 * taper);
-        const k = Math.min(1, u * 2.0);
+        const f = Math.pow(1 - u, K === 'slit' ? 0.6 : 1.3) * (K === 'slit' ? 4.0 : 2.6) * A.gain * vis * (0.35 + 0.65 * taper);
+        const k = K === 'slit' ? Math.min(1, u * 1.2) : K === 'broken' ? 1 : Math.min(1, u * 2.0);
         const r = lerp(1.35, A.tint[0], k) * f, g = lerp(1.35, A.tint[1], k) * f, b = lerp(1.45, A.tint[2], k) * f;
         A.col.set([r, g, b, r, g, b], i * 6);
       }
@@ -2292,6 +2317,7 @@
     tA.copy(enemy.chestWorld).lerp(player.tip, 0.45);
     if (d > CFG.reachPlayer) {
       Sound.whiff();
+      playerTrail.tint(0.4, 0.42, 0.48);   // 空振り：灰色の薄い軌跡だけ
       // 届かない斬りは隙になる。相手はすかさず咎める。
       if (['stalk', 'approach', 'open'].includes(S.mode) && d < 4.4 && S.r() < 0.7) { S.queue = []; startAction(d > 3.2 ? 'dash' : 'thrust'); }
       return;
@@ -2330,11 +2356,27 @@
       // 振りかぶっている相手は斬れるが、勢いは止まらない
       S.B = clamp(S.B + CFG.brk.windupHit, 0, 100); S.lastPressure = S.gt;
       Sound.cut(); burst(tA, 8, 1.0, 'red');
+      // 浅い：細く暗い三日月だけ。斬り線は出さない
+      playerTrail.tint(0.9, 0.55, 0.55);
+      slashArc(playerTrail.samples.map((q) => q.tip), tA, false, [0.9, 0.35, 0.4], 'shallow');
       glyphAt('浅', 'miss', tA);
       pushLog('浅い', '', '振りかぶった相手を斬った（止まらない）');
       return;
     }
     enemyDeflect(false);
+  }
+
+  // 斬り線：刃が通った向きに、相手の体を横切る細く鋭い白い光
+  function cutSlit(pts, big) {
+    const c = enemy.chestWorld.clone().lerp(enemy.hipWorld, 0.25);
+    const d = pts.length >= 6 ? pts[0].clone().sub(pts[5]) : V(1, -0.6, 0);
+    camera.getWorldDirection(_cv);
+    d.addScaledVector(_cv, -d.dot(_cv));
+    if (d.lengthSq() < 1e-6) d.set(1, -0.6, 0);
+    d.normalize();
+    const L = big ? 0.95 : 0.7, line = [];
+    for (let i = 0; i <= 8; i++) line.push(c.clone().addScaledVector(d, (i / 8 - 0.5) * 2 * L).addScaledVector(_cv, -0.25));
+    slashArc(line, c, big, [1.3, 1.25, 1.2], 'slit');
   }
 
   function landHit(amount, label, cls, big) {
@@ -2349,8 +2391,11 @@
     S.enemyDeflects = 0;
     addChain();
     Sound.at(tA); Sound.cut(big); Sound.rip();
+    // 斬れた：軌跡が白く灼け、太い三日月が体を通り抜け、体を横切る斬り線が一瞬残る
     const pts = playerTrail.samples.map((q) => q.tip);
-    slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big, big ? [1.4, 1.0, 0.55] : [1.2, 0.3, 0.38]);
+    playerTrail.tint(1.7, 1.55, 1.35);
+    slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big, big ? [1.4, 1.0, 0.55] : [1.2, 0.3, 0.38], 'cut');
+    cutSlit(pts, big);
     shred(tA, big ? 18 : 9);
     snowBurst(S.e.x, S.e.z, big ? 1.0 : 0.45);
     camKick(tA, big ? 1.0 : 0.5, big ? 0.35 : 0);
@@ -2383,6 +2428,9 @@
   function enemyDeflect(forceCounter) {
     // 斬りを弾かれた：火花、低い金属音、自分がのけぞる
     clashPoint(tA); Sound.at(tA);
+    // 弾かれた：軌跡は当たった所で途切れて冷たい鋼の青に変わり、短く折れて跳ね返る
+    playerTrail.tint(0.3, 0.5, 0.95, true);
+    slashArc(playerTrail.samples.slice(0, 12).map((q) => q.tip).reverse(), tA, false, [0.45, 0.65, 1.2], 'broken');
     Sound.clashLow(); burst(tA, 30, 2.8, 'hot'); glowAt(tA, 0.7, 100, 0xfff0d8); flare(tA, 1.1, 180); lightAt(tA, 3.5, 0xffe2c0); smoke(tA, 2, 0.25); camKick(tA, 0.5, 0);
     S.guardUntil = S.gt + 260;
     { const f = dirPE(); tween(S.p, S.p.x - f.x * 0.45, S.p.z - f.z * 0.45, 200); }
@@ -3105,6 +3153,8 @@
     arcTest() { const c = enemy.chestWorld.clone(); slashArc([c.clone().add(V(-0.6, 0.5, 0.2)), c.clone().add(V(-0.3, 0.25, 0.3)), c.clone().add(V(0, 0, 0.35)), c.clone().add(V(0.3, -0.25, 0.3)), c.clone().add(V(0.6, -0.5, 0.2))], c, true, [1.4, 1.0, 0.55]); },
     perf() { return { logic: +PERF.logic.toFixed(2), render: +PERF.render.toFixed(2) }; },
     setPost(v) { Post.enabled = v; },
+    arcState() { return arcs.map((A) => ({ v: A.m.visible, k: A.kind, n: A.pts.length, age: Math.round(performance.now() - A.t0) })); },
+    place(d) { const f = dirPE(); S.e.x = S.p.x + f.x * d; S.e.z = S.p.z + f.z * d; },
     soundDump(n, i) { return Sound.dump(n, i); },
     tips() { return { p: player.tip.toArray(), e: enemy.tip.toArray(), gt: S.gt }; },
     camDebug(pos, look) { S.camDebug = pos ? { pos: V(...pos), look: V(...look) } : null; },
