@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="風の伝説">
 <meta name="theme-color" content="#0a0f1c">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <style>html { -webkit-text-size-adjust: 100%; } body { margin: 0; }</style>
 </head>
 <body>
@@ -182,7 +185,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">Kaeshi · 試作 1.1</p>
+    <p class="kicker">風の伝説 · <span id="ver">試作 3.5 · 10/30 17:41 · 9169f57</span></p>
     <h1>風の伝説</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -311,6 +314,39 @@
     pierceF:  { key: 'T', O: 60, W: 380, S: 200, F: 420, R: 800, w: 1.5, reach: 3.4, lunge: 0.95, peril: 'pierce', fixed: true, name: '危：返しの突き' },
     tackleF:  { key: 'TK', O: 60, W: 360, S: 200, F: 500, R: 900, w: 1.6, reach: 2.6, lunge: 1.6, peril: 'tackle', fixed: true, name: '危：返しの体当たり' },
   };
+
+  // ───────── 技の様式（モダリティ）：同じ斬り方を、回る・跳ぶ・沈む・速める・溜める・詰める・回り込む・退く、とその組み合わせで変える（docs/29-modality-engine.md） ─────────
+  const MODS = {
+    spin:  { name: '回転', spin: 1, O: 1.0, W: 0.85, w: 1.15 },
+    jump:  { name: '跳び', jump: 0.75, O: 1.05, W: 0.9, w: 1.2 },
+    low:   { name: '沈み', low: 1, O: 0.95, W: 0.9, w: 1.0 },
+    quick: { name: '速', O: 0.55, W: 0.5, w: 0.75 },
+    heavy: { name: '剛', O: 1.15, W: 1.45, w: 1.45, lunge: 1.3 },
+    dash:  { name: '詰め', dash: 1, O: 0.9, W: 0.85, w: 1.1 },
+    side:  { name: '回り込み', side: 1, O: 0.9, W: 0.9, w: 1.0 },
+    back:  { name: '退き', back: 1, O: 0.85, W: 0.8, w: 0.85 },
+  };
+  const MOD_COMBOS = ['spin', 'jump', 'low', 'quick', 'heavy', 'dash', 'side', 'back',
+    'spin+jump', 'spin+low', 'jump+heavy', 'quick+low', 'dash+low', 'dash+quick', 'side+quick', 'side+spin', 'back+jump', 'quick+spin',
+    'low+heavy', 'dash+spin', 'jump+quick', 'side+low', 'back+quick', 'dash+heavy'];
+  const MOD_BASES = { R: 'cutR', L: 'cutL', KS: 'kesa', KG: 'gyaku', KSL: 'kesaL', KGL: 'gyakuL', D: 'over', U: 'kiriage', T: 'thrust', TH: 'thrustHi', TL: 'thrustLo', IA: 'iai' };
+  const VARIANTS = {};   // 元の技 → その様式違いの技の一覧
+  Object.values(MOD_BASES).forEach((bk) => {
+    const b = MOVES[bk]; VARIANTS[bk] = [];
+    MOD_COMBOS.forEach((combo) => {
+      const parts = combo.split('+');
+      if (bk === 'thrustLo' && parts.includes('jump')) return;   // 跳びながらの下段突きは成り立たない
+      if (bk === 'thrustHi' && parts.includes('low')) return;
+      const m = Object.assign({}, b, { mod: {} });
+      parts.forEach((pn) => { const md = MODS[pn]; m.O *= md.O; m.W *= md.W; m.w *= md.w; if (md.lunge) m.lunge *= md.lunge; Object.assign(m.mod, { spin: md.spin || m.mod.spin, jump: md.jump || m.mod.jump, low: md.low || m.mod.low, dash: md.dash || m.mod.dash, side: md.side || m.mod.side, back: md.back || m.mod.back }); });
+      if (m.mod.back) { m.lunge = -0.7; m.reach += 0.4; }
+      if (m.mod.dash) m.reach += 0.6;
+      if (m.mod.jump) m.F *= 1.15;
+      m.O = Math.round(m.O); m.W = Math.round(m.W);
+      m.name = parts.map((pn) => MODS[pn].name).join('・') + '・' + b.name;
+      const id = bk + '@' + combo; MOVES[id] = m; VARIANTS[bk].push(id);
+    });
+  });
 
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.05, pitch: 0, yaw: 0, roll: 0, lift: 0 }, o);
@@ -2585,7 +2621,9 @@
     }
     const feint = token === '~';
     const delayed = token.endsWith('*');
-    const key = token.replace('*', '');
+    let key = token.replace('*', '');
+    // 様式を変える：同じ斬り方でも、回る・跳ぶ・沈む・速める…のどれで来るかは毎回違う
+    if (!feint && VARIANTS[key] && !MOVES[key].fixed && S.r() < (S.phase === 1 ? 0.5 : 0.7)) key = VARIANTS[key][Math.floor(S.r() * VARIANTS[key].length)];
     // 虚：腕と刀だけが動く起こり（腰は動かない）。起こりの長さは本物と同じにして、腰でしか見分けられないようにする。
     const move = feint ? { key: ['R', 'L', 'D', 'KS'][Math.floor(S.r() * 4)], O: 330, W: 500, S: 180, F: 300, R: 500, w: 1.2, reach: 2.9, lunge: 0, name: '虚' } : MOVES[key];
     if (!move) { setMode('stalk', 600); return; }
@@ -3172,16 +3210,23 @@
   function updateAI() {
     const gt = S.gt, m = S.mode, f = dirPE();
     if (m === 'intro') { S.e.vx = S.e.vz = 0; if (gt >= S.modeUntil) setMode('stalk', 600); return; }
-    if (m === 'stalk') {
-      const pref = S.phase === 1 ? 3.6 : 3.2;
-      const radial = clamp((f.d - pref) * 1.2, -0.9, 0.9);
-      S.e.vx = (-f.z * S.stalkDir * 1.05 - f.x * radial);
-      S.e.vz = (f.x * S.stalkDir * 1.05 - f.z * radial);
-      if (gt >= S.modeUntil) { S.e.vx = S.e.vz = 0; think(); }
-    } else if (m === 'approach') {
-      const sp = S.phase === 1 ? 1.7 : 2.1;
-      S.e.vx = -f.x * sp; S.e.vz = -f.z * sp;
-      if (f.d <= 2.75 || gt >= S.modeUntil) { S.e.vx = S.e.vz = 0; think(); }
+    if (m === 'stalk' || m === 'approach') {
+      // メリハリ：構えてじっと止まり、次の瞬間、大きく鋭く一歩で動き、また止まる（ずっと歩き続けると、ちょこちょこして見える）
+      S.e.vx = S.e.vz = 0;
+      if (!S.e.tw && gt >= (S.nextBurst || 0)) {
+        const pref = S.phase === 1 ? 3.4 : 3.0;
+        const side = V(-f.z, 0, f.x).multiplyScalar(S.stalkDir);
+        let lat = 0, rad = 0;
+        if (m === 'approach' || f.d > pref + 0.6) { rad = -Math.min(1.6, f.d - 2.6); lat = (S.r() - 0.5) * 0.6; }
+        else { lat = 0.9 + S.r() * 0.7; rad = clamp((pref - f.d), -0.8, 0.8); if (S.r() < 0.25) S.stalkDir = -S.stalkDir; }
+        const dx = side.x * lat + f.x * rad, dz = side.z * lat + f.z * rad;
+        const dur = 230 + Math.hypot(dx, dz) * 60;
+        tween(S.e, S.e.x + dx, S.e.z + dz, dur, easeOut);
+        kickSnow(enemy.hipWorld, 0.6); Sound.step(1);
+        S.nextBurst = gt + dur + (S.phase === 1 ? 420 + S.r() * 520 : 260 + S.r() * 380);
+      }
+      if (m === 'approach' && f.d <= 2.75 && !S.e.tw) think();
+      else if (gt >= S.modeUntil && !S.e.tw) think();
     } else { S.e.vx = 0; S.e.vz = 0; }
 
     if ((m === 'open' || m === 'bait') && gt >= S.modeUntil) afterOpening();
@@ -3209,6 +3254,13 @@
       if (a.feint) {
         if (gt >= a.end) { S.action = null; if (S.queue.length) startAction(S.queue.shift()); else setMode('stalk', 500); }
         return;
+      }
+      const md = a.move.mod;
+      if (md && !a.modMoved && gt >= a.t0 + a.O * 0.6) {
+        a.modMoved = true;
+        if (md.dash) { const go = Math.max(0, f.d - 2.3); tween(S.e, S.e.x - f.x * go, S.e.z - f.z * go, Math.max(160, a.O * 0.4 + a.W * 0.6), easeOut); kickSnow(enemy.hipWorld, 1.1); }
+        if (md.side) { const sd = S.r() < 0.5 ? -1 : 1, lat = 1.3; tween(S.e, S.e.x - f.z * sd * lat, S.e.z + f.x * sd * lat, Math.max(160, a.W * 0.55), easeOut); kickSnow(enemy.hipWorld, 0.9); }
+        if (md.back && !md.dash) { tween(S.e, S.e.x + f.x * 0.5, S.e.z + f.z * 0.5, Math.max(140, a.W * 0.4), easeOut); }
       }
       if (a.move.leap && !a.leapt && gt >= a.t0 + a.O) {
         a.leapt = true;
@@ -3305,7 +3357,7 @@
         blendSplit(S.actionFrom, K.wind, 1, 0.25 + 0.75 * smooth((t - a.O) / a.W), out);
       } else if (t <= a.O + a.W + a.D) {
         blend(K.wind, K.wind, 0, out);
-        out.hand.x += Math.sin(gt * 0.09) * 0.006; out.hand.y += Math.sin(gt * 0.13) * 0.006;
+        out.hand.x += Math.sin(gt * 0.004) * 0.01;   // 溜め：刀先がゆっくり動くだけ（細かく震わせない）
       } else if (gt <= a.T) {
         // 振り：腰と胴が先に回り、腕と刀が後から追いつく
         const u = (gt - (a.T - a.S)) / a.S;
@@ -3328,7 +3380,27 @@
     } else if (m === 'victory') { blend(KNEEL, KNEEL, 0, out); out.pitch += 0.9; out.crouch += 0.25; }
     else {
       blend(S.actionFrom, NEUTRAL, smooth(since / 420), out);
-      if (m === 'stalk' || m === 'approach') { out.crouch += 0.03 + Math.abs(Math.sin(gt * 0.011)) * 0.025; out.roll += S.stalkDir * 0.05 * (m === 'stalk' ? 1 : 0); }
+      if (m === 'stalk' || m === 'approach') { out.crouch += 0.06; out.roll += S.stalkDir * 0.04; }   // 低く構えて静止（細かく揺らさない）
+    }
+    // 様式の体の動き：沈む、跳ぶ、回る
+    S.eSpin = 0;
+    if (m === 'attack' && a && !a.feint && a.move.mod) {
+      const md = a.move.mod, t = gt - a.t0, T = a.T - a.t0, endT = T + a.F + a.R;
+      const env = smooth(clamp(t / Math.max(1, a.O), 0, 1)) * (1 - smooth(clamp((t - T - a.F) / Math.max(1, a.R), 0, 1)));
+      if (md.low) { out.crouch += 0.24 * env; out.pitch += 0.18 * env; out.hand.y -= 0.25 * env; }
+      if (md.jump) {
+        const t0 = a.O + a.W * 0.35, t1 = T + a.F * 0.25;   // 溜めの途中で跳び、打ちの直後に降りる
+        if (t > t0 && t < t1) { const u = (t - t0) / (t1 - t0); out.lift += md.jump * Math.sin(Math.PI * Math.pow(u, 0.8)); out.crouch -= 0.08 * Math.sin(Math.PI * u); }
+        else if (t >= t1 && t < t1 + 160) out.crouch += 0.18 * (1 - (t - t1) / 160);   // 着地で沈む
+        else if (t <= t0 && t > a.O) out.crouch += 0.15 * smooth((t - a.O) / Math.max(1, t0 - a.O));   // 跳ぶ前に沈む
+      }
+      if (md.spin) {
+        // 打ちの直前に体を一回転させ、こちらへ向き直った瞬間に打つ
+        const t0 = T - a.S - a.W * 0.45, u = clamp((t - t0) / (T - t0), 0, 1);
+        const dir = ['L', 'KSL', 'KGL'].includes(a.move.key) ? -1 : 1;
+        S.eSpin = dir * Math.PI * 2 * (u * u * (3 - 2 * u));
+        if (u >= 1) S.eSpin = 0;
+      }
     }
     if (gt < S.guardUntil) blend(out, GUARD, 0.85, out);
     const load = S.B / 100;
@@ -3339,7 +3411,7 @@
       out.pitch += load * load * 0.12 + heave * load * 0.03;
       out.roll += Math.sin(gt * 0.0031) * load * 0.07;
       out.hand.y -= load * 0.12;
-      out.hand.x += Math.sin(gt * 0.047) * load * load * 0.02;
+      out.hand.x += Math.sin(gt * 0.006) * load * load * 0.02;
       if (load > 0.72 && m !== 'attack') { const k = (load - 0.72) / 0.28; out.hand.y -= k * 0.3; out.sword.y -= k * 1.6; out.sword.normalize(); }
       if (gt < (S.buckleUntil || 0)) { const u = 1 - (S.buckleUntil - gt) / 450; const k = Math.sin(u * Math.PI); out.crouch += 0.26 * k; out.pitch += 0.18 * k; }
     }
@@ -3392,7 +3464,7 @@
     const eFast = S.mode === 'attack' && act && !act.feint && S.gt >= act.T - act.S - 40 && S.gt <= act.T + act.F;
     const pa = S.pa;
     const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge'].includes(pa.kind) && S.gt - pa.t0 < 480;
-    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld });
+    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld });
     player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: enemy.headWorld });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
     const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
