@@ -185,7 +185,7 @@
 
 <div id="start" class="veil">
   <div class="card">
-    <p class="kicker">風の伝説 · <span id="ver">試作 3.5 · 10/30 18:03 · 28374b4</span></p>
+    <p class="kicker">風の伝説 · <span id="ver">試作 3.6 · 10/30 18:27 · b744528</span></p>
     <h1>風の伝説</h1>
     <p>画面のどこでも、四つの向きにはじく。</p>
     <div class="cross" aria-label="操作">
@@ -315,6 +315,22 @@
     tackleF:  { key: 'TK', O: 60, W: 360, S: 200, F: 500, R: 900, w: 1.6, reach: 2.6, lunge: 1.6, peril: 'tackle', fixed: true, name: '危：返しの体当たり' },
   };
 
+  // ── 行動エンジンの技（docs/30-behavior-engine.md）：弓、飛ぶ斬撃、大跳躍、旋風 ──
+  Object.assign(MOVES, {
+    arrow:   { key: 'BW', O: 260, W: 620, S: 0, F: 300, R: 520, w: 0.8, reach: 99, lunge: 0, ranged: { kind: 'arrow', speed: 15 }, name: '弓' },
+    arrowQ:  { key: 'BW', O: 120, W: 260, S: 0, F: 240, R: 420, w: 0.7, reach: 99, lunge: 0, ranged: { kind: 'arrow', speed: 17 }, name: '早打ち' },
+    arrowQF: { key: 'BW', O: 40, W: 220, S: 0, F: 220, R: 420, w: 0.7, reach: 99, lunge: 0, ranged: { kind: 'arrow', speed: 17 }, fixed: true, name: '二の矢' },
+    arrowP:  { key: 'BW', O: 300, W: 1000, S: 0, F: 360, R: 600, w: 1.4, reach: 99, lunge: 0, ranged: { kind: 'arrow', speed: 22 }, peril: 'sweep', name: '危：強弓' },
+    waveR:   { key: 'R', O: 300, W: 560, S: 0, F: 380, R: 640, w: 1.1, reach: 99, lunge: 0.2, ranged: { kind: 'wave', speed: 9, flat: true }, name: '飛ぶ斬撃・横' },
+    waveL:   { key: 'L', O: 300, W: 560, S: 0, F: 380, R: 640, w: 1.1, reach: 99, lunge: 0.2, ranged: { kind: 'wave', speed: 9, flat: true }, name: '飛ぶ斬撃・横' },
+    waveD:   { key: 'D', O: 340, W: 640, S: 0, F: 420, R: 700, w: 1.3, reach: 99, lunge: 0.2, ranged: { kind: 'wave', speed: 8 }, name: '飛ぶ斬撃・縦' },
+    waveF:   { key: 'KS', O: 60, W: 200, S: 0, F: 380, R: 640, w: 1.0, reach: 99, lunge: 0.1, ranged: { kind: 'wave', speed: 10 }, fixed: true, name: '返しの飛ぶ斬撃' },
+    leapHigh: { key: 'LP', O: 360, W: 700, S: 240, F: 520, R: 900, w: 1.8, reach: 3.2, lunge: 0, leap: true, quake: true, mod: { jump: 0.9 }, name: '大跳躍・兜割り' },
+    spinW1:  { key: 'SP1', O: 40, W: 120, S: 160, F: 80, R: 0, w: 0.9, reach: 3.0, lunge: 0.7, fixed: true, mod: { spin: 1 }, name: '旋風' },
+    spinW2:  { key: 'SPL1', O: 40, W: 120, S: 160, F: 80, R: 0, w: 0.9, reach: 3.0, lunge: 0.7, fixed: true, mod: { spin: 1 }, name: '旋風' },
+    spinWE:  { key: 'SP2', O: 40, W: 160, S: 180, F: 460, R: 860, w: 1.4, reach: 3.1, lunge: 0.8, fixed: true, quake: true, name: '旋風・止め' },
+  });
+
   // ───────── 技の様式（モダリティ）：同じ斬り方を、回る・跳ぶ・沈む・速める・溜める・詰める・回り込む・退く、とその組み合わせで変える（docs/29-modality-engine.md） ─────────
   const MODS = {
     spin:  { name: '回転', spin: 1, O: 1.0, W: 0.85, w: 1.15 },
@@ -424,6 +440,7 @@
   // 本物の隙：腰が伸び、力が抜けている。誘い：見た目は似ているが、腰が沈んで溜まっている。
   const OPEN = pose({ hand: V(0.32, 0.96, 0.32), sword: N(0.35, -0.62, 0.7), crouch: 0.0, hipZ: 0.03, pitch: 0.08 });
   const BAIT = pose({ hand: V(0.32, 0.96, 0.32), sword: N(0.35, -0.62, 0.7), crouch: 0.2, hipZ: -0.13, pitch: 0.08 });
+  const WAITPOSE = pose({ hand: V(0.1, 0.92, 0.5), sword: N(0.1, -0.35, 1), crouch: 0.3, pitch: 0.12, hipZ: -0.05 });   // 待ちの構え：下段に構えて静か
   const GUARD = pose({ hand: V(0.05, 1.45, 0.52), sword: N(0.78, 0.62, 0.1), crouch: 0.16, yaw: -0.25 });
 
   // 自分の姿勢。画面の向き（右＝+x、前＝相手の方）で書き、自分は相手に背を向けているので左右を反転して使う。
@@ -1255,6 +1272,7 @@
   }
 
   function makeFigure({ scale, kind, blade, tsukaLen, bladeLen }) {
+    let backBow = null;   // 背の弓（弓を射るときは隠す）
     const big = kind === 'enemy';
     const D = window.CLEF_CHARS[kind];
     const root = new THREE.Group();
@@ -1359,7 +1377,7 @@
       { const k = makeKitsune(true); k.position.copy(atBone(headG, 0, 1.985, 0.022)); k.rotation.x = -0.05; k.scale.set(1.06, 1.08, 1.02); headG.add(k); }
       // 喉を守る垂れ（よだれかけ）：面頬の下に三段の板
       for (let i = 0; i < 3; i++) { const l = makeLame(0.15 - i * 0.008, 0.032, 0.008, 0.03); l.position.copy(atBone(neckG, 0, 1.885 - i * 0.03, 0.072 + i * 0.006)); l.rotation.x = 0.18; neckG.add(l); }
-      const bow = makeBow(1.8); bow.position.copy(atBone(chestG, -0.04, 1.42, -0.22)); bow.rotation.set(0, 0, -0.42); chestG.add(bow);
+      const bow = makeBow(1.8); backBow = bow; bow.position.copy(atBone(chestG, -0.04, 1.42, -0.22)); bow.rotation.set(0, 0, -0.42); chestG.add(bow);
     }
     // 大太刀
     const BL = bladeLen, SORI = 0.06, TK = tsukaLen;
@@ -1369,6 +1387,10 @@
     const habaki = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.03), toon(0xb08a4a)); habaki.position.y = 0.02; sword.add(habaki);
     sword.add(inked(new THREE.CylinderGeometry(0.06, 0.06, 0.014, 18), toon(0x16141c), 0.08));
     const tsuka = inked(new THREE.CylinderGeometry(0.02, 0.023, TK, 8), toon(0x1b2030), 0.12); tsuka.position.y = -TK / 2; sword.add(tsuka);
+    // 手に持つ弓（相手が弓を射るとき、刀と持ち替える）
+    const swordParts = sword.children.slice();
+    let handBow = null;
+    if (big) { handBow = makeBow(1.55); handBow.visible = false; sword.add(handBow); }
 
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
@@ -1588,6 +1610,7 @@
     }
     return {
       root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd, bakeWorld, scatterAttachments,
+      setWeapon(w) { if (!handBow) return; const b = w === 'bow'; handBow.visible = b; swordParts.forEach((m) => { m.visible = !b; }); if (backBow) backBow.visible = !b; },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
       showBody() { body.visible = true; headMesh.visible = true; shadow.visible = true; },
       resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
@@ -2288,12 +2311,45 @@
     const b = puffs[puffCursor]; puffCursor = (puffCursor + 1) % puffs.length;
     b.m.position.copy(at); b.v.copy(vel); b.max = b.life = life; b.size = size; b.peak = peak; b.grav = grav || 0; b.m.visible = true;
   }
-  function exhale(at, forward, strength) {
-    for (let i = 0; i < 2; i++) {
-      tA.copy(at).addScaledVector(forward, 0.05 + i * 0.04);
-      tB.copy(forward).multiplyScalar(0.18 + strength * 0.25).add(V((Math.random() - 0.5) * 0.06, 0.12 + strength * 0.08, 0));
-      puff(tA, tB, 1.1 + strength * 0.9, 0.12 + strength * 0.22, 0.16 + strength * 0.42, 0);
+  // 吐息：丸い塊ではなく、細くたなびく白い湯気。薄い筋が前へ流れ、ほどけながら広がって消える
+  const wispTex = (() => {
+    const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+    const R = rng(91);
+    for (let k = 0; k < 14; k++) {
+      const y0 = N * (0.35 + R() * 0.3), amp = N * (0.04 + R() * 0.08), ph = R() * 6;
+      const grd = g.createLinearGradient(0, 0, N, 0); grd.addColorStop(0, 'rgba(235,240,250,0)'); grd.addColorStop(0.25 + R() * 0.2, `rgba(235,240,250,${0.05 + R() * 0.07})`); grd.addColorStop(1, 'rgba(235,240,250,0)');
+      g.strokeStyle = grd; g.lineWidth = 1 + R() * 3; g.beginPath();
+      for (let x = 0; x <= N; x += 4) { const y = y0 + Math.sin(x / N * 5 + ph) * amp * (x / N); x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
     }
+    const t = new THREE.CanvasTexture(c); return t;
+  })();
+  const wisps = Array.from({ length: 24 }, () => {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: wispTex, transparent: true, depthWrite: false, opacity: 0 }));
+    m.visible = false; scene.add(m);
+    return { m, v: V(0, 0, 0), life: 0, max: 1, s0: 0.1, peak: 0.2, rot: 0 };
+  });
+  let wispCursor = 0;
+  function exhale(at, forward, strength) {
+    for (let i = 0; i < 3; i++) {
+      const w = wisps[wispCursor]; wispCursor = (wispCursor + 1) % wisps.length;
+      w.m.position.copy(at).addScaledVector(forward, 0.04 + i * 0.03);
+      w.v.copy(forward).multiplyScalar(0.22 + strength * 0.3 + i * 0.05).add(V((Math.random() - 0.5) * 0.05, 0.06 + strength * 0.05, (Math.random() - 0.5) * 0.05));
+      w.max = w.life = 0.9 + strength * 0.8 + Math.random() * 0.3; w.s0 = 0.06 + strength * 0.05; w.peak = 0.25 + strength * 0.35;
+      w.m.material.rotation = Math.atan2(w.v.y, Math.hypot(w.v.x, w.v.z)) + (Math.random() - 0.5) * 0.4;
+      w.m.visible = true;
+    }
+  }
+  function updateWisps(dt) {
+    wisps.forEach((w) => {
+      if (!w.m.visible) return;
+      w.life -= dt; if (w.life <= 0) { w.m.visible = false; return; }
+      const u = 1 - w.life / w.max;
+      w.m.position.addScaledVector(w.v, dt); w.v.multiplyScalar(1 - dt * 0.9); w.v.y += dt * 0.05;
+      const sc = w.s0 + u * 0.55; w.m.scale.set(sc * 2.2, sc, 1);
+      w.m.material.opacity = w.peak * Math.sin(Math.PI * Math.min(1, u * 1.4)) * (1 - u);
+      w.m.material.rotation += dt * 0.2;
+    });
   }
   function kickSnow(at, strength) {
     for (let i = 0; i < 3 + strength * 6; i++) {
@@ -2540,6 +2596,9 @@
   };
 
   ['TH', 'TL', 'IA'].forEach((k) => ['wind', 'follow'].forEach((ph) => { const q = KEY[k][ph]; if (!q || q._big) return; q._big = true; q.yaw *= 1.3; q.crouch += 0.06; q.pitch *= 1.2; q.hipZ *= 1.25; }));
+  // 弓を引く姿勢：半身になり、弓を顔の前に立てる
+  const BOWPOSE = pose({ hand: V(-0.05, 1.62, 0.62), sword: N(0.12, 1, 0.08), yaw: 0.75, crouch: 0.16, hipX: -0.06, pitch: -0.04 });
+  KEY.BW = { wind: BOWPOSE, hit: pose(Object.assign({}, BOWPOSE, { hand: V(-0.05, 1.62, 0.7), yaw: 0.8 })), follow: BOWPOSE };
   function timing(move) {
     const k = S.phase === 2 && !move.fixed ? 0.92 : 1;
     return { O: move.O * k, W: move.W * k, S: move.S, F: move.F, R: move.R };
@@ -2600,18 +2659,53 @@
     S.actionFrom = clonePose(S.enemyPose);
     if (m === 'stalk' && S.r() < 0.35) S.stalkDir = -S.stalkDir;   // 回る向きはたまにしか変えない（何度も切り返すと、ちょこちょこして見える）
   }
+  // ───────── 行動エンジン：戦術を選び、戦術が技と構えと移動を並べる（docs/30-behavior-engine.md） ─────────
+  // 戦術ごとに、どの間合いで、どの癖に対して、どれだけ選ばれやすいかを持つ。同じ戦術が続かないよう、使ったものは選ばれにくくする
+  const pick = (arr) => arr[Math.floor(S.r() * arr.length)];
+  const TACTICS = {
+    // 連撃で押す（入り・繋ぎ・決めの句。技は様式違いに置き換わる）
+    press:   { w: (d) => (d < 4.2 ? 3 : 0.6), run: () => { S.queue = pickPattern(); startAction(S.queue.shift()); } },
+    // 居合の構え：腰を落とし、刀を引きつけて溜める。刃が光り、限界で抜き打つ（一太刀、二太刀、踏み込み、退いてから）
+    iai:     { w: (d) => (d < 4.5 ? 1.2 : 0.4), run: () => kamae('iai', 700 + S.r() * 900, pick([['iai'], ['iai@quick'], ['iai', 'kiriageF'], ['iai@dash'], ['iai@quick', 'kesaF', 'overF'], ['iai@side+quick'], ['backR', 'iai@dash']])) },
+    // 待ちの構え（後の先）：斬りかかると弾いて反撃する。待ちきれずにいると、構えを崩す突きや体当たり
+    wait:    { w: (d) => (d < 3.8 ? 1.0 + S.habit.attack * 0.5 : 0.2), run: () => kamae('wait', 1100 + S.r() * 900, pick([['thrustHi@quick'], ['pierce'], ['tackle'], ['iai@quick'], ['thrustLo@dash'], ['~', 'kesaHeavy']])) },
+    // 上段の構え：刀を高く掲げて溜め、重い一撃
+    jodan:   { w: (d) => (d < 4 ? 0.9 : 0.3), run: () => kamae('jodan', 600 + S.r() * 700, pick([['over@heavy'], ['over@jump+heavy'], ['kesaHeavy'], ['over*', 'kiriageF'], ['over@dash+heavy']])) },
+    // 旋風：回転しながら詰め寄る三〜五連の回転斬り
+    whirl:   { w: (d) => (S.phase === 2 ? 1.2 : 0.5) * (d < 5 ? 1 : 0.5), run: () => { const n = 2 + Math.floor(S.r() * 3); const q = []; for (let i = 0; i < n; i++) q.push(i % 2 ? 'spinW2' : 'spinW1'); q.push('spinWE'); S.queue = q; startAction(pick(['spin1', 'spinL1'])); } },
+    // 大跳躍：高く跳び、落ちながら兜割り。着地で雪が爆ぜる
+    aerial:  { w: (d) => (d > 3 ? 1.4 : 0.5) * (S.phase === 2 ? 1.3 : 0.8), run: () => { S.queue = pick([[], ['kiriageF'], ['gyakuF', 'kesaF'], ['spin1', 'spin2']]); startAction('leapHigh'); } },
+    // 弓：後ろへ跳び退いて間合いを取り、矢を射る（一矢、二矢、三矢、強弓）
+    bow:     { w: (d) => (d > 3.5 ? 1.6 : 0.7) + S.habit.dodge * 0.1, run: () => flip(pick([['arrow'], ['arrowQ', 'arrowQF'], ['arrowQ', 'arrowQF', 'arrowQF'], ['arrowP'], ['arrow', 'arrowQF'], ['arrowQ', 'leapHigh']])) },
+    // 飛ぶ斬撃：離れた間合いから、斬撃そのものを飛ばす
+    wave:    { w: (d) => (d > 3.2 ? 1.4 : 0.3), run: () => { S.queue = pick([[], ['waveF'], ['waveF', 'leapHigh'], ['dash']]); startAction(pick(['waveR', 'waveL', 'waveD'])); } },
+    // 跳び退き：後ろへ宙返りするように跳んで間合いを外し、次の手へ
+    disengage: { w: (d) => (d < 2.8 ? 1.2 : 0.2), run: () => flip(pick([['waveR'], ['arrowQ'], ['dash'], ['leapHigh'], []])) },
+    // 虚の連鎖：起こりだけを重ね、本物を混ぜる
+    feints:  { w: (d) => (d < 4 ? 0.6 + S.habit.guard * 0.4 : 0.2), run: () => { S.queue = pick([['~', 'kesa@quick'], ['~', '~', 'thrustHi'], ['kiriage@quick'], ['~', 'iai@quick']]); startAction(S.queue.shift()); } },
+    // 間合いを詰める：鋭い踏み込みの連続から入る
+    rush:    { w: (d) => (d > 4 ? 2.0 : 0.3), run: () => { S.queue = pick([['kesa@dash'], ['thrust@dash+quick'], ['cutR@dash+spin'], ['gyaku@dash+low']]); startAction('dash'); } },
+  };
+  function kamae(kind, dur, then) { S.kamae = { kind, then }; setMode('kamae', dur); }
+  function flip(then) {
+    const f = dirPE();
+    tween(S.e, S.e.x + f.x * 2.6, S.e.z + f.z * 2.6, 520, easeOut);
+    kickSnow(enemy.hipWorld, 1.2); Sound.step(1);
+    S.flipThen = then; setMode('flip', 560);
+  }
   function think() {
     const d = dist();
     if (S.queue.length) { startAction(S.queue.shift()); return; }
     Object.keys(S.habit).forEach((k) => { S.habit[k] *= 0.93; });
-    const r = S.r();
-    if (S.phase === 2 && d > 3.6 && r < 0.5) { startAction('leap'); return; }
-    if (d > 3.8 && S.gt - S.lastDodge < 1500 && r < 0.6) { startAction(S.phase === 2 ? 'leap' : 'dash'); return; }
-    if (d > 4.8) { if (r < 0.55) startAction('dash'); else setMode('approach', 4000); return; }
-    if (d > 3.0) { if (r < 0.6) setMode('approach', 4000); else setMode('stalk', 1200 + S.r() * 900); return; }
-    if (r < (S.phase === 1 ? 0.18 : 0.08)) { setMode('stalk', 1100 + S.r() * 900); return; }
-    S.queue = pickPattern();
-    startAction(S.queue.shift());
+    S.tacticUse = S.tacticUse || {};
+    const names = Object.keys(TACTICS);
+    const ws = names.map((n) => Math.max(0.01, TACTICS[n].w(d)) / (1 + (S.tacticUse[n] || 0) * 1.5));
+    let r = S.r() * ws.reduce((x, y) => x + y, 0), choice = names[0];
+    for (let i = 0; i < names.length; i++) { r -= ws[i]; if (r <= 0) { choice = names[i]; break; } }
+    Object.keys(S.tacticUse).forEach((k) => { S.tacticUse[k] *= 0.6; });
+    S.tacticUse[choice] = (S.tacticUse[choice] || 0) + 1;
+    S.tactic = choice;
+    TACTICS[choice].run();
   }
   function startAction(token) {
     // 分岐：直前の技を弾かれたかどうかで、次の技を選ぶ
@@ -2629,6 +2723,7 @@
     if (!move) { setMode('stalk', 600); return; }
     S.lastResult = null;
     const tm = timing(move);
+    if (move.ranged) tm.S = Math.max(160, (dist() - 0.4) / move.ranged.speed * 1000);   // 飛ぶ時間
     const D = delayed ? 380 + S.r() * 380 : 0;
     const a = { move, feint, t0: S.gt, ...tm, D, resolved: false, parried: false, lunged: false, peril: move.peril || null };
     a.T = a.t0 + a.O + a.W + a.D + a.S;
@@ -2746,6 +2841,7 @@
       if (S.mode !== 'broken') setMode('staggered', 850);
       return;
     }
+    if (m === 'kamae' && S.kamae && S.kamae.kind === 'wait') { S.kamae = null; pushLog('待ち', '', '待ちの構えに斬りかかった'); enemy.bladeMat.emissive.set(0x1a2230); enemyDeflect(true); return; }
     if (pa.intoFeint || m === 'bait') { pushLog(m === 'bait' ? '誘い' : '虚', '', m === 'bait' ? '誘いに乗った' : '虚に斬りかかった'); enemyDeflect(true); return; }
     const opening = m === 'open' || m === 'staggered' || m === 'retreat' || (m === 'attack' && a && a.resolved);
     if (opening) {
@@ -2870,6 +2966,7 @@
 
   function applyImpact(a, res) {
     S.lastResult = res;
+    if (a.move.ranged) Proj.resolve(a, res);
     const near = (t) => (Math.abs(a.T - t) < 1000 ? Math.round(a.T - t) : null);
     S.tele.push({ t: Math.round(S.gt / 100) / 10, ph: S.phase, m: a.move.name, r: res, guard: near(S.guardStart), dodge: near(S.dodgeStart), B: Math.round(S.B), P: Math.round(S.P) });
     if (res === 'parry') parry(a);
@@ -3136,6 +3233,65 @@
     snowBurst(S.e.x, S.e.z, 1.2);
   }
 
+  // ───────── 飛び道具：矢と、飛ぶ斬撃 ─────────
+  const Proj = (() => {
+    const list = [];
+    const arrowGeo = (() => { const g = new THREE.CylinderGeometry(0.006, 0.006, 0.85, 5); g.rotateX(Math.PI / 2); return g; })();
+    const arrowMat = toon(0x3a2a1c), headMat = toon(0xc8ced8, { metalness: 0.9, roughness: 0.25 }), fletchMat = toon(0xe8e2d6, { side: THREE.DoubleSide });
+    const waveMat = new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    function make(kind, flat) {
+      const g = new THREE.Group();
+      if (kind === 'arrow') {
+        g.add(new THREE.Mesh(arrowGeo, arrowMat));
+        const hd = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.06, 6), headMat); hd.rotation.x = Math.PI / 2; hd.position.z = 0.45; g.add(hd);
+        [0, 1, 2].forEach((k) => { const f = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.1), fletchMat); f.position.z = -0.38; f.rotation.z = k * Math.PI / 1.5; f.rotation.x = Math.PI / 2; g.add(f); });
+      } else {
+        // 三日月の光の刃：中心が厚く、両端が細い
+        const sh = new THREE.Shape(); sh.absarc(0, 0, 0.62, Math.PI * 0.15, Math.PI * 0.85, false); sh.absarc(0, -0.12, 0.58, Math.PI * 0.8, Math.PI * 0.2, true);
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 24), waveMat.clone()); m.position.y = -0.35;
+        const wrap = new THREE.Group(); wrap.add(m); if (flat) wrap.rotation.z = Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1) * 0 + 0; if (flat) m.rotation.z = 0; if (!flat) wrap.rotation.z = Math.PI / 2;
+        g.add(wrap); g.userData.glow = m;
+      }
+      g.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
+      scene.add(g); return g;
+    }
+    return {
+      fire(a) {
+        const from = a.move.ranged.kind === 'arrow' ? enemy.chestWorld.clone().add(V(0, 0.12, 0)) : enemy.chestWorld.clone();
+        const to = player.chestWorld.clone();
+        const m = make(a.move.ranged.kind, a.move.ranged.flat);
+        m.position.copy(from); m.lookAt(to);
+        list.push({ a, m, from, to, t0: S.gt, dur: Math.max(60, a.T - S.gt), state: 'fly', v: V(0, 0, 0), life: 1.2, kind: a.move.ranged.kind });
+        if (a.move.ranged.kind === 'arrow') { Sound.at(from); Sound.clank(); } else { Sound.at(from); Sound.swing(1.4); burst(from, 20, 1.6, 'cool'); }
+      },
+      // 当たった結果に合わせて飛び方を変える：弾かれた矢は火花を散らして跳ね、避けた矢は後ろへ抜ける
+      resolve(a, res) {
+        const p = list.find((q) => q.a === a); if (!p) return;
+        if (res === 'parry' || res === 'block') { p.state = 'deflect'; p.v.set((Math.random() - 0.5) * 6, 4 + Math.random() * 2, (Math.random() - 0.5) * 6); burst(p.m.position, 40, 2.6, 'hot'); }
+        else if (res === 'mikiri' || res === 'dodge' || res === 'miss' || res === 'stomp') { p.state = 'pass'; p.v.copy(p.to).sub(p.from).normalize().multiplyScalar(18); }
+        else { p.state = 'gone'; burst(p.m.position, 20, 1.5, p.kind === 'arrow' ? 'warm' : 'cool'); }
+      },
+      update(dt) {
+        for (let i = list.length - 1; i >= 0; i--) {
+          const p = list[i];
+          if (p.state === 'fly') {
+            const u = Math.min(1.05, (S.gt - p.t0) / p.dur);
+            p.m.position.lerpVectors(p.from, p.to, u);
+            if (p.kind === 'arrow') p.m.position.y += Math.sin(Math.PI * Math.min(1, u)) * 0.08;
+            else { const g = p.m.userData.glow; g.material.opacity = 0.6 + 0.3 * Math.sin(S.gt * 0.05); p.m.scale.setScalar(1 + u * 0.4); }
+            if (u >= 1.05 && !p.a.resolved) p.state = 'pass';
+          } else if (p.state === 'deflect' || p.state === 'pass') {
+            p.life -= dt; if (p.state === 'deflect') { p.v.y -= 9 * dt; p.m.rotation.x += dt * 12; }
+            p.m.position.addScaledVector(p.v, dt);
+            if (p.m.userData.glow) p.m.userData.glow.material.opacity *= 0.92;
+            if (p.life <= 0 || p.m.position.y < 0) { scene.remove(p.m); list.splice(i, 1); }
+          } else { scene.remove(p.m); list.splice(i, 1); }
+        }
+      },
+      clear() { list.forEach((p) => scene.remove(p.m)); list.length = 0; },
+    };
+  })();
+
   function defeat() {
     S.queue = []; S.action = null;
     S.mode = 'defeat'; S.modeStart = S.gt;
@@ -3210,6 +3366,17 @@
   function updateAI() {
     const gt = S.gt, m = S.mode, f = dirPE();
     if (m === 'intro') { S.e.vx = S.e.vz = 0; if (gt >= S.modeUntil) setMode('stalk', 600); return; }
+    if (m === 'kamae') {
+      S.e.vx = S.e.vz = 0;
+      if (S.kamae.kind === 'iai') enemy.bladeMat.emissive.setRGB(0.15 + 0.6 * clamp((gt - S.modeStart) / Math.max(1, S.modeUntil - S.modeStart), 0, 1), 0.12, 0.06);
+      if (gt >= S.modeUntil) { enemy.bladeMat.emissive.set(S.phase === 2 ? 0x3a0c10 : 0x1a2230); S.queue = S.kamae.then.slice(); startAction(S.queue.shift()); }
+      return;
+    }
+    if (m === 'flip') {
+      S.e.vx = S.e.vz = 0;
+      if (gt >= S.modeUntil && !S.e.tw) { const t = S.flipThen || []; if (t.length) { S.queue = t.slice(); startAction(S.queue.shift()); } else setMode('stalk', 700); }
+      return;
+    }
     if (m === 'stalk' || m === 'approach') {
       // メリハリ：構えてじっと止まり、次の瞬間、大きく鋭く一歩で動き、また止まる（ずっと歩き続けると、ちょこちょこして見える）
       S.e.vx = S.e.vz = 0;
@@ -3254,6 +3421,11 @@
       if (a.feint) {
         if (gt >= a.end) { S.action = null; if (S.queue.length) startAction(S.queue.shift()); else setMode('stalk', 500); }
         return;
+      }
+      if (a.move.ranged && !a.fired && gt >= a.T - a.S) { a.fired = true; Proj.fire(a); }
+      if (a.move.quake && !a.quaked && gt >= a.T) {
+        // 着地・止めの一撃で、雪が爆ぜ、地が揺れる
+        a.quaked = true; ring(S.e.x, S.e.z, 3.6, 0xe8f0ff); snowBurst(S.e.x, S.e.z, 1.4); S.shake = Math.max(S.shake, 0.09); camKick(enemy.hipWorld, 0.8, 0.2); Sound.step(1); Sound.clashLow();
       }
       const md = a.move.mod;
       if (md && !a.modMoved && gt >= a.t0 + a.O * 0.6) {
@@ -3359,8 +3531,8 @@
         blend(K.wind, K.wind, 0, out);
         out.hand.x += Math.sin(gt * 0.004) * 0.01;   // 溜め：刀先がゆっくり動くだけ（細かく震わせない）
       } else if (gt <= a.T) {
-        // 振り：腰と胴が先に回り、腕と刀が後から追いつく
-        const u = (gt - (a.T - a.S)) / a.S;
+        // 振り：腰と胴が先に回り、腕と刀が後から追いつく（飛び道具は、放つ一瞬だけ振る）
+        const u = a.move.ranged ? clamp((gt - (a.T - a.S)) / 150, 0, 1) : (gt - (a.T - a.S)) / a.S;
         blendSplit(K.wind, K.hit, easeOut(clamp(u * 1.35, 0, 1)), easeIn(u), out);
       } else if (gt <= a.T + a.F) {
         const u = (gt - a.T) / a.F;
@@ -3368,6 +3540,16 @@
       } else {
         blend(K.follow, NEUTRAL, smooth((gt - a.T - a.F) / a.R), out);
       }
+    } else if (m === 'kamae') {
+      // 構え：居合は刀を腰に引いて深く沈む。待ちは刀先を下げて低く静か。上段は刀を高く掲げる
+      const K = S.kamae && S.kamae.kind === 'iai' ? KEY.IA.wind : S.kamae && S.kamae.kind === 'jodan' ? KEY.D.wind : WAITPOSE;
+      blend(S.actionFrom, K, easeOut(clamp(since / 260, 0, 1)), out);
+      if (S.kamae && S.kamae.kind === 'iai') out.crouch += 0.06 * clamp(since / 900, 0, 1);
+    } else if (m === 'flip') {
+      // 跳び退き：体を反らして後ろへ高く跳び、着地で沈む
+      const u = clamp(since / 520, 0, 1);
+      blend(S.actionFrom, NEUTRAL, smooth(u), out);
+      out.lift += 0.85 * Math.sin(Math.PI * u); out.pitch -= 0.55 * Math.sin(Math.PI * u); out.crouch += u > 0.8 ? 0.2 * (1 - (u - 0.8) / 0.2) : -0.05;
     } else if (m === 'intro') {
       const u = since < 900 ? smooth(since / 900) : since < 1500 ? 1 : 1 - smooth((since - 1500) / 800);
       blend(NEUTRAL, BOW, u, out);
@@ -3464,6 +3646,7 @@
     const eFast = S.mode === 'attack' && act && !act.feint && S.gt >= act.T - act.S - 40 && S.gt <= act.T + act.F;
     const pa = S.pa;
     const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge'].includes(pa.kind) && S.gt - pa.t0 < 480;
+    enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
     enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld });
     player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: enemy.headWorld });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
@@ -3485,6 +3668,8 @@
     updateFX(dt);
     enemy.updateHat(dt);
     Shatter.update(dt);
+    updateWisps(dt);
+    Proj.update(dt);
     flares.forEach((f) => {
       if (!f.m.visible) return;
       const u = (now - f.t0) / f.dur;
@@ -3671,6 +3856,7 @@
     });
     S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.p.x = 0; S.p.z = 2.1; S.p.tw = null;
     enemy.resetFeet(); player.resetFeet();
+    Proj.clear(); S.kamae = null;
     if (fromPhase === 1) { Shatter.clear(); clearTimeout(S.endTimer); enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
     else if (enemy.hatOn()) enemy.dropHat();
     enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
