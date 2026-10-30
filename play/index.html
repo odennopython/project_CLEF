@@ -202,7 +202,7 @@
     <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
     <span class="t-tap">触れて始める</span>
   </button>
-  <span class="t-ver"><span id="ver">試作 3.9 · 10/30 21:48 · c66aff4</span></span>
+  <span class="t-ver"><span id="ver">試作 4.0 · 10/31 06:46 · bed1d1d</span></span>
 </div>
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
@@ -459,11 +459,12 @@
     rise:    PS({ hand: V(-0.32, 2.1, 0.56), sword: N(-0.55, 0.78, 0.3), yaw: -1.35, lift: 0.62, pitch: -0.14, crouch: 0.05 }),
     riseEnd: PS({ hand: V(-0.48, 1.72, 0.2), sword: N(-0.8, 0.5, -0.32), yaw: -1.55, lift: 0.12, crouch: 0.22 }),
     // 弾き：前へ大きく踏み込み、刀を横一文字に突き出して受け、跳ね上げる
-    deflect: PS({ hand: V(0.04, 1.58, 0.66), sword: N(0.96, 0.45, 0.16), crouch: 0.36, pitch: 0.14, yaw: -0.7, hipZ: 0.14 }),
-    deflectSnap: PS({ hand: V(0.24, 1.95, 0.36), sword: N(0.55, 0.82, -0.22), crouch: 0.24, yaw: 0.35, pitch: -0.2, lift: 0.08 }),
-    dodge:   PS({ hand: V(0.1, 1.0, 0.36), sword: N(0.05, 0.35, 0.94), crouch: 0.36, pitch: 0.12 }),
+    // 弾き：一瞬でぐっと腰を落とし、刀を真横に寝かせて前へ突き出し、刃の腹で受ける（ひと目で弾きとわかる形）
+    deflect: PS({ hand: V(0.0, 1.3, 0.66), sword: N(1, 0.1, 0.12), crouch: 0.6, pitch: 0.24, yaw: -1.0, hipX: -0.1, hipZ: 0.16, roll: 0.12 }),
+    deflectSnap: PS({ hand: V(0.34, 2.1, 0.28), sword: N(0.45, 0.88, -0.2), crouch: 0.28, yaw: 0.7, pitch: -0.3, lift: 0.14, roll: -0.1 }),   // 弾き返し：刀を大きく跳ね上げる
+    dodge:   PS({ hand: V(0.1, 0.95, 0.3), sword: N(0.05, 0.3, 0.95), crouch: 0.5, pitch: 0.2 }),
     stomp:   PS({ hand: V(0.14, 1.6, 0.12), sword: N(0.35, 0.8, -0.45), crouch: 0.3, pitch: 0.38, lift: 0.22, hipZ: 0.22 }),
-    hit:     PS({ hand: V(0.16, 1.0, 0.2), sword: N(0.3, 0.4, 0.6), crouch: 0.22, pitch: -0.34, hipZ: -0.16 }),
+    hit:     PS({ hand: V(0.3, 0.95, 0.05), sword: N(0.5, 0.3, 0.4), crouch: 0.32, pitch: -0.6, hipZ: -0.3, roll: 0.15 }),   // 斬られた：大きくのけぞる
     kneel:   PS({ hand: V(0.2, 0.62, 0.42), sword: N(0.2, -0.9, 0.3), crouch: 0.46, pitch: 0.5 }),
     issen:   PS({ hand: V(0.58, 1.02, 0.5), sword: N(0.85, -0.35, 0.4), crouch: 0.3, yaw: 0.7, hipZ: 0.16 }),
     // 振り抜き：打ったあとも刀の勢いで体が回り切り、刀先は背の側まで流れる
@@ -487,7 +488,7 @@
     slash2:  { dur: 440, hitAt: 165, cancel: 240, lunge: 1.7, keys: [[115, 'windL', easeOut], [172, 'hitR', easeIn], [235, 'thruR', easeOut], [285, 'thruR', smooth], [440, 'guard', smooth]] },
     slash3:  { dur: 630, hitAt: 270, cancel: 430, lunge: 1.9, heavy: true, keys: [[150, 'windUp', easeOut], [200, 'windUp', smooth], [270, 'hitDown', easeIn], [350, 'thruDown', easeOut], [420, 'thruDown', smooth], [630, 'guard', smooth]] },
     counter: { dur: 700, hitAt: 290, cancel: 530, lunge: 3.0, heavy: true, keys: [[120, 'coil', easeOut], [180, 'coil', smooth], [295, 'rise', easeIn], [390, 'thruRise', easeOut], [460, 'thruRise', smooth], [560, 'riseEnd', smooth], [700, 'guard', smooth]] },
-    deflect: { dur: 470, keys: [[55, 'deflect', easeOut], [340, 'deflect', smooth], [470, 'guard', smooth]] },
+    deflect: { dur: 560, keys: [[35, 'deflect', easeOut], [380, 'deflect', smooth], [560, 'guard', smooth]] },
     dodge:   { dur: 380, keys: [[80, 'dodge', easeOut], [260, 'dodge', smooth], [380, 'guard', smooth]] },
     stomp:   { dur: 540, keys: [[120, 'stomp', easeOut], [300, 'hitDown', easeIn], [540, 'guard', smooth]] },
     hit:     { dur: 600, keys: [[80, 'hit', easeOut], [600, 'guard', smooth]] },
@@ -1193,12 +1194,12 @@
     const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8;
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: dark ? 0.25 : 0.42, metalness: 0, envMapIntensity: dark ? 1.2 : 0.9 });
     // 面：顔を覆う殻。中心から前へ、鼻先が狐の口吻として伸びる
-    const geo = new THREE.SphereGeometry(0.104, 56, 36, Math.PI * 0.02, Math.PI * 0.96, Math.PI * 0.1, Math.PI * 0.74);   // 顔の横まで回り込む
+    const geo = new THREE.SphereGeometry(0.104, 64, 40, -Math.PI * 0.08, Math.PI * 1.16, Math.PI * 0.1, Math.PI * 0.76);   // 顔の横を越えて耳の後ろまで回り込む（横から見ても厚みがある）
     const pa = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pa.count; i++) {
       let x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
       // 球の前（+z）を顔に。横は少し細く
-      x *= 1.0; z *= 0.8;   // 顔に沿う浅い面（前へ長いと、横から見て細長い）
+      x *= 1.0; z *= 1.0;   // 顔に沿う浅い面（前へ長いと、横から見て細長い）
       const snout = Math.exp(-(x * x) / (0.03 * 0.03) - Math.pow((y + 0.035) / 0.04, 2));
       z += snout * 0.042; y -= snout * 0.008;
       const cheek = Math.exp(-Math.pow((Math.abs(x) - 0.045) / 0.03, 2) - Math.pow((y + 0.01) / 0.03, 2));
@@ -1208,6 +1209,9 @@
     }
     geo.computeVertexNormals();
     const face = new THREE.Mesh(geo, mat); face.castShadow = true; grp.add(face);
+    // 面の厚み：内側にもう一枚、少し小さい殻を重ね、縁を閉じる（横から見ても板にならない）
+    { const inner = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: dark ? 0x0c0c10 : 0x2a2622, roughness: 0.9, side: THREE.BackSide })); inner.scale.setScalar(0.93); grp.add(inner);
+      const rimPts = []; const pa = geo.attributes.position; }
     // 耳：三角の厚い板。内側は朱
     const earIn = new THREE.MeshStandardMaterial({ color: new THREE.Color(dark ? 0xd42a33 : 0xc4222b).convertSRGBToLinear(), roughness: 0.32 });
     const earOut = new THREE.MeshStandardMaterial({ color: new THREE.Color(dark ? 0x15151a : 0xf4efe6).convertSRGBToLinear(), roughness: dark ? 0.22 : 0.28 });
@@ -1370,7 +1374,7 @@
     const atBone = (bone, x, y, z) => { const o = D.bones[D.bones.findIndex((q) => q.name === bone.name)].at; return V(x - o[0], y - o[1], z - o[2]); };
     if (!big) {
       // 狐面：顔を覆う（目の穴の奥は暗い）
-      { const k = makeKitsune(); k.position.copy(atBone(headG, 0, 1.985, 0.022)); k.rotation.x = -0.05; k.scale.set(1.03, 1.06, 1); headG.add(k); }
+      { const k = makeKitsune(); k.position.copy(atBone(headG, 0, 1.985, 0.006)); k.rotation.x = -0.05; k.scale.set(1.03, 1.06, 1.0); headG.add(k); }
       const kasa = makeKasa(); kasa.traverse((o) => { if (o.isMesh) o.castShadow = true; }); kasa.position.copy(atBone(headG, 0, 2.058, -0.006)); kasa.rotation.x = 0.13; headG.add(kasa);
       // 家紋：羽織の背と、胸の左右
       { const c = crestDecal(0.12); c.position.copy(atBone(chestG, 0, 1.64, -0.172)); c.rotation.y = Math.PI; chestG.add(c); }
@@ -1431,7 +1435,7 @@
         const kn = inked(new THREE.SphereGeometry(0.018, 8, 6), toon(0x8c1a26), 0.15); kn.position.copy(atBone(chestG, sd * 0.11, 1.6, 0.15)); chestG.add(kn);
       });
       // 黒狐の面
-      { const k = makeKitsune(true); k.position.copy(atBone(headG, 0, 1.985, 0.022)); k.rotation.x = -0.05; k.scale.set(1.06, 1.08, 1.02); headG.add(k); }
+      { const k = makeKitsune(true); k.position.copy(atBone(headG, 0, 1.985, 0.006)); k.rotation.x = -0.05; k.scale.set(1.06, 1.08, 1.02); headG.add(k); }
       // 喉を守る垂れ（よだれかけ）：面頬の下に三段の板
       for (let i = 0; i < 3; i++) { const l = makeLame(0.15 - i * 0.008, 0.032, 0.008, 0.03); l.position.copy(atBone(neckG, 0, 1.885 - i * 0.03, 0.072 + i * 0.006)); l.rotation.x = 0.18; neckG.add(l); }
       const bow = makeBow(1.8); backBow = bow; bow.position.copy(atBone(chestG, -0.04, 1.42, -0.22)); bow.rotation.set(0, 0, -0.42); chestG.add(bow);
@@ -1653,7 +1657,8 @@
     const scattered = [];
     function scatterAttachments(power) {
       const list = [];
-      [headG, chestG, hips, neckG, ...bones].forEach((bn) => bn.children.slice().forEach((c) => { if (!c.isBone && c.isObject3D) list.push(c); }));
+      // 骨は一つずつ数える（同じ骨を二度数えると、戻すときに元の場所を取り違え、笠や鞘が倒れた場所に残る）
+      new Set([headG, chestG, hips, neckG, ...bones]).forEach((bn) => bn.children.slice().forEach((c) => { if (!c.isBone && c.isObject3D && !list.includes(c)) list.push(c); }));
       list.push(sword);
       list.forEach((m) => {
         scattered.push({ m, parent: m.parent, p: m.position.clone(), q: m.quaternion.clone(), s: m.scale.clone() });
@@ -2886,9 +2891,9 @@
     }
     if (kind === 'dodge') {
       const side = S.pa.side;
-      const ang = Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z) - side * 0.6;
-      const r = Math.max(f.d + 0.25, 2.0);
-      tween(S.p, S.e.x + Math.sin(ang) * r, S.e.z + Math.cos(ang) * r, 260);
+      const ang = Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z) - side * 0.85;   // 大きく横へ跳ぶ
+      const r = Math.max(f.d + 0.5, 2.2);
+      tween(S.p, S.e.x + Math.sin(ang) * r, S.e.z + Math.cos(ang) * r, 240);
       Sound.dodge(); kickSnow(player.hipWorld, 0.6);
     }
     if (kind === 'stomp') { tween(S.p, S.p.x + f.x * Math.min(0.6, f.d - CFG.minGap), S.p.z + f.z * Math.min(0.6, f.d - CFG.minGap), 200); Sound.swing(1.0); }
@@ -3014,7 +3019,7 @@
     enemy.addTear();
     S.stagger.vp += -0.9 * (big ? 1.7 : 1);
     const f = dirPE();
-    tween(S.e, S.e.x + f.x * (big ? 0.8 : 0.3), S.e.z + f.z * (big ? 0.8 : 0.3), big ? 320 : 200);
+    tween(S.e, S.e.x + f.x * (big ? 1.2 : 0.55), S.e.z + f.z * (big ? 1.2 : 0.55), big ? 320 : 220);   // 斬られた相手が大きく押し込まれる
     if (big) { ring(S.e.x, S.e.z, 3.2, 0xe8f0ff); S.fovKick = Math.max(S.fovKick, 6); S.shake = Math.max(S.shake, 0.07); fxFlash(0.12, 0.13, 0.16); }
     pushLog(label, '', `崩し ${Math.round(amount)}`);
     if (S.B >= 100) breakEnemy();
@@ -3805,8 +3810,8 @@
     }
     if (S.flinch && gt - S.flinch.t0 < 520) {
       const u = (gt - S.flinch.t0) / 520, k = Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) * (1 - smooth(u)) * S.flinch.amt;
-      out.yaw += S.flinch.side * 0.6 * k; out.pitch -= 0.34 * k; out.roll += S.flinch.side * 0.14 * k;
-      out.hand.y -= 0.24 * k; out.hand.x += S.flinch.side * 0.12 * k; out.crouch += 0.12 * k; out.hipZ -= 0.1 * k;
+      out.yaw += S.flinch.side * 0.95 * k; out.pitch -= 0.55 * k; out.roll += S.flinch.side * 0.25 * k;   // 斬られた相手：大きくひねられ、のけぞる
+      out.hand.y -= 0.34 * k; out.hand.x += S.flinch.side * 0.2 * k; out.crouch += 0.18 * k; out.hipZ -= 0.18 * k;
     }
     out.hipX += S.stagger.x * 0.35; out.yaw += -S.stagger.x * 0.6; out.pitch += S.stagger.p * 0.35; out.hand.x += S.stagger.x * 0.4;
     return out;
@@ -3830,8 +3835,10 @@
       }
       if (!done) blend(prev, prev, 0, out);
       if (pa.kind === 'deflect' && pa.snap) {
+        // 弾けた：まず刀を真横に寝かせて低く受け止める形を一瞬見せ（ぐっと沈む）、それから大きく跳ね上げる
         const u = S.gt - pa.snap;
-        blend(out, PL.deflectSnap, clamp(u < 60 ? easeOut(u / 60) : 1 - smooth((u - 60) / 280), 0, 1), out);
+        if (u < 120) { blend(out, PL.deflect, 1, out); out.crouch += 0.1 * Math.sin(Math.PI * u / 120); out.hipZ -= 0.08 * Math.sin(Math.PI * u / 120); }
+        else blend(PL.deflect, PL.deflectSnap, clamp(u < 200 ? easeOut((u - 120) / 80) : 1 - smooth((u - 200) / 320), 0, 1), out);
       }
       if (pa.recoil) { const u = S.gt - pa.recoil; const k = u < 80 ? easeOut(u / 80) : 1 - smooth((u - 80) / 300); blend(out, PL.hit, clamp(k, 0, 1) * 0.7, out); }
     } else blend(P_BASE, P_BASE, 0, out);
@@ -3839,6 +3846,8 @@
     out.crouch += 0.01 * Math.sin(S.gt / breathPeriod(S.P) * Math.PI * 2) + load * 0.08;
     out.roll += Math.sin(S.gt * 0.0027) * load * 0.06;
     out.hand.y -= load * 0.1;
+    // 避け：跳ぶ向きへ体を大きく倒し、低く滑り込む
+    if (pa && pa.kind === 'dodge') { const u = clamp((S.gt - pa.t0) / 380, 0, 1), k = Math.sin(Math.PI * Math.min(1, u * 1.3)); const sd = pa.side || 1; out.roll -= sd * 0.55 * k; out.hipX += sd * 0.2 * k; out.yaw += sd * 0.4 * k; out.lift += 0.1 * k; }
     return out;
   }
 
