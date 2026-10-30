@@ -106,8 +106,8 @@ function sculpt(kind) {
   // 着物のしわ：胸と腹に、縦に流れる浅い溝
   const foldWrap = (base) => (p) => base(p) - 0.0028 * Math.sin(p[0] * 70 + p[1] * 9);
   P.slice(0, 3).forEach((q) => { q.d = foldWrap(q.d); });
-  // 襟（前の重なり）と、白い内襟
-  [-1, 1].forEach((s) => {
+  // 襟（前の重なり）と、白い内襟（主人公は高い立ち襟なので付けない）
+  if (big) [-1, 1].forEach((s) => {
     const a0 = v(s * 0.095, 1.79, 0.1), a1 = v(s * -0.01, 1.48, 0.128), bL = basisFrom(sub(a1, a0), v(1, 0, 0));
     part('lapel', 'chest', 0.01, (p) => sdBox(p, mul(add(a0, a1), 0.5), v(0.026, len(sub(a1, a0)) / 2, 0.012), 0.008, bL));
     const c0 = v(s * 0.072, 1.8, 0.096), c1 = v(s * 0.0, 1.55, 0.124), bC = basisFrom(sub(c1, c0), v(1, 0, 0));
@@ -134,25 +134,33 @@ function sculpt(kind) {
     part('hair', 'head', 0.03, (p) => sdEllipsoid(p, v(0, 2.035, -0.03), v(0.108, 0.1, 0.112)) - 0.004 * Math.sin(p[0] * 160) * Math.sin(p[1] * 140));
     part('hair', 'head', 0.04, (p) => sdCone(p, v(0, 2.0, -0.08), v(0, 1.78, -0.13), 0.07, 0.035));
   } else {
-    // 髷：引き締めた髪と、結い上げた髷
-    part('hair', 'head', 0.018, (p) => {
-      const shell = sdEllipsoid(p, v(0, 2.02, -0.022), v(0.103, 0.104, 0.11));
-      const shaved = p[1] - (2.07 + Math.max(0, -p[2]) * 0.35);   // 頭頂（月代）は剃る：この面より上を削る
-      const face = p[2] - (0.03 + (2.02 - p[1]) * 0.4);            // 額と顔は出す：この面より前を削る
-      return Math.max(shell, shaved, face) - 0.0018 * Math.sin(p[1] * 260 + p[0] * 40);
+    // 髪：側頭は刈り上げ（短い髪の色）、頭頂の髪は後ろへ流して高い髷に結う
+    part('stubble', 'head', 0.012, (p) => Math.max(sdEllipsoid(p, v(0, 2.015, -0.018), v(0.1, 0.104, 0.108)), p[2] - (0.03 + (2.02 - p[1]) * 0.4), -(p[1] - 1.95)));
+    part('hair', 'head', 0.016, (p) => {
+      const crown = sdEllipsoid(p, v(0, 2.05, -0.03), v(0.07, 0.085, 0.112));          // 頭頂から後ろへ流れる髪の帯
+      return crown - 0.0025 * Math.sin(p[0] * 300) * Math.cos(p[2] * 120);
     });
-    part('hair', 'head', 0.012, (p) => sdCone(p, v(0, 2.12, -0.04), v(0, 2.155, -0.115), 0.019, 0.022));
-    part('hair', 'head', 0.01, (p) => sdEllipsoid(p, v(0, 2.16, -0.125), v(0.024, 0.022, 0.03)));
-    part('tasuki', 'head', 0.004, (p) => sdCone(p, v(-0.024, 2.135, -0.078), v(0.024, 2.135, -0.078), 0.008, 0.008));
-    // たすき：背中で交差する赤い紐
-    [-1, 1].forEach((s) => part('tasuki', 'chest', 0.006, (p) => sdCone(p, v(s * 0.17, 1.74, -0.118), v(s * -0.15, 1.33, -0.112), 0.013, 0.013)));
+    part('hair', 'head', 0.014, (p) => sdCone(p, v(0, 2.11, -0.08), v(0, 2.2, -0.13), 0.03, 0.026));                // 高く結い上げた髷
+    part('hair', 'head', 0.012, (p) => sdEllipsoid(p, v(0, 2.215, -0.14), v(0.034, 0.03, 0.04)));
+    part('lapel', 'head', 0.004, (p) => sdCone(p, v(-0.03, 2.165, -0.105), v(0.03, 2.165, -0.105), 0.009, 0.009));   // 深紅の結い紐
+    // 高い立ち襟（首を包む）
+    part('coat', 'chest', 0.01, (p) => { const q = sub(p, v(0, 1.82, 0.005)); return Math.max(Math.abs(Math.hypot(q[0], q[2] * 1.1) - 0.075) - 0.012, Math.abs(q[1]) - 0.055); });
+    part('lapel', 'chest', 0.004, (p) => { const q = sub(p, v(0, 1.872, 0.005)); return Math.max(Math.abs(Math.hypot(q[0], q[2] * 1.1) - 0.078) - 0.006, Math.abs(q[1]) - 0.006); });
+    // 左肩だけに羽織る長い外套（右肩は脱ぐ）：背中と左の前身頃。前の縁は深紅。
+    part('coat', 'chest', 0.03, (p) => Math.max(sdEllipsoid(p, v(0.0, 1.52, -0.02), v(0.225, 0.3, 0.14)), p[2] - 0.0, -(p[1] - 1.14)));
+    part('coat', 'chest', 0.03, (p) => Math.max(sdEllipsoid(p, v(0.03, 1.52, 0.0), v(0.215, 0.3, 0.145)), -(p[0] - 0.05), -(p[1] - 1.14)));
+    part('coat', 'upperArmL', 0.03, (p) => sdEllipsoid(p, v(0.27, 1.71, -0.01), v(0.11, 0.1, 0.1)));
+    part('lapel', 'chest', 0.004, (p) => sdCone(p, v(0.055, 1.8, 0.13), v(0.085, 1.16, 0.15), 0.01, 0.012));
+    // 胸に斜めにかけた深紅の帯紐（右肩から左の腰へ、背中にも）
+    part('tasuki', 'chest', 0.005, (p) => sdCone(p, v(-0.15, 1.75, 0.118), v(0.15, 1.2, 0.152), 0.012, 0.012));
+    part('tasuki', 'chest', 0.005, (p) => sdCone(p, v(-0.15, 1.75, -0.135), v(0.15, 1.2, -0.15), 0.012, 0.012));
   }
 
   // 帯、帯の結び目
   part('sash', 'hips', 0.012, (p) => { const q = sub(p, v(0, 1.17, 0)); const r = len([q[0], 0, q[2] / 0.8]); return Math.max(r - 0.195 * (big ? 1.06 : 1), Math.abs(q[1]) - 0.045); });
   [-1, 1].forEach((s) => part('sash', 'hips', 0.015, (p) => sdEllipsoid(p, v(s * 0.05, 1.17, -0.165), v(0.065, 0.04, 0.03))));
   // 袴：腰の上部（ひだ）
-  const skirtTop = 1.17, skirtBot = big ? 0.12 : 0.86, skirtR0 = 0.19 * (big ? 1.06 : 1), skirtR1 = big ? 0.42 : 0.27;
+  const skirtTop = 1.17, skirtBot = big ? 0.12 : 0.98, skirtR0 = 0.19 * (big ? 1.06 : 1), skirtR1 = big ? 0.42 : 0.225;
   part('hakama', 'hips', 0.03, (p) => {
     const t = clamp((skirtTop - p[1]) / (skirtTop - skirtBot), 0, 1);
     const r = lerp(skirtR0, skirtR1, t) * (1 + pleat(p, v(0, 0, 0), v(0, 1, 0), 7, 0.06 * t));
@@ -183,6 +191,7 @@ function sculpt(kind) {
     part('wrap', sh, 0.015, (p) => sdEllipsoid(p, A, v(0.042, 0.045, 0.042)));
     // 足袋と草鞋
     part('tabi', ft, 0.02, (p) => sdEllipsoid(p, add(A, v(0, -0.04, 0.06)), v(0.048, 0.034, 0.115)));
+    if (!big) part('tabi', ft, 0.02, (p) => sdEllipsoid(p, add(A, v(0, 0.02, 0.0)), v(0.05, 0.07, 0.05)));          // 地下足袋の足首
     part('tabi', ft, 0.012, (p) => sdEllipsoid(p, add(A, v(0, -0.052, 0.155)), v(0.04, 0.024, 0.04)));
     part('sandal', ft, 0.004, (p) => sdBox(p, add(A, v(0, -0.075, 0.07)), v(0.052, 0.008, 0.14), 0.006));
     part('strap', ft, 0.003, (p) => sdCone(p, add(A, v(-0.04, -0.06, 0.05)), add(A, v(0.0, -0.035, 0.13)), 0.006, 0.006));
@@ -200,24 +209,27 @@ function sculpt(kind) {
       part('kimono', ua, 0.05, (p) => sdCone(p, add(S, mul(dir, 0.04)), add(E, mul(dir, 0.16)), 0.085, 0.17) - 0.004 * Math.sin(dot(sub(p, S), bA[0]) * 60));
       part('kimono', fa, 0.03, (p) => sdCone(p, E, add(WR, mul(dir, -0.04)), 0.054 * lw, 0.04 * lw));
     } else {
-      // たすきで縛った袖（肩口でふくらむ）と、むき出しの腕
-      part('kimono', ua, 0.04, (p) => sdEllipsoid(p, add(S, mul(dir, 0.08)), v(0.088, 0.1, 0.088), bA) - 0.003 * Math.sin(dot(sub(p, S), bA[2]) * 80));
-      part('skin', ua, 0.03, (p) => sdCone(p, add(S, mul(dir, 0.12)), E, 0.056, 0.046));
-      part('skin', ua, 0.03, (p) => sdEllipsoid(p, add(add(S, mul(dir, 0.2)), v(0, 0, 0.018)), v(0.045, 0.07, 0.046), bA));     // 二の腕
-      part('skin', fa, 0.03, (p) => sdCone(p, E, WR, 0.048, 0.031));
-      part('skin', fa, 0.03, (p) => sdEllipsoid(p, add(E, mul(dir, 0.08)), v(0.05, 0.08, 0.048), bA));   // 前腕の膨らみ
+      // 細身の黒い袖（肘で絞る）と、鋼の籠手
+      part('kimono', ua, 0.03, (p) => sdCone(p, add(S, mul(dir, 0.04)), E, 0.06, 0.048) - 0.0025 * Math.sin(dot(sub(p, S), bA[1]) * 90));
+      part('kimono', ua, 0.03, (p) => sdEllipsoid(p, add(add(S, mul(dir, 0.18)), v(0, 0, 0.016)), v(0.05, 0.075, 0.05), bA));    // 二の腕
+      part('glove', fa, 0.025, (p) => sdCone(p, E, WR, 0.05, 0.034));
+      part('glove', fa, 0.025, (p) => sdEllipsoid(p, add(E, mul(dir, 0.07)), v(0.052, 0.075, 0.05), bA));
+      // 籠手の鋼板（前腕の外側）と、留め紐
+      part('steel', fa, 0.006, (p) => sdBox(p, add(add(E, mul(dir, 0.15)), mul(bA[2], -0.042)), v(0.03, 0.1, 0.008), 0.006, bA));
+      [0.08, 0.2].forEach((t) => part('lapel', fa, 0.003, (p) => sdCone(p, add(add(E, mul(dir, t)), mul(bA[0], -0.05)), add(add(E, mul(dir, t)), mul(bA[0], 0.05)), 0.006, 0.006) + Math.max(0, -dot(sub(p, add(E, mul(dir, t))), bA[2])) * 0));
     }
-    part('skin', fa, 0.015, (p) => sdEllipsoid(p, WR, v(0.033, 0.03, 0.03)));
+    part(big ? 'skin' : 'glove', fa, 0.015, (p) => sdEllipsoid(p, WR, v(0.033, 0.03, 0.03)));
     // 手：柄を握った拳（握る軸は前向き）。手のひら、指の節、親指
     const F = add(WR, mul(dir, 0.065));
     const bH = basisFrom(dir, v(0, 0, 1));
-    part('skin', hd, 0.018, (p) => sdBox(p, add(WR, mul(dir, 0.045)), v(0.022, 0.045, 0.04), 0.018, bH));
-    part('skin', hd, 0.012, (p) => {   // 握った四本の指：握る軸（前向き）に沿って並ぶ
+    const handM = big ? 'skin' : 'glove';
+    part(handM, hd, 0.018, (p) => sdBox(p, add(WR, mul(dir, 0.045)), v(0.022, 0.045, 0.04), 0.018, bH));
+    part(handM, hd, 0.012, (p) => {   // 握った四本の指：握る軸（前向き）に沿って並ぶ
       const q = sub(p, F); const ql = [dot(q, bH[0]), dot(q, bH[1]), dot(q, bH[2])];
       const ring = Math.hypot(ql[0] + 0.012, ql[1] - 0.01) - 0.03;   // 柄のまわりを巻く指の輪
       return Math.max(Math.abs(ring) - 0.013, Math.abs(ql[2]) - 0.042) - 0.0015 * Math.cos(ql[2] * 150);
     });
-    part('skin', hd, 0.01, (p) => sdCone(p, add(F, add(mul(bH[0], -0.03), mul(bH[2], 0.03))), add(F, add(mul(bH[0], 0.0), mul(bH[2], 0.05))), 0.013, 0.011));   // 親指
+    part(handM, hd, 0.01, (p) => sdCone(p, add(F, add(mul(bH[0], -0.03), mul(bH[2], 0.03))), add(F, add(mul(bH[0], 0.0), mul(bH[2], 0.05))), 0.013, 0.011));   // 親指
   });
 
   if (big) {
@@ -234,8 +246,8 @@ function sculpt(kind) {
 
 // 素材の色（見た目どおりの色）。陰影は後で焼き込む。
 const PALETTE = {
-  player: { kimono: '#2d3a4f', hakama: '#1f2633', skin: '#a3876f', sash: '#8fa3bf', lapel: '#8fa3bf', white: '#e8e6e0', wrap: '#c9ced8', tabi: '#e4e6ec', sandal: '#7a6848', strap: '#3a2f24', hair: '#111318', tasuki: '#b02e3a', mask: '#5a1a1c', kataginu: '#231e2b' },
-  enemy: { kimono: '#2a2433', hakama: '#3b3541', skin: '#6e5a52', sash: '#d2c08f', lapel: '#d2c08f', white: '#d9d4c8', wrap: '#5b5560', tabi: '#d4d6dc', sandal: '#6e5f45', strap: '#3a2f24', hair: '#0d0f14', tasuki: '#d2c08f', mask: '#5a1a1c', kataginu: '#231e2b' },
+  player: { kimono: '#16181d', hakama: '#262a33', skin: '#a3876f', sash: '#b3182c', lapel: '#b3182c', white: '#cfd2d8', wrap: '#14161b', tabi: '#101216', sandal: '#2a2b30', strap: '#b3182c', hair: '#0b0c10', tasuki: '#b3182c', mask: '#5a1a1c', kataginu: '#231e2b', coat: '#2b303a', steel: '#8d99ab', glove: '#1a1c22', stubble: '#6f5c4e' },
+  enemy: { coat: '#2b303a', steel: '#8d99ab', glove: '#1a1c22', stubble: '#6f5c4e', kimono: '#2a2433', hakama: '#3b3541', skin: '#6e5a52', sash: '#d2c08f', lapel: '#d2c08f', white: '#d9d4c8', wrap: '#5b5560', tabi: '#d4d6dc', sandal: '#6e5f45', strap: '#3a2f24', hair: '#0d0f14', tasuki: '#d2c08f', mask: '#5a1a1c', kataginu: '#231e2b' },
 };
 
 function bake(kind, cell) {
