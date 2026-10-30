@@ -260,7 +260,10 @@ function sculpt(kind) {
     part(handM, hd, 0.01, (p) => sdCone(p, add(F, add(mul(bH[0], -0.03), mul(bH[2], 0.03))), add(F, add(mul(bH[0], 0.0), mul(bH[2], 0.05))), 0.013, 0.011));
   });
 
-  return { parts: P, carve: [], paint: [], bones, J };
+  // 袴の股の割れ：左右の脚の間を、股の下から裾まで細く割る（一枚のスカートに見えないように。脚を開くと割れが開く）
+  const crotch = big ? 0.9 : 0.95;
+  const carve = [{ k: 0.012, d: (p) => Math.max(Math.abs(p[0]) - 0.012, p[1] - crotch + Math.abs(p[2]) * 0.3, -p[1] - 1) }];
+  return { parts: P, carve, paint: [], bones, J };
 }
 
 // 素材の色（見た目どおりの色）。陰影は後で焼き込む。
@@ -342,7 +345,7 @@ function bake(kind, cell, region) {
   const bones = S.bones;
   const children = bones.map((_, i) => bones.map((b, j) => (b[1] === i ? j : -1)).filter((x) => x >= 0));
   const segDist = (p, b) => { const a = b[2], c = b[3]; const ba = sub(c, a), pa = sub(p, a); const h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1); return len(sub(pa, mul(ba, h))); };
-  const out = { pos: [], nor: [], col: [], si: [], sw: [] };
+  const out = { pos: [], nor: [], col: [], si: [], sw: [], fx: [] };
   for (let vi = 0; vi < verts.length; vi++) {
     let p = verts[vi];
     for (let it = 0; it < 2; it++) { const d = dist(p); const g = grad(p); p = sub(p, mul(g, d)); }
@@ -363,7 +366,16 @@ function bake(kind, cell, region) {
     c = c.map((x) => x / cw);
     // 色で描く部分（目、眉）
     for (const q of paint) { const w = clamp(0.5 - q.d(p) / 0.003, 0, 1); if (w > 0) { const ci = hex(pal[q.m]); c = c.map((x, a) => lerp(x, ci[a], w)); } }
-    c = c.map((x) => clamp(x * ao, 0, 1));
+    // 手描きのような、ゆるい色のむら（面ごとに少し明るさと色味が揺らぐ）
+    const pv = 1 + 0.05 * Math.sin(p[0] * 9 + p[1] * 4.3) * Math.sin(p[2] * 7.1 - p[1] * 5.7) + 0.03 * Math.sin(p[1] * 13 + p[0] * 5);
+    c = c.map((x, a) => clamp(x * ao * pv * (a === 2 ? 1 + 0.02 * Math.sin(p[1] * 6) : 1), 0, 1));
+    // 布の揺れの重み：袴と羽織の裾ほど大きく揺れる。羽織の袖も揺れる
+    const m0 = part0.m, onArm = part0.b >= BONE.upperArmR && part0.b <= BONE.handL;
+    let fx = 0;
+    if (m0 === 'hakama') fx = clamp((1.08 - p[1]) / 0.95, 0, 1);
+    else if (m0 === 'haori' || m0 === 'lining' || m0 === 'haoriEri') fx = onArm ? 0.55 : clamp((1.3 - p[1]) / 0.35, 0, 1) * 0.7;
+    else if (kind === 'enemy' && m0 === 'kimono' && onArm) fx = 0.35;
+    out.fx.push(fx);
     // 皮の重み：一番近い部品の骨と、その親・子の骨の間で、骨からの距離に応じて滑らかに分ける
     const b0 = part0.b;
     const cand = [b0, bones[b0][1], ...children[b0]].filter((x) => x >= 0);
@@ -395,7 +407,7 @@ function bake(kind, cell, region) {
 function pack(kind, cell, region) {
   const B = bake(kind, cell, region);
   const n = B.out.pos.length / 3;
-  const pos = new Uint16Array(n * 3), nor = new Int8Array(n * 3), col = new Uint8Array(n * 3), si = new Uint8Array(n * 4), sw = new Uint8Array(n * 4);
+  const pos = new Uint16Array(n * 3), nor = new Int8Array(n * 3), col = new Uint8Array(n * 3), si = new Uint8Array(n * 4), sw = new Uint8Array(n * 4), fx = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     for (let a = 0; a < 3; a++) {
       pos[i * 3 + a] = Math.round(clamp((B.out.pos[i * 3 + a] - B.min[a]) / (B.max[a] - B.min[a]), 0, 1) * 65535);
@@ -405,13 +417,14 @@ function pack(kind, cell, region) {
     let s = 0;
     for (let a = 0; a < 4; a++) { si[i * 4 + a] = B.out.si[i * 4 + a]; sw[i * 4 + a] = Math.round(B.out.sw[i * 4 + a] * 255); s += sw[i * 4 + a]; }
     sw[i * 4] += 255 - s;
+    fx[i] = Math.round(B.out.fx[i] * 255);
   }
   const idx = n < 65536 ? new Uint16Array(B.tris) : new Uint32Array(B.tris);
   const b64 = (arr) => Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength).toString('base64');
   return {
     min: B.min, max: B.max, n, wide: n >= 65536,
     bones: B.bones.map(([name, parent, at]) => ({ name, parent, at: at.map((x) => +x.toFixed(4)) })),
-    pos: b64(pos), nor: b64(nor), col: b64(col), si: b64(si), sw: b64(sw), idx: b64(idx),
+    pos: b64(pos), nor: b64(nor), col: b64(col), si: b64(si), sw: b64(sw), fx: b64(fx), idx: b64(idx),
   };
 }
 
