@@ -109,7 +109,6 @@ function sculpt(kind) {
   part('skin', 'head', 0.04, (p) => sdEllipsoid(p, v(0, 1.962, 0.016), big ? v(0.068, 0.074, 0.07) : v(0.07, 0.072, 0.066)));
   part('skin', 'head', 0.03, (p) => sdEllipsoid(p, v(0, 1.912, 0.036), big ? v(0.036, 0.03, 0.03) : v(0.03, 0.026, 0.026)));
   part('skin', 'head', 0.008, (p) => sdCone(p, v(0, 1.99, 0.094), v(0, 1.966, 0.102), 0.006, big ? 0.009 : 0.008));
-  if (big) [-1, 1].forEach((s) => part('skin', 'head', 0.012, (p) => sdEllipsoid(p, v(s * 0.094, 1.985, -0.006), v(0.012, 0.024, 0.017))));   // 主人公の耳は頭巾の中
   // 目：まぶたの切れ込み（ここに実行時、本物の眼球を入れる）と、上まぶたのふくらみ
   const eyeCarve = [];
   [-1, 1].forEach((s) => {
@@ -119,14 +118,9 @@ function sculpt(kind) {
   });
   // 口元を覆う：主人公は黒い布の面覆い、相手は黒漆の面頬（鼻と頬当て、喉へ続く）
   const faceSkin = (p) => smin(smin(sdEllipsoid(p, v(0, 2.02, -0.012), big ? v(0.094, 0.104, 0.104) : v(0.097, 0.105, 0.103)), sdEllipsoid(p, v(0, 1.962, 0.022), big ? v(0.068, 0.074, 0.074) : v(0.07, 0.072, 0.074)), 0.04), sdEllipsoid(p, v(0, 1.91, 0.044), big ? v(0.036, 0.03, 0.032) : v(0.03, 0.026, 0.03)), 0.03);
-  if (!big) {
-    part('mask', 'head', 0.004, (p) => Math.max(faceSkin(p) - 0.0075 - 0.0012 * Math.sin(p[0] * 140 + p[1] * 30), p[1] - 2.06, -0.05 - p[2], 1.87 - p[1]));   // 狐面の下は黒い頭巾：顔全体と頬を覆う（面の横から肌がのぞかない）
-    part('mask', 'neck', 0.01, (p) => Math.max(sdCone(p, v(0, 1.79, 0.0), v(0, 1.95, 0.008), 0.05, 0.047), p[1] - 1.95));   // 頭巾は首を一周する
-  } else {
-    part('menpo', 'head', 0.004, (p) => Math.max(faceSkin(p) - 0.009, p[1] - (1.975 - Math.abs(p[0]) * 0.18), -0.04 - p[2], 1.88 - p[1]));
-    part('menpo', 'head', 0.003, (p) => sdCone(p, v(0, 1.988, 0.097), v(0, 1.962, 0.113), 0.005, 0.0085));   // 面頬の鼻：細く鋭く
-    [-1, 1].forEach((s) => part('menpo', 'head', 0.006, (p) => sdEllipsoid(p, v(s * 0.06, 1.935, 0.06), v(0.022, 0.03, 0.026))));
-  }
+  // 二人とも狐面をかぶる。面の下は黒い頭巾で顔全体と首を覆う（面の横から肌がのぞかない）
+  part('mask', 'head', 0.004, (p) => Math.max(faceSkin(p) - 0.0075 - 0.0012 * Math.sin(p[0] * 140 + p[1] * 30), p[1] - (big ? 2.1 : 2.06), -0.05 - p[2], 1.87 - p[1]));
+  part('mask', 'neck', 0.01, (p) => Math.max(sdCone(p, v(0, 1.79, 0.0), v(0, 1.95, 0.008), big ? 0.054 : 0.05, big ? 0.05 : 0.047), p[1] - 1.95));
   // 髪：頭を包む髪（額と耳の前を空ける）
   // 相手は額を広く出し、生え際は中央が下がる（富士額）。髪は後ろへ撫でつけた筋
   const hairline = (p) => big ? 2.085 - 0.0 + Math.abs(p[0]) * 0.25 - 0.012 * Math.exp(-p[0] * p[0] / 0.0004) : 2.05;
@@ -292,7 +286,7 @@ function sculpt(kind) {
 // 相手：黒漆の鎧と、深紅の縅と内襟。袴は鈍い紫がかった灰。
 const PALETTE = {
   player: { mask: '#17181d', skin: '#f0cfb4', hair: '#1c2030', kimono: '#2c2e36', eri: '#1a1b21', haori: '#15171e', haoriEri: '#202330', lining: '#7a1424', sash: '#111216', hakama: '#262830', tabi: '#d9dce2', sandal: '#3a3128', strap: '#3d2a55', guard: '#1d1e24', glove: '#1d1e24', accent: '#7a1424' },
-  enemy: { menpo: '#141519', skin: '#e3bfa2', hair: '#14151b', kimono: '#1c1b21', lapel: '#8c1a26', armor: '#121318', sash: '#2a2730', hakama: '#3a3640', tabi: '#d4d6dc', sandal: '#5e5140', strap: '#2d2620', glove: '#2a2228', accent: '#8c1a26' },
+  enemy: { mask: '#141519', menpo: '#141519', skin: '#e3bfa2', hair: '#14151b', kimono: '#1c1b21', lapel: '#8c1a26', armor: '#121318', sash: '#2a2730', hakama: '#3a3640', tabi: '#d4d6dc', sandal: '#5e5140', strap: '#2d2620', glove: '#2a2228', accent: '#8c1a26' },
 };
 
 // 素材の番号：描くときの質感（凹凸と光沢）を描き分ける。index.html の DETAIL_GLSL と対応
