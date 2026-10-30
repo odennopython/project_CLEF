@@ -173,6 +173,18 @@
     .glyph, .glyph.phase { animation-duration: 1ms; }
     #slash.on { animation-duration: 1ms; }
   }
+
+  /* 始めの画面：余白と一行の題だけ。夜の雪原が透けて見える */
+  #start { position: fixed; inset: 0; z-index: 20; background: radial-gradient(120% 90% at 50% 45%, rgba(8, 11, 20, 0.55), rgba(4, 6, 12, 0.92)); }
+  #start[hidden] { display: none !important; }
+  #startBtn { all: unset; position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 22px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .t-title { font-family: var(--display); font-weight: 500; font-size: clamp(34px, 10vw, 56px); letter-spacing: 0.5em; padding-left: 0.5em; color: #eef1f6; opacity: 0; animation: tIn 2.4s 0.2s ease forwards; }
+  .t-rule { width: 1px; height: 44px; background: linear-gradient(rgba(238, 241, 246, 0), rgba(238, 241, 246, 0.5), rgba(238, 241, 246, 0)); opacity: 0; animation: tIn 2s 1s ease forwards; }
+  .t-keys { font-family: var(--display); font-size: 12px; letter-spacing: 0.32em; color: rgba(214, 220, 232, 0.55); opacity: 0; animation: tIn 2s 1.4s ease forwards; }
+  .t-tap { font-family: var(--display); font-size: 11px; letter-spacing: 0.5em; padding-left: 0.5em; color: rgba(214, 220, 232, 0.4); margin-top: 26px; opacity: 0; animation: tIn 2s 1.8s ease forwards, tBreath 3.6s 3.8s ease-in-out infinite; }
+  .t-ver { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center; font-size: 10px; letter-spacing: 0.12em; color: rgba(214, 220, 232, 0.28); pointer-events: none; }
+  @keyframes tIn { to { opacity: 1; } }
+  @keyframes tBreath { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.12; } }
 </style>
 
 <div id="stage" aria-label="対戦の画面"></div>
@@ -183,28 +195,14 @@
 <button id="logBtn" type="button" aria-pressed="false">記録</button>
 <div id="log" hidden></div>
 
-<div id="start" class="veil">
-  <div class="card">
-    <p class="kicker">風の伝説 · <span id="ver">試作 3.7 · 10/30 20:25 · c43f18b</span></p>
-    <h1>風の伝説</h1>
-    <p>画面のどこでも、四つの向きにはじく。</p>
-    <div class="cross" aria-label="操作">
-      <div class="k up"><b>上</b><span>斬る</span></div>
-      <div class="k left"><b>左</b><span>避ける</span></div>
-      <div class="k mid">はじく</div>
-      <div class="k right"><b>右</b><span>避ける</span></div>
-      <div class="k down"><b>下</b><span>弾く</span></div>
-    </div>
-    <dl>
-      <dt>弾き</dt><dd>刃が届く直前に下。早いと「受け」になる。</dd>
-      <dt>見切り</dt><dd>刃が届く直前に左右。時間がゆっくりになる。</dd>
-      <dt>反撃</dt><dd>弾き・見切りの直後に上。跳び込んで大きく斬る。</dd>
-      <dt>赤い刃</dt><dd>弾けない。左右で避ける。突きなら直前に上で踏みつける。</dd>
-      <dt>一閃</dt><dd>相手が膝をついたら上。</dd>
-    </dl>
-    <p class="note">相手が動き出した瞬間に上で斬れば、出鼻を挫ける。隙のない相手に斬りかかると弾かれ、反撃される。PCでは矢印キーでも遊べます。音が出ます。</p>
-    <button id="startBtn" type="button">はじめる</button>
-  </div>
+<div id="start">
+  <button id="startBtn" type="button" aria-label="はじめる">
+    <span class="t-title">風の伝説</span>
+    <span class="t-rule" aria-hidden="true"></span>
+    <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
+    <span class="t-tap">触れて始める</span>
+  </button>
+  <span class="t-ver"><span id="ver">試作 3.8 · 10/30 20:59 · ed1d759</span></span>
 </div>
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
@@ -1613,6 +1611,7 @@
     }
     return {
       root, apply, tip, mid, headWorld, hipWorld, chestWorld, bladeMat: matBlade, right, fwd, bakeWorld, scatterAttachments,
+      eyeWorld(sd, out) { return headG.localToWorld(out.set(sd * 0.034, -0.004, 0.122)); },
       setWeapon(w) { if (!handBow) return; const b = w === 'bow'; handBow.visible = b; swordParts.forEach((m) => { m.visible = !b; }); if (backBow) backBow.visible = !b; },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
       showBody() { body.visible = true; headMesh.visible = true; shadow.visible = true; },
@@ -2782,6 +2781,19 @@
     S.comboStep = step;
     S.habit.attack += 0.5;
     startPA('slash' + step, { debana, intoFeint });
+    enemyReadsSlash();
+  }
+  // 相手のかわし：隙のない相手に無理に斬りかかると、相手は身をかわし、空を切らせてから斬り返す（弾く場合は enemyDeflect）
+  function enemyReadsSlash() {
+    const m = S.mode;
+    if (!['stalk', 'approach', 'retreat', 'flip'].includes(m) && !(m === 'kamae' && S.kamae && S.kamae.kind !== 'wait')) return;
+    if (dist() > CFG.reachPlayer + 0.6) return;
+    const p = clamp((S.phase === 1 ? 0.28 : 0.42) + S.habit.attack * 0.06, 0, 0.7);
+    if (S.r() > p) return;
+    const f = dirPE(), sd = S.r() < 0.5 ? -1 : 1, back = 0.7;
+    tween(S.e, S.e.x - f.z * sd * 1.2 + f.x * back, S.e.z + f.x * sd * 1.2 + f.z * back, 210, easeOut);
+    S.evade = { until: S.gt + 320, side: sd }; S.evadeCount = (S.evadeCount || 0) + 1;
+    kickSnow(enemy.hipWorld, 1.0); Sound.step(1);
   }
 
   function startPA(kind, opts) {
@@ -2817,6 +2829,15 @@
 
   // ───────────────────────── こちらの斬り ─────────────────────────
   function resolvePlayerHit(pa) {
+    if (S.evade && S.gt < S.evade.until) {
+      // かわされた：空を切り、相手が斬り返す
+      S.evade = null;
+      Sound.whiff(); playerTrail.tint(0.4, 0.42, 0.48);
+      if (S.pa) S.pa.recoil = S.gt;
+      S.queue = []; setTimeout(() => { if (!['broken', 'falling', 'victory', 'defeat'].includes(S.mode)) startAction(S.r() < 0.5 ? 'degiwa' : (S.r() < 0.5 ? 'counterR' : 'counterL')); }, 0);
+      pushLog('かわされた', '', '無理に斬りかかった');
+      return;
+    }
     const d = dist();
     tA.copy(enemy.chestWorld).lerp(player.tip, 0.45);
     if (d > CFG.reachPlayer) {
@@ -2860,10 +2881,10 @@
     if (m === 'attack' && a && !a.resolved) {
       // 振りかぶっている相手は斬れるが、勢いは止まらない
       S.B = clamp(S.B + CFG.brk.windupHit, 0, 100); S.lastPressure = S.gt;
-      Sound.cut(); burst(tA, 8, 1.0, 'red');
+      Sound.cut(); burst(tA, 8, 1.0, 'cool');
       // 浅い：細く暗い三日月だけ。斬り線は出さない
-      playerTrail.tint(0.9, 0.55, 0.55);
-      slashArc(playerTrail.samples.map((q) => q.tip), tA, false, [0.9, 0.35, 0.4], 'shallow');
+      playerTrail.tint(0.6, 0.64, 0.72);   // 浅い：斬れていないので赤くしない
+      slashArc(playerTrail.samples.map((q) => q.tip), tA, false, [0.6, 0.66, 0.8], 'shallow');
       glyphAt('浅', 'miss', tA);
       pushLog('浅い', '', '振りかぶった相手を斬った（止まらない）');
       return;
@@ -2898,9 +2919,9 @@
     Sound.at(tA); Sound.cut(big); Sound.rip();
     // 斬れた：軌跡が白く灼け、太い三日月が体を通り抜け、体を横切る斬り線が一瞬残る
     const pts = playerTrail.samples.map((q) => q.tip);
-    playerTrail.tint(1.25, 1.15, 1.05);
+    playerTrail.tint(1.4, 0.45, 0.4);
     slashArc.pivot = player.chestWorld.clone().lerp(player.headWorld, 0.2);
-    slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big, big ? [1.4, 1.0, 0.55] : [1.2, 0.3, 0.38], 'cut');
+    slashArc(pts.length >= 3 ? pts : [enemy.chestWorld.clone().add(V(-0.4, 0.3, 0)), enemy.chestWorld.clone(), enemy.chestWorld.clone().add(V(0.4, -0.3, 0))], tA, big, big ? [1.5, 0.35, 0.3] : [1.3, 0.25, 0.3], 'cut');   // 赤は斬れたときだけ
     slashArc.pivot = null;
     cutSlit(pts, big);
     shred(tA, big ? 18 : 9);
@@ -2938,7 +2959,7 @@
     // 弾かれた：軌跡は当たった所で途切れて冷たい鋼の青に変わり、短く折れて跳ね返る
     playerTrail.tint(0.3, 0.5, 0.95, true);
     slashArc(playerTrail.samples.slice(0, 12).map((q) => q.tip).reverse(), tA, false, [0.45, 0.65, 1.2], 'broken');
-    Sound.clashLow(); burst(tA, 30, 2.8, 'hot'); glowAt(tA, 0.7, 100, 0xfff0d8); flare(tA, 1.1, 180); lightAt(tA, 3.5, 0xffe2c0); smoke(tA, 2, 0.25); camKick(tA, 0.5, 0);
+    Sound.clashLow(); burst(tA, 30, 2.8, 'cool'); glowAt(tA, 0.7, 100, 0xfff0d8); flare(tA, 1.1, 180); lightAt(tA, 3.5, 0xffe2c0); smoke(tA, 2, 0.25); camKick(tA, 0.5, 0);
     S.guardUntil = S.gt + 260;
     { const f = dirPE(); tween(S.p, S.p.x - f.x * 0.45, S.p.z - f.z * 0.45, 200); }
     if (S.pa) S.pa.recoil = S.gt;
@@ -2948,7 +2969,7 @@
     glyphAt('弾', 'miss', tA);
     pushLog('弾かれた', '', '隙のない相手に斬りかかった');
     S.shake = Math.max(S.shake, 0.04);
-    if (forceCounter || S.enemyDeflects >= 2 || S.r() < 0.3) {
+    if (forceCounter || S.enemyDeflects >= 2 || S.r() < clamp(0.45 + S.habit.attack * 0.08, 0, 0.85)) {   // 無理に斬りかかるほど、弾いて斬り返される
       S.enemyDeflects = 0; S.queue = [];
       setTimeout(() => { if (!['broken', 'falling', 'victory', 'defeat'].includes(S.mode)) startAction(S.r() < 0.5 ? 'counterR' : 'counterL'); }, 0);
     }
@@ -3252,30 +3273,45 @@
     snowBurst(S.e.x, S.e.z, 1.2);
   }
 
-  // ───────── 見切りの気：避けを読んでいる間、相手の体から白く揺らめく気が立ちのぼる ─────────
+  // ───────── 見切りの眼光：避けを読んでいる間、面の両目から細い光の筋が滑らかに尾を引く（文字は出さない） ─────────
   const Aura = (() => {
-    const N = 64, c = document.createElement('canvas'); c.width = 32; c.height = N; const g = c.getContext('2d');
-    const gr = g.createLinearGradient(0, N, 0, 0); gr.addColorStop(0, 'rgba(220,235,255,0)'); gr.addColorStop(0.25, 'rgba(220,235,255,0.55)'); gr.addColorStop(1, 'rgba(220,235,255,0)');
-    g.fillStyle = gr; g.beginPath(); g.moveTo(16, 0); g.quadraticCurveTo(30, N * 0.6, 16, N); g.quadraticCurveTo(2, N * 0.6, 16, 0); g.fill();
-    const tex = new THREE.CanvasTexture(c);
-    const flames = Array.from({ length: 34 }, (_, i) => {
-      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xa8d0ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
-      m.visible = false; scene.add(m);
-      return { m, a: i / 34 * Math.PI * 2, ph: Math.random(), sp: 0.7 + Math.random() * 0.6 };
+    const N = 40, LIFE = 0.55;
+    const mat = new THREE.MeshBasicMaterial({ color: 0xbfe3ff, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const trails = [-1, 1].map((sd) => {
+      const g = new THREE.BufferGeometry(), pos = new Float32Array(N * 2 * 3), col = new Float32Array(N * 2 * 3), idx = [];
+      for (let i = 0; i < N - 1; i++) { const a2 = i * 2; idx.push(a2, a2 + 1, a2 + 2, a2 + 1, a2 + 3, a2 + 2); }
+      g.setIndex(idx); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.visible = false; scene.add(m);
+      return { sd, m, g, pos, col, pts: [] };
     });
+    const eye = V(0, 0, 0), side = V(0, 0, 0), dir = V(0, 0, 0), drift = V(0, 0, 0);
     let k = 0;
     return {
       update(dt, now) {
-        k += ((readingDodge() && !['falling', 'victory', 'broken'].includes(S.mode) ? 1 : 0) - k) * Math.min(1, dt * 5);
+        k += ((readingDodge() && !['falling', 'victory', 'broken'].includes(S.mode) ? 1 : 0) - k) * Math.min(1, dt * 4);
         const on = k > 0.02;
-        flames.forEach((f) => {
-          f.m.visible = on; if (!on) return;
-          const u = (now * 0.001 * f.sp + f.ph) % 1;
-          const r = 0.38 + 0.1 * Math.sin(now * 0.003 + f.a * 3);
-          const a = f.a + now * 0.0006;
-          f.m.position.set(enemy.hipWorld.x + Math.cos(a) * r, enemy.hipWorld.y - 0.6 + u * 1.9, enemy.hipWorld.z + Math.sin(a) * r);
-          f.m.scale.set(0.28 + 0.14 * (1 - u), 0.8 + 0.6 * (1 - u), 1);
-          f.m.material.opacity = k * 1.0 * Math.sin(Math.PI * u);
+        camera.getWorldDirection(_cv);
+        // 光は、顔の向きの後ろへ、少し上へ流れる
+        drift.copy(enemy.fwd).multiplyScalar(-0.9).add(V(0, 0.35, 0));
+        trails.forEach((t) => {
+          t.m.visible = on;
+          if (!on) { t.pts.length = 0; return; }
+          enemy.eyeWorld(t.sd, eye);
+          t.pts.unshift({ p: eye.clone(), age: 0 });
+          t.pts.forEach((q) => { q.age += dt; q.p.addScaledVector(drift, dt); q.p.y += Math.sin(now * 0.004 + q.age * 9 + t.sd) * dt * 0.08; });
+          while (t.pts.length > N || (t.pts.length && t.pts[t.pts.length - 1].age > LIFE)) t.pts.pop();
+          const L = t.pts.length;
+          for (let i = 0; i < N; i++) {
+            const q = t.pts[Math.min(i, L - 1)] || { p: eye, age: LIFE };
+            const nx = t.pts[Math.min(i + 1, L - 1)] || q;
+            dir.copy(nx.p).sub(q.p); if (dir.lengthSq() < 1e-8) dir.set(0, 1, 0);
+            side.copy(dir).cross(_cv).normalize();
+            const u = Math.min(1, q.age / LIFE), w = 0.012 * (1 - u) + 0.002;
+            t.pos.set([q.p.x + side.x * w, q.p.y + side.y * w, q.p.z + side.z * w, q.p.x - side.x * w, q.p.y - side.y * w, q.p.z - side.z * w], i * 6);
+            const c = k * Math.pow(1 - u, 1.6) * (i < L ? 1.6 : 0);
+            t.col.set([c, c, c, c, c, c], i * 6);
+          }
+          t.g.attributes.position.needsUpdate = true; t.g.attributes.color.needsUpdate = true;
         });
       },
     };
@@ -3351,7 +3387,19 @@
     S.queue = []; S.action = null;
     S.mode = 'defeat'; S.modeStart = S.gt;
     startPA('down');
-    setTimeout(() => showEnd(false), 1300);
+    // 負けた：こちらも相手と同じように、斬られた面で斬り分けられて飛び散る（血は出さない）
+    setTimeout(() => {
+      if (S.mode !== 'defeat') return;
+      const c = player.chestWorld.clone().lerp(player.hipWorld, 0.3);
+      const f = dirPE(), cut = V(f.z, -0.6, -f.x).normalize(), nrm = cut.clone().cross(V(-f.x, 0, -f.z)).normalize();
+      Shatter.start(player, c, nrm);
+      setTimeout(() => { if (S.mode === 'defeat') Shatter.chop(V(-f.x, 0, -f.z)); }, 260);
+      Sound.at(c); Sound.cut(true); Sound.hit();
+      burst(c, 70, 3.2, 'hot'); glowAt(c, 0.6, 180, 0xffffff); flare(c, 1.2, 300); fxShock(c, 1.0); fxFlash(0.18, 0.15, 0.15); camKick(c, 1.4, 0.7); S.shake = Math.max(S.shake, 0.1);
+      slashArc([c.clone().addScaledVector(cut, -1.1), c.clone().addScaledVector(cut, -0.4), c.clone(), c.clone().addScaledVector(cut, 0.4), c.clone().addScaledVector(cut, 1.1)], c, true, [1.3, 1.25, 1.2], 'slit');
+      snowBurst(S.p.x, S.p.z, 1.6);
+    }, 140);
+    setTimeout(() => showEnd(false), 2600);
   }
 
   // ───────────────────────── 画面上の表現 ─────────────────────────
@@ -3365,6 +3413,7 @@
 
   const logEl = document.getElementById('log');
   const logBtn = document.getElementById('logBtn');
+  logBtn.hidden = true;   // 始めの画面では出さない
   function pushLog(t, e, d) {
     S.log.unshift({ t, e, d });
     S.log.length = Math.min(S.log.length, 8);
@@ -3620,6 +3669,7 @@
       blend(S.actionFrom, NEUTRAL, smooth(since / 420), out);
       if (m === 'stalk' || m === 'approach') { out.crouch += 0.06; out.roll += S.stalkDir * 0.04; }   // 低く構えて静止（細かく揺らさない）
     }
+    if (S.evade && gt < S.evade.until) { const u = 1 - (S.evade.until - gt) / 320, k2 = Math.sin(Math.PI * u); out.roll += S.evade.side * 0.45 * k2; out.crouch += 0.18 * k2; out.yaw += S.evade.side * 0.5 * k2; out.lift += 0.12 * k2; }
     // 様式の体の動き：沈む、跳ぶ、回る
     S.eSpin = 0;
     if (m === 'attack' && a && !a.feint && a.move.mod) {
@@ -3918,7 +3968,8 @@
     });
     S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.p.x = 0; S.p.z = 2.1; S.p.tw = null;
     enemy.resetFeet(); player.resetFeet();
-    Proj.clear(); S.kamae = null; S.readDodgeUntil = 0; S.dodgeLog = [];
+    Proj.clear(); S.kamae = null; S.evade = null;
+    Shatter.clear(); player.resetHat(); S.readDodgeUntil = 0; S.dodgeLog = [];
     if (fromPhase === 1) { Shatter.clear(); clearTimeout(S.endTimer); enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
     else if (enemy.hatOn()) enemy.dropHat();
     enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
@@ -3943,7 +3994,7 @@
     enemy.setWeapon('sword');
   }
   setTimeout(warmUp, 300);
-  document.getElementById('startBtn').addEventListener('click', () => { warmUp(); Sound.init(); startEl.hidden = true; begin(1); });
+  document.getElementById('startBtn').addEventListener('click', () => { warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; begin(1); });
   function showEnd(won) {
     const st = S.stats;
     const secs = Math.round((S.gt - st.start) / 1000);
@@ -3998,6 +4049,7 @@
     arcState() { return arcs.map((A) => ({ v: A.m.visible, k: A.kind, n: A.pts.length, age: Math.round(performance.now() - A.t0) })); },
     place(d) { const f = dirPE(); S.e.x = S.p.x + f.x * d; S.e.z = S.p.z + f.z * d; },
     finishTest() { finishCut(); },
+    evadeCount() { return S.evadeCount || 0; },
     readDodgeTest() { S.readDodgeUntil = S.gt + 999999; },
     chopTest() { chopFollow(); },
     shatterCount() { return Shatter.count; },
