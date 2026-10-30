@@ -64,7 +64,7 @@ function skeleton(sw) {
   const J = { H, W, C, N, HD };
   [['R', -1], ['L', 1]].forEach(([s, sg]) => {
     const dir = v(sg * Math.sin(armAng), -Math.cos(armAng), 0);
-    const S = add(C, v(sg * 0.205 * sw, 0.30, 0));
+    const S = add(C, v(sg * 0.19 * sw, 0.295, 0));   // 肩の関節：狭め（肩幅が広すぎると不自然）
     const E = add(S, mul(dir, 0.31)), WR = add(E, mul(dir, 0.29));
     J['S' + s] = S; J['E' + s] = E; J['WR' + s] = WR; J['dir' + s] = dir;
     const P = add(H, v(sg * 0.095, -0.05, 0)), K = add(P, v(0, -0.5, 0)), A = add(K, v(0, -0.49, 0));
@@ -89,7 +89,7 @@ const BONE = { hips: 0, waist: 1, chest: 2, neck: 3, head: 4, upperArmR: 5, fore
 // 硬い物（笠、縄の帯、鞘、鎧の板、弓）は焼き出さず、実行時に形として付ける（index.html）。
 function sculpt(kind) {
   const big = kind === 'enemy';
-  const sw = big ? 1.14 : 1.0;
+  const sw = big ? 1.06 : 1.0;
   const { J, bones } = skeleton(sw);
   const P = [];
   let headPart = false;
@@ -156,13 +156,18 @@ function sculpt(kind) {
     const neckHole = (p) => Math.max(Math.hypot(p[0], p[2] * 1.15) - 0.105, 1.7 - p[1]);
     const haoriBody = (p) => {
       const t = clamp((1.76 - p[1]) / 0.76, 0, 1), fl = Math.max(0, 1.18 - p[1]);
-      return smin(sdEllipsoid(p, v(0, 1.725, -0.01), v(0.278, 0.115, 0.158)), sdBox(p, v(0, 1.38, -0.012), v(0.236 - t * 0.03 + fl * 0.2, 0.38, 0.154 - t * 0.012 + fl * 0.35), 0.065), 0.05);
+      // なで肩：肩の張りを抑え、肩から腕へなだらかに落とす。背と脇には、肩甲骨の下から裾へ落ちるひだ
+      const body = smin(sdEllipsoid(p, v(0, 1.715, -0.01), v(0.232, 0.1, 0.152)), sdBox(p, v(0, 1.38, -0.012), v(0.205 - t * 0.012 + fl * 0.22, 0.38, 0.15 - t * 0.008 + fl * 0.35), 0.06), 0.06);
+      const ang = Math.atan2(p[2], p[0]), fold = 0.0055 * Math.sin(ang * 11 + Math.sin(p[1] * 6) * 0.6) * clamp((1.62 - p[1]) / 0.4, 0, 1) * (p[2] < 0.06 ? 1 : 0.3);
+      return body - fold;
     };
     part('haori', 'chest', 0.02, (p) => Math.max(haoriBody(p), -front(p), -neckHole(p), 1.3 - p[1]));
     part('haori', 'waist', 0.003, (p) => Math.max(haoriBody(p), -front(p), 1.0 - p[1], p[1] - 1.34));
+    // 裾の返し：裾の内側に深紅の裏地が細くのぞく
+    part('lining', 'waist', 0.002, (p) => Math.max(haoriBody(p) + 0.002, -(haoriBody(p) + 0.012), Math.abs(p[1] - 1.006) - 0.007, -front(p)));
     [-1, 1].forEach((s) => {
       // 羽織の襟（前の縁を下まで）と、返った裏地の細い線
-      part('haoriEri', 'chest', 0.006, (p) => sdBox(p, v(s * 0.15, 1.36, 0.14), v(0.018, 0.4, 0.014), 0.01, basisFrom(v(s * 0.1, 1, 0.08), v(1, 0, 0))));
+      part('haoriEri', 'chest', 0.006, (p) => sdBox(p, v(s * 0.15, 1.36, 0.137), v(0.018, 0.4, 0.014), 0.01, basisFrom(v(s * 0.1, 1, 0.08), v(1, 0, 0))));
       part('haoriEri', 'chest', 0.01, (p) => sdCone(p, v(s * 0.08, 1.83, -0.02), v(s * 0.15, 1.72, 0.13), 0.022, 0.022));
       part('lining', 'chest', 0.003, (p) => sdBox(p, v(s * 0.13, 1.36, 0.146), v(0.006, 0.38, 0.01), 0.005, basisFrom(v(s * 0.1, 1, 0.08), v(1, 0, 0))));
     });
@@ -191,7 +196,7 @@ function sculpt(kind) {
 
   // ── 袴 ──
   // 相手の袴も、腰の上だけを覆い、その下は左右の脚に分かれる（地面まで一枚の釣鐘にするとスカートに見える）
-  const skirtTop = big ? 1.17 : 1.2, skirtBot = big ? 0.92 : 1.0, skirtR0 = big ? 0.19 * 1.06 : 0.165, skirtR1 = big ? 0.27 : 0.185;
+  const skirtTop = big ? 1.17 : 1.2, skirtBot = big ? 0.92 : 1.0, skirtR0 = big ? 0.19 * 1.06 : 0.165, skirtR1 = big ? 0.29 : 0.2;
   part('hakama', 'hips', 0.03, (p) => {
     const t = clamp((skirtTop - p[1]) / (skirtTop - skirtBot), 0, 1);
     const r = lerp(skirtR0, skirtR1, big ? t : Math.sqrt(t)) * (1 + pleat(p, v(0, 0, 0), v(0, 1, 0), 9, 0.045 * t));
@@ -205,11 +210,12 @@ function sculpt(kind) {
     const th = 'thigh' + s, sh = 'shin' + s, ft = 'foot' + s;
     if (big) {
       // 左右に分かれた幅の広い袴の脚。折り目の立ったひだが裾へ広がる
-      part('hakama', th, 0.035, (p) => sdCone(p, Pj, K, 0.115, 0.15) - pleat(p, Pj, norm(sub(K, Pj)), 6, 0.012));
-      part('hakama', sh, 0.035, (p) => sdCone(p, K, add(A, v(0, 0.03, 0)), 0.15, 0.185) - pleat(p, K, norm(sub(A, K)), 6, 0.02));
+      part('hakama', th, 0.035, (p) => sdCone(p, Pj, K, 0.13, 0.175) - pleat(p, Pj, norm(sub(K, Pj)), 6, 0.014));
+      part('hakama', sh, 0.035, (p) => sdCone(p, K, add(A, v(0, 0.035, 0)), 0.175, 0.23) - pleat(p, K, norm(sub(A, K)), 7, 0.024) - 0.009 * Math.exp(-Math.pow((p[1] - A[1] - 0.09) / 0.04, 2)));
     } else {
-      part('hakama', th, 0.03, (p) => sdCone(p, Pj, K, 0.098, 0.125) - pleat(p, Pj, norm(sub(K, Pj)), 5, 0.008));
-      part('hakama', sh, 0.03, (p) => sdCone(p, K, add(A, v(0, 0.03, 0)), 0.125, 0.15) - pleat(p, K, norm(sub(A, K)), 5, 0.013));
+      part('hakama', th, 0.03, (p) => sdCone(p, Pj, K, 0.12, 0.158) - pleat(p, Pj, norm(sub(K, Pj)), 5, 0.012));
+      // 裾は広く、足首の上でわずかにたまる（ダボっとした袴）
+      part('hakama', sh, 0.03, (p) => sdCone(p, K, add(A, v(0, 0.035, 0)), 0.158, 0.2) - pleat(p, K, norm(sub(A, K)), 6, 0.02) - 0.008 * Math.exp(-Math.pow((p[1] - A[1] - 0.09) / 0.04, 2)));
     }
     part('tabi', ft, 0.02, (p) => sdEllipsoid(p, add(A, v(0, -0.04, 0.06)), v(0.048, 0.034, 0.115)));
     part('tabi', ft, 0.02, (p) => sdEllipsoid(p, add(A, v(0, 0.0, 0.0)), v(0.044, 0.05, 0.045)));
@@ -226,7 +232,7 @@ function sculpt(kind) {
     const bA = basisFrom(dir, v(0, 0, 1));
     const hang = norm(sub(v(0, -1, 0), mul(dir, dot(v(0, -1, 0), dir))));
     const bS = [cross(dir, hang), dir, hang];
-    part('kimono', ua, 0.04, (p) => sdEllipsoid(p, S, mul(v(1, 1, 1), big ? 0.085 : 0.048)));
+    part('kimono', ua, 0.04, (p) => sdEllipsoid(p, S, mul(v(1, 1, 1), big ? 0.072 : 0.044)));
     if (big) {
       // 相手：袖は肘の上で絞り、前腕は黒漆の籠手（板を三段）
       part('kimono', ua, 0.04, (p) => sdCone(p, add(S, mul(dir, 0.04)), E, 0.08, 0.07) - 0.004 * Math.sin(dot(sub(p, S), bA[0]) * 60));
@@ -238,13 +244,13 @@ function sculpt(kind) {
       part('kimono', ua, 0.03, (p) => sdCone(p, add(S, mul(dir, 0.04)), E, 0.05, 0.045));
       const sleeve = (c0, c1, open) => (p) => {
         const c = mul(add(c0, c1), 0.5), half = len(sub(c1, c0)) / 2;
-        let d = sdBox(p, add(c, mul(hang, 0.035)), v(0.07, half, 0.1), 0.03, bS);
-        if (open) d = Math.max(d, -sdBox(p, add(c1, mul(hang, 0.035)), v(0.05, 0.035, 0.08), 0.015, bS));
+        let d = sdBox(p, add(c, mul(hang, 0.03)), v(0.056, half, 0.085), 0.028, bS) - 0.003 * Math.sin(dot(sub(p, c), dir) * 70);   // 細めの袖と、袖に寄るしわ
+        if (open) d = Math.max(d, -sdBox(p, add(c1, mul(hang, 0.03)), v(0.04, 0.035, 0.068), 0.015, bS));
         return d;
       };
       part('haori', ua, 0.02, sleeve(add(S, mul(dir, 0.03)), add(E, mul(dir, 0.02)), false));
       part('haori', fa, 0.02, sleeve(E, add(E, mul(dir, 0.12)), true));
-      part('lining', fa, 0.003, (p) => { const c = add(add(E, mul(dir, 0.12)), mul(hang, 0.035)); return Math.max(Math.abs(dot(sub(p, c), dir)) - 0.008, sdBox(p, c, v(0.072, 0.2, 0.102), 0.03, bS), -sdBox(p, c, v(0.055, 0.2, 0.085), 0.015, bS)); });
+      part('lining', fa, 0.003, (p) => { const c = add(add(E, mul(dir, 0.12)), mul(hang, 0.03)); return Math.max(Math.abs(dot(sub(p, c), dir)) - 0.008, sdBox(p, c, v(0.058, 0.2, 0.087), 0.028, bS), -sdBox(p, c, v(0.043, 0.2, 0.072), 0.015, bS)); });
       const band = (p) => 0.004 * Math.max(0, Math.sin(dot(sub(p, E), dir) * 150)) ** 2;
       part('guard', fa, 0.02, (p) => sdCone(p, add(E, mul(dir, 0.03)), add(WR, mul(dir, -0.01)), 0.047, 0.037) - band(p));
     }
@@ -345,7 +351,7 @@ function bake(kind, cell, region) {
   const bones = S.bones;
   const children = bones.map((_, i) => bones.map((b, j) => (b[1] === i ? j : -1)).filter((x) => x >= 0));
   const segDist = (p, b) => { const a = b[2], c = b[3]; const ba = sub(c, a), pa = sub(p, a); const h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1); return len(sub(pa, mul(ba, h))); };
-  const out = { pos: [], nor: [], col: [], si: [], sw: [], fx: [] };
+  const out = { pos: [], nor: [], col: [], si: [], sw: [], fx: [], cl: [] };
   for (let vi = 0; vi < verts.length; vi++) {
     let p = verts[vi];
     for (let it = 0; it < 2; it++) { const d = dist(p); const g = grad(p); p = sub(p, mul(g, d)); }
@@ -376,6 +382,8 @@ function bake(kind, cell, region) {
     else if (m0 === 'haori' || m0 === 'lining' || m0 === 'haoriEri') fx = onArm ? 0.55 : clamp((1.3 - p[1]) / 0.35, 0, 1) * 0.7;
     else if (kind === 'enemy' && m0 === 'kimono' && onArm) fx = 0.35;
     out.fx.push(fx);
+    // 布かどうか（布には細かい織り目を描く）
+    out.cl.push(['kimono', 'eri', 'haori', 'haoriEri', 'lining', 'hakama', 'sash', 'lapel'].includes(m0) ? 1 : m0 === 'armor' ? 0.5 : 0);
     // 皮の重み：一番近い部品の骨と、その親・子の骨の間で、骨からの距離に応じて滑らかに分ける
     const b0 = part0.b;
     const cand = [b0, bones[b0][1], ...children[b0]].filter((x) => x >= 0);
@@ -407,7 +415,7 @@ function bake(kind, cell, region) {
 function pack(kind, cell, region) {
   const B = bake(kind, cell, region);
   const n = B.out.pos.length / 3;
-  const pos = new Uint16Array(n * 3), nor = new Int8Array(n * 3), col = new Uint8Array(n * 3), si = new Uint8Array(n * 4), sw = new Uint8Array(n * 4), fx = new Uint8Array(n);
+  const pos = new Uint16Array(n * 3), nor = new Int8Array(n * 3), col = new Uint8Array(n * 3), si = new Uint8Array(n * 4), sw = new Uint8Array(n * 4), fx = new Uint8Array(n), cl = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     for (let a = 0; a < 3; a++) {
       pos[i * 3 + a] = Math.round(clamp((B.out.pos[i * 3 + a] - B.min[a]) / (B.max[a] - B.min[a]), 0, 1) * 65535);
@@ -417,14 +425,14 @@ function pack(kind, cell, region) {
     let s = 0;
     for (let a = 0; a < 4; a++) { si[i * 4 + a] = B.out.si[i * 4 + a]; sw[i * 4 + a] = Math.round(B.out.sw[i * 4 + a] * 255); s += sw[i * 4 + a]; }
     sw[i * 4] += 255 - s;
-    fx[i] = Math.round(B.out.fx[i] * 255);
+    fx[i] = Math.round(B.out.fx[i] * 255); cl[i] = Math.round(B.out.cl[i] * 255);
   }
   const idx = n < 65536 ? new Uint16Array(B.tris) : new Uint32Array(B.tris);
   const b64 = (arr) => Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength).toString('base64');
   return {
     min: B.min, max: B.max, n, wide: n >= 65536,
     bones: B.bones.map(([name, parent, at]) => ({ name, parent, at: at.map((x) => +x.toFixed(4)) })),
-    pos: b64(pos), nor: b64(nor), col: b64(col), si: b64(si), sw: b64(sw), fx: b64(fx), idx: b64(idx),
+    pos: b64(pos), nor: b64(nor), col: b64(col), si: b64(si), sw: b64(sw), fx: b64(fx), cl: b64(cl), idx: b64(idx),
   };
 }
 
