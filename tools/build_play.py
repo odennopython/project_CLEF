@@ -17,7 +17,7 @@ HEAD = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="返し">
+<meta name="apple-mobile-web-app-title" content="風の伝説">
 <meta name="theme-color" content="#0a0f1c">
 <style>html { -webkit-text-size-adjust: 100%; } body { margin: 0; }</style>
 </head>
