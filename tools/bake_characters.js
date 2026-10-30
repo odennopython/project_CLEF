@@ -190,7 +190,8 @@ function sculpt(kind) {
   }
 
   // ── 袴 ──
-  const skirtTop = big ? 1.17 : 1.2, skirtBot = big ? 0.12 : 1.0, skirtR0 = big ? 0.19 * 1.06 : 0.165, skirtR1 = big ? 0.42 : 0.185;
+  // 相手の袴も、腰の上だけを覆い、その下は左右の脚に分かれる（地面まで一枚の釣鐘にするとスカートに見える）
+  const skirtTop = big ? 1.17 : 1.2, skirtBot = big ? 0.92 : 1.0, skirtR0 = big ? 0.19 * 1.06 : 0.165, skirtR1 = big ? 0.27 : 0.185;
   part('hakama', 'hips', 0.03, (p) => {
     const t = clamp((skirtTop - p[1]) / (skirtTop - skirtBot), 0, 1);
     const r = lerp(skirtR0, skirtR1, big ? t : Math.sqrt(t)) * (1 + pleat(p, v(0, 0, 0), v(0, 1, 0), 9, 0.045 * t));
@@ -203,8 +204,9 @@ function sculpt(kind) {
     const Pj = J['P' + s], K = J['K' + s], A = J['A' + s];
     const th = 'thigh' + s, sh = 'shin' + s, ft = 'foot' + s;
     if (big) {
-      part('hakama', th, 0.05, (p) => sdCone(p, Pj, K, 0.13, 0.15) - pleat(p, Pj, norm(sub(K, Pj)), 5, 0.012));
-      part('hakama', sh, 0.05, (p) => sdCone(p, K, add(A, v(0, 0.02, 0)), 0.15, 0.2) - pleat(p, K, norm(sub(A, K)), 5, 0.02));
+      // 左右に分かれた幅の広い袴の脚。折り目の立ったひだが裾へ広がる
+      part('hakama', th, 0.035, (p) => sdCone(p, Pj, K, 0.115, 0.15) - pleat(p, Pj, norm(sub(K, Pj)), 6, 0.012));
+      part('hakama', sh, 0.035, (p) => sdCone(p, K, add(A, v(0, 0.03, 0)), 0.15, 0.185) - pleat(p, K, norm(sub(A, K)), 6, 0.02));
     } else {
       part('hakama', th, 0.03, (p) => sdCone(p, Pj, K, 0.098, 0.125) - pleat(p, Pj, norm(sub(K, Pj)), 5, 0.008));
       part('hakama', sh, 0.03, (p) => sdCone(p, K, add(A, v(0, 0.03, 0)), 0.125, 0.15) - pleat(p, K, norm(sub(A, K)), 5, 0.013));
@@ -414,7 +416,7 @@ function pack(kind, cell, region) {
 }
 
 const CELL_SIZE = +(process.argv[2] || 0.014);
-const HEAD_CELL = 0.005;
+const HEAD_CELL = 0.0042;
 const data = { player: pack('player', CELL_SIZE), playerHead: pack('player', HEAD_CELL, 'head'), enemy: pack('enemy', CELL_SIZE), enemyHead: pack('enemy', HEAD_CELL, 'head') };
 const js = 'window.CLEF_CHARS = ' + JSON.stringify(data) + ';';
 const target = path.join(__dirname, '..', 'prototype', 'kaeshi', 'index.html');
