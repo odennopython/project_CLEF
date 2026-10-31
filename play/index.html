@@ -222,7 +222,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev">開発</button>
-  <span class="t-ver"><span id="ver">試作 4.7 · 10/31 17:48 · 1b4c5b7</span></span>
+  <span class="t-ver"><span id="ver">試作 4.8 · 10/31 18:29 · f5de3aa</span></span>
 </div>
 
 <div id="devPanel" hidden>
@@ -1771,11 +1771,23 @@
       else { h = dNoise(P * 320.0) * 0.7 + dNoise(P * 1300.0) * 0.3; amp = 0.0003; rough = 0.55; freq = 1300.0; }                                                             // 革
     }
   `;
-  function addDetail(mat) {
+  // 装束の塗り分け：布の部位（着物・襟・袴・帯・鎧・籠手）ごとに、勢力の色へ塗り替える。元の色の明暗（陰や縫い目）は残す
+  const PAL_SLOTS = [3, 4, 5, 6, 7, 11];
+  const PAL_GLSL = `
+  if (uPOn > 0.5) {
+    vec3 pc = vec3(-1.0); float rf = 1.0;
+    if (abs(dId - 3.0) < 0.5) { pc = uPal0; rf = uRef.x; } else if (abs(dId - 4.0) < 0.5) { pc = uPal1; rf = uRef.y; } else if (abs(dId - 5.0) < 0.5) { pc = uPal2; rf = uRef.z; }
+    else if (abs(dId - 6.0) < 0.5) { pc = uPal3; rf = uRef.w; } else if (abs(dId - 7.0) < 0.5) { pc = uPal4; rf = uRef2.x; } else if (abs(dId - 11.0) < 0.5) { pc = uPal5; rf = uRef2.y; }
+    if (pc.x >= 0.0) { float l = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)); diffuseColor.rgb = pc * clamp(l / rf, 0.35, 1.8); }
+  }`;
+  function addDetail(mat, pal) {
     mat.extensions = Object.assign(mat.extensions || {}, { derivatives: true });
+    // 塗り分ける材質と塗り分けない材質は、別の描き方として作らせる（同じ描き方を共有すると、敵の装束の色が主人公に流れ込む）
+    mat.customProgramCacheKey = () => (pal ? 'detail-pal' : 'detail');
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (sh, r) => {
       if (prev) prev(sh, r);
+      if (pal) { Object.assign(sh.uniforms, pal); sh.fragmentShader = 'uniform float uPOn; uniform vec3 uPal0, uPal1, uPal2, uPal3, uPal4, uPal5; uniform vec4 uRef; uniform vec2 uRef2;\n' + sh.fragmentShader; }
       sh.vertexShader = 'attribute float cloth;\nvarying float vCl;\nvarying vec3 vOP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vCl = cloth; vOP = position;');
       sh.fragmentShader = DETAIL_GLSL + sh.fragmentShader
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
@@ -1783,7 +1795,7 @@
   detailAt(vOP, dId, dH, dAmp, dRough, dFreq);
   float dFade = clamp(1.0 - length(fwidth(vOP)) * dFreq / 2.5, 0.0, 1.0);   // 画面で細かすぎる模様は弱める（ちらつき防止）
   roughnessFactor = dRough;
-  diffuseColor.rgb *= 1.0 + 0.06 * (dH - 0.3) * dFade;`)
+  diffuseColor.rgb *= 1.0 + 0.06 * (dH - 0.3) * dFade;` + (pal ? PAL_GLSL : ''))
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { vec3 sp = -vViewPosition; vec3 sx = dFdx(sp), sy = dFdy(sp);
     float hh = dH * dAmp * dFade;
@@ -1952,7 +1964,7 @@
     const X = (x) => (x + 0.09) / 0.18 * W, Y = (y) => (0.08 - y) / 0.18 * W;
     // dark：黒狐（相手）。黒漆の地に、朱と金の隈取り
     // 面の色：白狐（主人公）、黒狐（主）、赤狐・灰狐・鉄（雑兵）
-    const PAL = { white: ['#f4efe6', '#c4222b', '#e2a33a'], black: ['#15151a', '#d42a33', '#d8a540'], red: ['#7e1b1f', '#14110f', '#e0b45a'], grey: ['#5f6672', '#e9e4da', '#9b2a2a'], iron: ['#2b2d33', '#8f969f', '#6a1c1f'] };
+    const PAL = { kage: ['#1d1e26', '#d9d9df', '#6a6a78'], white: ['#f4efe6', '#c4222b', '#e2a33a'], black: ['#15151a', '#d42a33', '#d8a540'], red: ['#7e1b1f', '#14110f', '#e0b45a'], grey: ['#5f6672', '#e9e4da', '#9b2a2a'], iron: ['#2b2d33', '#8f969f', '#6a1c1f'] };
     const vk = dark === true ? 'black' : (dark || 'white'), [base, red, gold] = PAL[vk], ink = '#0a0a0c';
     dark = vk !== 'white';
     g.fillStyle = base; g.fillRect(0, 0, W, W);
@@ -2174,7 +2186,12 @@
     const skeleton = new THREE.Skeleton(bones);
     const geo = buildBody(D);
     const clothU = { uTime: { value: 0 }, uSway: { value: V(0, 0, 0) } };
-    const bodyMat = addDetail(addCloth(toon(0xffffff, { vertexColors: true, skinning: true, roughness: 0.8, envMapIntensity: 0.85 }), clothU));
+    // 装束の色（相手だけ）。基準の明るさは、焼いた人物の元の色
+    const refL = (hex) => { const c = new THREE.Color(hex).convertSRGBToLinear(); return c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722; };
+    const mkPal = (hood) => ({ uPOn: { value: 0 }, uPal0: { value: new THREE.Color() }, uPal1: { value: new THREE.Color() }, uPal2: { value: new THREE.Color() }, uPal3: { value: new THREE.Color() }, uPal4: { value: new THREE.Color() }, uPal5: { value: new THREE.Color() },
+      uRef: { value: new THREE.Vector4(refL(hood ? '#141519' : '#1c1b21'), refL('#8c1a26'), refL('#3a3640'), refL('#2a2730')) }, uRef2: { value: new THREE.Vector2(refL('#121318'), refL('#2a2228')) } });
+    const palB = big ? mkPal(false) : null, palH = big ? mkPal(true) : null;
+    const bodyMat = addDetail(addCloth(toon(0xffffff, { vertexColors: true, skinning: true, roughness: 0.8, envMapIntensity: 0.85 }), clothU), palB);
     const body = new THREE.SkinnedMesh(geo, bodyMat);
     body.frustumCulled = false;
     root.add(body);
@@ -2183,7 +2200,7 @@
     // 頭は細かい面で別に焼き出してある。同じ骨で動かす。首の重なりでは頭の面が前に出る
     const geoH = buildBody(window.CLEF_CHARS[kind + 'Head']);
     // 顔は影を浅く（アニメの顔のように、明るい面で見せる）
-    const headMat = addDetail(toon(0xffffff, { vertexColors: true, skinning: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, envMapIntensity: 0.85 }));
+    const headMat = addDetail(toon(0xffffff, { vertexColors: true, skinning: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, envMapIntensity: 0.85 }), palH);
     const headMesh = new THREE.SkinnedMesh(geoH, headMat); headMesh.frustumCulled = false; headMesh.castShadow = true; root.add(headMesh); headMesh.bind(skeleton, body.bindMatrix);
     
     // 二人とも狐面で覆うので、顔の絵と眼球は描かない
@@ -2222,7 +2239,7 @@
 
     // 相手の鎧の板（袖と草摺）。前半は傷の節目で一枚ずつ落ち、後半に入る瞬間に残りがすべて落ちる（鎧を捨てて速くなる）
     const plates = [], chips = [], cracks = [], tears = [];
-    let hat = null, hatFall = null, hitGlow = 0;
+    let hat = null, hatFall = null, hitGlow = 0; const acc = {};
     if (big) {
       const crackMat = toon(0xe8d8c8), crackGeo = new THREE.BoxGeometry(0.008, 0.07, 0.006);
       for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(crackGeo, crackMat); c.position.copy(atBone(chestG, -0.06 + i * 0.04, 1.47 + (i % 2) * 0.03, 0.155)); c.rotation.z = 0.6 - i * 0.4; c.visible = false; chestG.add(c); cracks.push(c); }
@@ -2256,11 +2273,42 @@
       });
       // 黒狐の面
       // 面：黒狐（主）、赤狐、灰狐、鉄の面。雑兵ごとに付け替える
-      ['black', 'red', 'grey', 'iron', 'white'].forEach((v) => { const k = makeKitsune(v === 'black' ? true : v); k.position.copy(atBone(headG, 0, 1.985, 0.006)); k.rotation.x = -0.05; k.scale.set(1.06, 1.08, 1.02); k.visible = v === 'black'; headG.add(k); maskSet[v] = k; });
+      ['black', 'red', 'grey', 'iron', 'white', 'kage'].forEach((v) => { const k = makeKitsune(v === 'black' ? true : v); k.position.copy(atBone(headG, 0, 1.985, 0.006)); k.rotation.x = -0.05; k.scale.set(1.06, 1.08, 1.02); k.visible = v === 'black'; headG.add(k); maskSet[v] = k; });
       strawKasa = makeKasa(); strawKasa.position.copy(atBone(headG, 0, 2.06, -0.006)); strawKasa.rotation.x = 0.12; strawKasa.visible = false; strawKasa.traverse((o) => { if (o.isMesh) o.castShadow = true; }); headG.add(strawKasa);
       // 喉を守る垂れ（よだれかけ）：面頬の下に三段の板
       for (let i = 0; i < 3; i++) { const l = makeLame(0.15 - i * 0.008, 0.032, 0.008, 0.03); l.position.copy(atBone(neckG, 0, 1.885 - i * 0.03, 0.072 + i * 0.006)); l.rotation.x = 0.18; neckG.add(l); }
       const bow = makeBow(1.8); backBow = bow; bow.position.copy(atBone(chestG, -0.04, 1.42, -0.22)); bow.rotation.set(0, 0, -0.42); chestG.add(bow);
+      // ── 装束の部品（docs/42）：勢力と法則を、形で見分けられるようにする ──
+      const ACC_M = { lacq: toon(0x1a1416, { roughness: 0.35, metalness: 0.2 }), gold: toon(0xb08a3a, { metalness: 0.8, roughness: 0.3 }), straw: toon(0xffffff, { vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }), cloth: toon(0xd8d2c2, { side: THREE.DoubleSide }), band: toon(0xb02420), white: toon(0xe6e2d8), black: toon(0x101014) };
+      const addAcc = (k, parent, obj) => { obj.visible = false; obj.traverse((o) => { if (o.isMesh) o.castShadow = true; }); parent.add(obj); acc[k] = obj; return obj; };
+      // 兜：黒漆の鉢と、肩へ広がる錣。頭は金の鍬形を立てる
+      { const g = new THREE.Group(); const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.135, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), ACC_M.lacq); g.add(bowl);
+        for (let i = 0; i < 3; i++) { const sk = new THREE.Mesh(new THREE.CylinderGeometry(0.14 + i * 0.03, 0.17 + i * 0.03, 0.05, 20, 1, true, Math.PI * 0.25, Math.PI * 1.5), ACC_M.lacq); sk.position.y = -0.02 - i * 0.045; sk.rotation.y = Math.PI; g.add(sk); }
+        const crest = new THREE.Group(); [-1, 1].forEach((sd) => { const h = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.22, 0.006), ACC_M.gold); h.position.set(sd * 0.06, 0.13, 0.12); h.rotation.z = -sd * 0.38; crest.add(h); }); const base = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.03, 0.01), ACC_M.gold); base.position.set(0, 0.04, 0.13); crest.add(base); g.add(crest); g.userData.crest = crest;
+        g.position.copy(atBone(headG, 0, 2.05, -0.01)); addAcc('kabuto', headG, g); }
+      // 頭襟：修験者の額の小さな黒い箱
+      { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.05, 12), ACC_M.black); t.position.copy(atBone(headG, 0, 2.105, 0.07)); t.rotation.x = 0.35; addAcc('tokin', headG, t); }
+      // 鉢巻：額に締めた布と、後ろへ垂れる二本の端
+      { const g = new THREE.Group(), m = toon(0xe6e2d8, { side: THREE.DoubleSide }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.014, 6, 24), m); r.rotation.x = Math.PI / 2 - 0.12; g.add(r); [-1, 1].forEach((sd) => { const tl = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.2), m); tl.position.set(sd * 0.02, -0.1, -0.12); tl.rotation.set(0.3, 0, sd * 0.2); g.add(tl); }); g.position.copy(atBone(headG, 0, 2.02, 0.0)); g.userData.mat = m; addAcc('hachimaki', headG, g); }
+      // 蓑：肩から腰までを覆う藁の外套。体が一回り大きく見える
+      { const geo = new THREE.CylinderGeometry(0.19, 0.36, 0.62, 36, 6, true); const pa = geo.attributes.position, col = new Float32Array(pa.count * 3), R = rng(5);
+        for (let i = 0; i < pa.count; i++) { const y = pa.getY(i), a = Math.atan2(pa.getZ(i), pa.getX(i)); const bot = y < -0.3, k = 1 + 0.07 * Math.sin(a * 29) + 0.04 * Math.sin(a * 53 + y * 7) + (bot ? 0.1 * Math.sin(a * 41) : 0); pa.setX(i, pa.getX(i) * k); pa.setZ(i, pa.getZ(i) * k * 0.8); if (bot) pa.setY(i, y - 0.09 * Math.abs(Math.sin(a * 13))); const v = 0.7 + 0.3 * Math.abs(Math.sin(a * 37 + y * 9)); col.set([0.15 * v, 0.11 * v, 0.05 * v], i * 3); }
+        geo.computeVertexNormals(); geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); const m = new THREE.Mesh(geo, ACC_M.straw); m.position.copy(atBone(chestG, 0, 1.5, -0.03)); addAcc('mino', chestG, m); m.userData.col = col; }
+      // 背旗（指物）：番所の兵の印。背に立てた竿と小旗
+      { const g = new THREE.Group(); const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.25, 5), ACC_M.lacq); pole.position.y = 0.55; g.add(pole);
+        const fm = toon(0xd8d2c2, { side: THREE.DoubleSide }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.62), fm); fl.position.set(0.16, 0.86, 0); g.add(fl); const dot = new THREE.Mesh(new THREE.CircleGeometry(0.075, 18), toon(0x14141a, { side: THREE.DoubleSide })); dot.position.set(0.16, 0.92, 0.003); g.add(dot);
+        g.position.copy(atBone(chestG, 0.06, 1.45, -0.2)); g.userData.mat = fm; addAcc('sashimono', chestG, g); }
+      // 結袈裟：修験者の胸の六つの房
+      { const g = new THREE.Group(), m = toon(0xe8e2d4); [-1, 1].forEach((sd) => [0, 1, 2].forEach((i) => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 8), m); b.position.set(sd * 0.075, 1.63 - i * 0.1, 0.165 - i * 0.012); g.add(b); })); [-1, 1].forEach((sd) => { const c = new THREE.CatmullRomCurve3([V(sd * 0.075, 1.68, 0.15), V(sd * 0.12, 1.8, 0.04), V(sd * 0.11, 1.78, -0.1)]); g.add(new THREE.Mesh(new THREE.TubeGeometry(c, 8, 0.012, 5), toon(0x3a3838))); });
+        g.position.copy(atBone(chestG, 0, 0, 0)); g.userData.mat = m; addAcc('yuigesa', chestG, g); }
+      // 襷：胸と背で交差する紐
+      { const g = new THREE.Group(), m = toon(0xb02420); [-1, 1].forEach((sd) => { [1, -1].forEach((fz) => { const c = new THREE.CatmullRomCurve3([V(sd * 0.17, 1.78, 0.02 * fz), V(sd * 0.05, 1.55, 0.17 * fz), V(-sd * 0.14, 1.3, 0.15 * fz)]); g.add(new THREE.Mesh(new THREE.TubeGeometry(c, 10, 0.013, 5), m)); }); });
+        g.position.copy(atBone(chestG, 0, 0, 0)); g.userData.mat = m; addAcc('tasuki', chestG, g); }
+      // 天狗の面：赤い顔と、長い鼻
+      { const g = new THREE.Group(), red = toon(0xa81e1a, { roughness: 0.45, metalness: 0.1 }); const f = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 14), red); f.scale.set(1.0, 1.25, 0.62); g.add(f);
+        const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.03, 0.17, 10), red); nose.rotation.x = Math.PI / 2 - 0.15; nose.position.set(0, -0.01, 0.13); g.add(nose);
+        [-1, 1].forEach((sd) => { const br = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.02), ACC_M.black); br.position.set(sd * 0.04, 0.05, 0.06); br.rotation.z = sd * 0.35; g.add(br); const ey = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), ACC_M.gold); ey.position.set(sd * 0.038, 0.025, 0.062); g.add(ey); });
+        g.position.copy(atBone(headG, 0, 1.985, 0.06)); g.visible = false; headG.add(g); maskSet.tengu = g; }
     }
     // 大太刀
     let BL = bladeLen, SORI = 0.06, TK = tsukaLen, dual = false;   // 武器を持ち替えると変わる
@@ -2286,7 +2334,9 @@
     const chains = [];
     if (big) {
       // 高く結った長い髪：頭の上から背へ流れる
-      chains.push({ c: makeChain(11, 0.07, 0.07, 0x14151b, 1), anchor: atBone(headG, 0, 2.135, -0.125), at: 'head' });
+      chains.push({ c: makeChain(11, 0.07, 0.07, 0x14151b, 1), anchor: atBone(headG, 0, 2.135, -0.125), at: 'head', hair: true });
+      // 襟巻：首の後ろから長くなびく布（速い相手・身軽な相手の印）
+      chains.push({ c: makeChain(10, 0.085, 0.09, 0xb02420, 1), anchor: atBone(chestG, 0, 1.8, -0.1), at: 'chest', off: true, scarf: true });
     } else {
       // 縄の帯の結んだ先：背中から二本垂れる
       [-0.03, 0.03].forEach((x) => chains.push({ c: makeChain(7, 0.065, 0.038, 0x3d2a55, 1), anchor: atBone(hips, x, 1.19, -0.19), at: 'hips' }));
@@ -2314,11 +2364,11 @@
     function setLocal(bone, target, parentQ) { qInv.copy(parentQ).invert(); bone.quaternion.copy(qInv).multiply(target); }
 
     function idealFoot(i, p, out) {
-      const sx = (i === 0 ? -1 : 1) * (0.19 + p.crouch * 0.45);
+      const sx = (i === 0 ? -1 : 1) * (0.19 + p.crouch * 0.45) * (1 - footNarrow * 0.6);   // 走る間は、足を体の中心線へ寄せる
       out.set(sx, 0, i === 0 ? 0.18 : -0.16);
       return root.localToWorld(out);
     }
-    let fastK = 0;
+    let fastK = 0, footNarrow = 0;
     function animate(p, T, fast) {
       // 揺れ戻りの少ないばね（減衰を強く）。行き過ぎて戻る動きは、ゼリーのように見えて気持ち悪い
       // 硬く、揺れ戻りのないばね：体が姿勢にきびきびと追いつく（柔らかいと、ふにゃっと崩れて見える）
@@ -2352,7 +2402,12 @@
       clothU.uTime.value = performance.now() / 1000;
       if (T > 0) { const k = 1 - Math.exp(-T * 6); swayV.x += (clamp(-vs * 0.035, -0.12, 0.12) - swayV.x) * k; swayV.z += (clamp(-vf * 0.035, -0.12, 0.12) - swayV.z) * k; clothU.uSway.value.set(swayV.x, 0, swayV.z); }
       const lean = clonePose(target);
-      if (opts && opts.walk) { const st = feet.find((q) => q.stepping); if (st) { lean.crouch -= 0.03 * Math.sin(Math.PI * clamp(st.t, 0, 1)); lean.roll += (st === feet[0] ? 1 : -1) * 0.025 * Math.sin(Math.PI * clamp(st.t, 0, 1)); } }
+      if (opts && opts.walk) {
+        const st = feet.find((q) => q.stepping), sp = Math.hypot(vel.x, vel.z), run = clamp((sp - 2.6) / 1.4, 0, 1);
+        if (st) { const k = Math.sin(Math.PI * clamp(st.t, 0, 1)); lean.crouch -= lerp(0.03, 0.07, run) * k; lean.lift += run * 0.05 * k; lean.roll += (st === feet[0] ? 1 : -1) * lerp(0.025, 0.04, run) * k; lean.yaw += (st === feet[0] ? 1 : -1) * run * 0.12 * k; }
+        lean.crouch += run * 0.02; lean.pitch += run * 0.08;   // 走る：前へ傾く
+        footNarrow += (run - footNarrow) * Math.min(1, T * 6);
+      } else footNarrow += (0 - footNarrow) * Math.min(1, T * 6);
       lean.pitch += vf * 0.045; lean.roll -= vs * 0.055; lean.crouch += Math.min(0.1, (Math.abs(vf) + Math.abs(vs)) * 0.012);
       const p = animate(lean, T, opts && opts.fast);
 
@@ -2388,15 +2443,16 @@
         const lag = tA.distanceTo(f.pos);
         if (walking) {
           // 歩く：足は交互に、体の少し先へ大きく踏み出す。一歩の長さと速さは歩く速さで決まる（小刻みに足を動かすと、ちょこちょこして見える）
-          const half = 0.4 * scale / 0.9, swing = clamp(0.95 / spd, 0.3, 0.44);
+          // 走る（毎秒3m より速い）：歩幅を広げ、足の振りを短くし、両足が地面を離れる瞬間を作る
+          const run = clamp((spd - 2.6) / 1.4, 0, 1), half = lerp(0.4, 0.62, run) * scale / 0.9, swing = lerp(clamp(0.95 / spd, 0.3, 0.44), 0.27, run);
           tB.copy(f.pos).sub(tA); const behind = tB.dot(vDir);
           if (f.stepping) {
             f.t += dtMs / f.dur;
             const rem = Math.max(0, 1 - f.t) * swing;
             f.to.copy(tA).addScaledVector(vel, rem).addScaledVector(vDir, half); f.to.y = G(f.to.x, f.to.z);
-            f.pos.copy(f.from).lerp(f.to, smooth(f.t)); f.pos.y += Math.sin(clamp(f.t, 0, 1) * Math.PI) * (0.11 + Math.max(0, f.to.y - f.from.y) * 0.6) * scale;
+            f.pos.copy(f.from).lerp(f.to, smooth(f.t)); f.pos.y += Math.sin(clamp(f.t, 0, 1) * Math.PI) * (lerp(0.11, 0.2, run) + Math.max(0, f.to.y - f.from.y) * 0.6) * scale;
             if (f.t >= 1) { f.stepping = false; f.pos.copy(f.to); footprint(f.to.x, f.to.z, yaw, f.to.y); if (onStep) onStep(f.to, false); }
-          } else if (!anyStepping && (behind < -half * 0.85 || lag > half * 2.6)) {
+          } else if ((!anyStepping || (run > 0.5 && feet.every((q) => q === f || !q.stepping || q.t > 0.55))) && (behind < -half * 0.85 || lag > half * 2.6)) {
             f.stepping = true; f.t = 0; f.dur = swing * 1000; f.from.copy(f.pos);
           }
           return;
@@ -2503,7 +2559,12 @@
           p.fromBufferAttribute(P, i).applyMatrix4(tmp); wp[i * 3] = p.x; wp[i * 3 + 1] = p.y; wp[i * 3 + 2] = p.z;
           mN.setFromMatrix4(tmp); n.fromBufferAttribute(Nn, i).applyMatrix3(mN).normalize(); wn[i * 3] = n.x; wn[i * 3 + 1] = n.y; wn[i * 3 + 2] = n.z;
         }
-        for (let t = 0; t < I.length; t++) { const i = I[t]; out.pos.push(wp[i * 3], wp[i * 3 + 1], wp[i * 3 + 2]); out.nor.push(wn[i * 3], wn[i * 3 + 1], wn[i * 3 + 2]); out.col.push(Cc.getX(i), Cc.getY(i), Cc.getZ(i)); }
+        const CL = g.attributes.cloth, PU = mesh === body ? palB : palH, on = PU && PU.uPOn.value > 0.5;
+        const refs = on ? [PU.uRef.value.x, PU.uRef.value.y, PU.uRef.value.z, PU.uRef.value.w, PU.uRef2.value.x, PU.uRef2.value.y] : null;
+        for (let t = 0; t < I.length; t++) { const i = I[t]; out.pos.push(wp[i * 3], wp[i * 3 + 1], wp[i * 3 + 2]); out.nor.push(wn[i * 3], wn[i * 3 + 1], wn[i * 3 + 2]);
+          let r = Cc.getX(i), gg = Cc.getY(i), b = Cc.getZ(i);
+          if (on && CL) { const si = PAL_SLOTS.indexOf(Math.round(CL.getX(i) * 16)); if (si >= 0) { const pc = PU['uPal' + si].value, k = clamp((r * 0.2126 + gg * 0.7152 + b * 0.0722) / refs[si], 0.35, 1.8); r = pc.r * k; gg = pc.g * k; b = pc.b * k; } }
+          out.col.push(r, gg, b); }
       });
       return out;
     }
@@ -2542,15 +2603,27 @@
       // 見た目：体の色合い、笠、面、鎧の板、背の弓、体の大きさ
       dress(o) {
         if (!big) return;
-        bodyMat.color.setRGB(...(o.tint || [1, 1, 1])); headMat.color.setRGB(...(o.tint || [1, 1, 1]));
+        // 装束の色：勢力の配色があれば部位ごとに塗り分け、なければ元の色に色合いを掛ける
+        const P = o.pal, on = P ? 1 : 0;
+        bodyMat.color.setRGB(...(P ? [1, 1, 1] : (o.tint || [1, 1, 1]))); headMat.color.setRGB(...(P ? [1, 1, 1] : (o.tint || [1, 1, 1])));
+        [palB, palH].forEach((U, h) => { U.uPOn.value = on; if (!P) return; ['kimono', 'lapel', 'hakama', 'sash', 'armor', 'glove'].forEach((k, i) => U['uPal' + i].value.set(h && i === 0 ? (P.hood || P.kimono) : P[k]).convertSRGBToLinear()); });
         plates.forEach((pl) => { if (!pl.noChip) pl.m.visible = !!o.plates; });
         const jg = plates.find((pl) => pl.noChip); if (jg) jg.m.visible = o.hat === 'jingasa';
         if (strawKasa) strawKasa.visible = o.hat === 'kasa';
+        const A = o.acc || {};
+        acc.kabuto.visible = o.hat === 'kabuto'; acc.kabuto.userData.crest.visible = !!A.crest;
+        acc.tokin.visible = o.hat === 'tokin' || !!A.tokin;
+        acc.hachimaki.visible = o.hat === 'hachimaki'; if (A.band) acc.hachimaki.userData.mat.color.set(A.band).convertSRGBToLinear();
+        acc.mino.visible = !!A.mino; { const c = acc.mino.userData.col, dk = A.mino === 'dark'; for (let i = 0; i < c.length; i += 3) { const v = 0.8 + 0.2 * Math.sin(i * 0.37); if (dk) c.set([0.02 * v, 0.02 * v, 0.025 * v], i); else c.set([0.15 * v, 0.11 * v, 0.05 * v], i); } acc.mino.geometry.attributes.color.needsUpdate = true; }
+        acc.sashimono.visible = !!A.sashimono; if (A.sashimono) acc.sashimono.userData.mat.color.set(A.sashimono).convertSRGBToLinear();
+        acc.yuigesa.visible = !!A.yuigesa; if (A.yuigesa) acc.yuigesa.userData.mat.color.set(A.yuigesa).convertSRGBToLinear();
+        acc.tasuki.visible = !!A.tasuki; if (A.tasuki) acc.tasuki.userData.mat.color.set(A.tasuki).convertSRGBToLinear();
+        chains.forEach((c) => { if (c.scarf) { c.off = !A.scarf; if (A.scarf) c.c.mesh.material.color.set(A.scarf).convertSRGBToLinear(); c.c.mesh.visible = !c.off && root.visible; } if (c.hair) { c.off = !!A.noHair; c.c.mesh.visible = !c.off && root.visible; } });
         Object.entries(maskSet).forEach(([k, m]) => { m.visible = k === (o.mask || 'black'); });
         armShowBackBow = !!o.backBow; if (backBow) backBow.visible = armShowBackBow;
         root.scale.setScalar(o.scale || scale);
       },
-      present(on) { root.visible = on; shadow.visible = on; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = on; }); },
+      present(on) { root.visible = on; shadow.visible = on; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = on && !c.off; }); },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
       showBody() { body.visible = true; headMesh.visible = true; shadow.visible = true; },
       resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
@@ -2586,7 +2659,7 @@
       },
       resetHat() {
         hatFall = null;
-        body.visible = true; headMesh.visible = true; shadow.visible = true; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = true; });
+        body.visible = true; headMesh.visible = true; shadow.visible = true; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = !c.off; });
         chips.forEach((c) => { if (c.m.parent === scene) scene.remove(c.m); }); chips.length = 0;
         // 斬り分けで外した物を、元の場所へ戻す
         scattered.forEach((x) => { scene.remove(x.m); x.parent.add(x.m); x.m.position.copy(x.p); x.m.quaternion.copy(x.q); x.m.scale.copy(x.s); }); scattered.length = 0;
@@ -2896,7 +2969,7 @@
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: trailTex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     mesh.frustumCulled = false; scene.add(mesh);
-    const samples = [];
+    const samples = [], keys = [];
     const LIFE = 300;
     const dA = V(0, 0, 0), dB = V(0, 0, 0), qa = new THREE.Quaternion(), qf = new THREE.Quaternion(), dTmp = V(0, 0, 0);
     let last = null;
@@ -2914,28 +2987,27 @@
         if (active && !halted) {
           // 帯は刀身の外側だけ（柄の側まで伸ばすと、手首を中心に回るとき内側の端が逆に振れて帯がねじれる）
           const mid = fig.mid.clone().lerp(fig.tip, -0.12), tip = fig.tip.clone().lerp(fig.mid, -0.1);
-          if (last) {
-            dA.copy(last.tip).sub(last.mid); const LA = dA.length(); dA.normalize();
-            dB.copy(tip).sub(mid); const LB = dB.length(); dB.normalize();
-            const ang = Math.acos(clamp(dA.dot(dB), -1, 1));
-            const k = Math.min(60, Math.ceil(ang / 0.05));
-            qa.setFromUnitVectors(dA, dB);
-            for (let j = 1; j < k; j++) {
-              const f = j / k;
-              qf.identity().slerp(qa, f);
-              const m = last.mid.clone().lerp(mid, f);
-              dTmp.copy(dA).applyQuaternion(qf).multiplyScalar(lerp(LA, LB, f));
-              push(m.clone().add(dTmp), m, lerp(last.t, now, f));
-            }
-          }
-          push(tip, mid, now); last = { tip, mid, t: now };
+          keys.unshift({ mid, dir: tip.clone().sub(mid), t: now }); last = keys[0];
         } else last = null;
-        while (samples.length > N || (samples.length && now - samples[samples.length - 1].t > LIFE)) samples.pop();
+        while (keys.length > 40 || (keys.length && now - keys[keys.length - 1].t > LIFE)) keys.pop();
+        // コマごとの刀の位置（手元と刀の向き）の間を、滑らかな曲線でつなぐ。向きも曲線で補ってから長さをそろえる
+        // （直線でつなぐと、速い振りではコマの継ぎ目がそのまま角になり、帯がカクカクする）
+        samples.length = 0;
+        for (let i = 0; i < keys.length - 1 && samples.length < N; i++) {
+          const k0 = keys[Math.max(0, i - 1)], k1 = keys[i], k2 = keys[i + 1], k3 = keys[Math.min(keys.length - 1, i + 2)];
+          const ang = Math.acos(clamp(k1.dir.clone().normalize().dot(k2.dir.clone().normalize()), -1, 1));
+          const m = clamp(Math.ceil(ang / 0.035 + k1.mid.distanceTo(k2.mid) / 0.03), 1, 48);
+          for (let j = 0; j < m && samples.length < N; j++) {
+            const f = j / m, md = catmull(k0.mid, k1.mid, k2.mid, k3.mid, f, V(0, 0, 0));
+            catmull(k0.dir, k1.dir, k2.dir, k3.dir, f, dTmp); const len = lerp(k1.dir.length(), k2.dir.length(), f);
+            samples.push({ tip: md.clone().addScaledVector(dTmp.normalize(), len), mid: md, t: lerp(k1.t, k2.t, f) });
+          }
+        }
+        if (keys.length) { const kl = keys[keys.length - 1]; samples.push({ tip: kl.mid.clone().add(kl.dir), mid: kl.mid.clone(), t: kl.t }); }
         const c = this.color, L = samples.length;
         if (L < 2) { col.fill(0); geo.attributes.color.needsUpdate = true; geo.setDrawRange(0, 0); return; }
         // 点を両隣と均して（2回）、帯の縁を滑らかにする
         for (let i = 0; i < L; i++) { sT[i] = (sT[i] || V(0, 0, 0)).copy(samples[i].tip); sM[i] = (sM[i] || V(0, 0, 0)).copy(samples[i].mid); }
-        for (let pass = 0; pass < 2; pass++) for (let i = 1; i < L - 1; i++) { tmpA.copy(sT[i - 1]).add(sT[i + 1]).multiplyScalar(0.5); sT[i].lerp(tmpA, 0.5); tmpA.copy(sM[i - 1]).add(sM[i + 1]).multiplyScalar(0.5); sM[i].lerp(tmpA, 0.5); }
         for (let i = 0; i < L; i++) {
           const sm = samples[i], st = sT[i], sd = sM[i];
           const f = Math.max(0, 1 - (now - sm.t) / LIFE);
@@ -3718,10 +3790,65 @@
       brk: R0.brk * (L.brk || 1), time: R0.time * (L.time || 1), w: R0.w * (L.w || 1), read: R0.read + (L.read || 0), counter: L.counter || 0, feint: L.feint || 0, noFlinch: !!L.noFlinch,
       look: { tint: TINTS[tint], hat, mask, plates: R0.plates, backBow: wk === 'bow', scale: 1.2 * R0.scale * (wk === 'tetsubo' || wk === 'otachi' ? 1.06 : 1) * (wk === 'kunai' || wk === 'ninjato' ? 0.94 : 1) } });
   }));
+  // ───────── 山の勢力（docs/42）：誰が、どの合目に、どんな装いでいるか ─────────
+  // 色は勢力（どこの者か）、頭と背の形は勢力と格、なびく布や兜の飾りは固有の法則を表す（見た目が、そのまま読みの手がかりになる）
+  const FACTIONS = {
+    // 野伏り：麓に巣くう食い詰め者。継ぎの当たった土色の布、編み笠か鉢巻、雨よけの蓑
+    nobushi: { name: '野伏り', weapons: ['katana', 'kodachi', 'dual', 'staff', 'tetsubo', 'kusarigama', 'otachi'], hats: ['kasa', 'hachimaki', 'none', 'kasa'], mask: 'grey', mino: 0.35,
+      pals: [{ kimono: '#5b4a3a', lapel: '#3a2f25', hakama: '#4b4337', sash: '#77663f', armor: '#4a3c30', glove: '#3b3129', hood: '#2b241f' }, { kimono: '#4c4a3a', lapel: '#2e2c24', hakama: '#3c3a30', sash: '#6b4a2a', armor: '#2a2620', glove: '#33302a', hood: '#26241e' }, { kimono: '#5a3e34', lapel: '#c2b49a', hakama: '#3f3630', sash: '#2a2620', armor: '#2c2420', glove: '#3a2c26', hood: '#2a1f1b' }] },
+    // 番所の兵：山の関を守る藩の兵。藍の揃いの装い、陣笠、背に白地に黒丸の旗
+    bansho: { name: '番所の兵', weapons: ['spear', 'bow', 'katana', 'naginata', 'otachi', 'tetsubo'], hats: ['jingasa'], mask: 'iron', flag: '#d8d2c2',
+      pals: [{ kimono: '#1f2b46', lapel: '#c9c2ab', hakama: '#283048', sash: '#8b6b2b', armor: '#3b2b24', glove: '#1c2233', hood: '#1a2238' }] },
+    // 修験：霧の参道と滝で行をする山伏と僧兵。白の装束、頭襟、胸の結袈裟
+    shugen: { name: '修験', weapons: ['naginata', 'staff', 'otachi', 'katana'], hats: ['tokin'], mask: 'grey', yuigesa: true,
+      pals: [{ kimono: '#d6d0c0', lapel: '#ebe5d6', hakama: '#b9a46c', sash: '#3a3838', armor: '#cbc4b2', glove: '#cfc7b6', hood: '#dedacd' }, { kimono: '#c9c2ae', lapel: '#e6e0d0', hakama: '#7b6a8a', sash: '#3a3838', armor: '#bfb8a6', glove: '#c2b9a6', hood: '#d4cfc0' }] },
+    // 忍び：霧と樹氷に潜む者。闇の藍と黒、頭巾、影の面
+    shinobi: { name: '忍び', weapons: ['ninjato', 'kunai', 'kusarigama', 'kodachi', 'dual'], hats: ['none'], mask: 'kage', noHair: true,
+      pals: [{ kimono: '#151a28', lapel: '#1c2333', hakama: '#171b29', sash: '#3a1418', armor: '#101219', glove: '#131623', hood: '#0d0f17' }, { kimono: '#1c1c22', lapel: '#2a2a30', hakama: '#1a1a20', sash: '#4a3a1a', armor: '#121216', glove: '#18181e', hood: '#101014' }] },
+    // 剣客：白峰の浪人の噂を聞いて集まった、腕に覚えのある者たち。一人ひとり違う色の着物
+    kenkaku: { name: '剣客', weapons: ['katana', 'otachi', 'dual', 'spear', 'kodachi'], hats: ['kasa', 'none', 'none'], mask: 'red',
+      pals: [{ kimono: '#5e1a22', lapel: '#d8d0c0', hakama: '#2c2a30', sash: '#141416', armor: '#4a161c', glove: '#2a2228', hood: '#1a1418' }, { kimono: '#1f4848', lapel: '#d8d0c0', hakama: '#2a2c30', sash: '#141416', armor: '#1a3a3a', glove: '#22282a', hood: '#141a1a' },
+        { kimono: '#7a5e22', lapel: '#2a2420', hakama: '#33302c', sash: '#141416', armor: '#5e481c', glove: '#2c2820', hood: '#1c1810' }, { kimono: '#3e2242', lapel: '#d8d0c0', hakama: '#2a2830', sash: '#141416', armor: '#341c38', glove: '#262028', hood: '#18141a' }] },
+    // 天狗党：吹雪の尾根に住みつき、天狗の面をつけた荒くれの修験崩れ。黒の装束、黒い羽の蓑
+    tengu: { name: '天狗党', weapons: ['naginata', 'katana', 'dual', 'staff', 'ninjato'], hats: ['tokin'], mask: 'tengu', mino: 'dark',
+      pals: [{ kimono: '#24242a', lapel: '#8e1d1d', hakama: '#35262a', sash: '#c6a145', armor: '#1c1416', glove: '#2a2024', hood: '#1a1a1e' }] },
+    // 白峰の守り手：頂に至り、白狐に仕える者。白と銀の装い、白い襟巻
+    mamori: { name: '白峰の守り手', weapons: null, hats: ['kasa', 'none'], mask: 'white', scarf: '#e8eaf0',
+      pals: [{ kimono: '#c9cdd7', lapel: '#8c1a26', hakama: '#9aa1af', sash: '#dadde5', armor: '#b1b7c3', glove: '#c1c5cd', hood: '#d1d5dd' }] },
+  };
+  // 合目ごとに出会う勢力（地形と合わせる：麓は野伏り、関は番所、霧と滝は修験、樹氷は忍び、尾根は天狗党、頂の手前は守り手）
+  const STAGE_FACTIONS = { 1: ['nobushi'], 2: ['nobushi', 'bansho'], 3: ['shinobi', 'shugen'], 4: ['bansho'], 5: ['kenkaku', 'nobushi'], 6: ['shugen', 'kenkaku'], 7: ['shinobi', 'kenkaku'], 8: ['tengu'], 9: ['mamori', 'kenkaku'] };
+  const defaultFaction = (t) => (t.weapon === 'ninjato' || t.weapon === 'kunai' ? 'shinobi' : t.weapon === 'naginata' ? 'shugen' : t.rank === 'zako' ? 'nobushi' : t.rank === 'ashigaru' ? 'bansho' : 'kenkaku');
+  const hashStr = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
+  // 装いを決める：勢力（色・頭・背）＋ 格（鎧の板、頭の兜）＋ 固有の法則の印
+  //  疾い＝赤い襟巻がなびく、身軽＝灰の襟巻（鎧なし）、返しが鋭い＝赤い襷、怯まない＝金の鍬形の兜、堅い＝鎧の板と兜、重い＝蓑、虚が多い＝影の面
+  function factionLook(fk, t, salt) {
+    const F = FACTIONS[fk], R = rng(hashStr(t.id + ':' + fk + ':' + (salt || 0))), pick2 = (a) => a[Math.floor(R() * a.length)];
+    const look = { pal: pick2(F.pals), hat: pick2(F.hats), mask: F.mask, plates: !!(RANKS[t.rank] && RANKS[t.rank].plates), backBow: t.weapon === 'bow', scale: (t.look && t.look.scale) || 1.2, acc: {} };
+    const A = look.acc;
+    if (F.mino === 'dark') A.mino = 'dark'; else if (F.mino && R() < F.mino) A.mino = true;
+    if (F.yuigesa) A.yuigesa = t.rank === 'kashira' ? '#6a3a8a' : t.rank === 'ryuha' ? '#c8a040' : '#e8e2d4';
+    if (F.flag) A.sashimono = t.rank === 'kashira' ? '#8c1a26' : F.flag;
+    if (F.scarf) A.scarf = F.scarf;
+    if (F.noHair) A.noHair = true;
+    if (fk === 'tengu') A.tokin = true;
+    if (look.hat === 'hachimaki') A.band = R() < 0.5 ? '#e6e2d8' : '#9a2420';
+    if (t.rank === 'kashira' && fk !== 'tengu') { look.hat = 'kabuto'; A.crest = true; }
+    const law = t.law || 'none';
+    if (law === 'swift') A.scarf = A.scarf || '#a3201c';
+    if (law === 'evasive') { A.scarf = A.scarf || '#8a8e98'; look.plates = false; }
+    if (law === 'counter') A.tasuki = '#b02420';
+    if (law === 'stubborn') { look.hat = 'kabuto'; A.crest = true; }
+    if (law === 'armored') { look.plates = true; if (look.hat === 'none' || look.hat === 'hachimaki') look.hat = 'kabuto'; }
+    if (law === 'heavy') A.mino = A.mino || true;
+    if (law === 'feinty' && look.mask !== 'tengu') look.mask = 'kage';
+    return look;
+  }
+  ROSTER.forEach((t) => { t.look = factionLook(defaultFaction(t), t); t.faction = defaultFaction(t); });
   // 五合目の主：白峰の浪人（今までの相手）。前半と後半の二段
   const BOSS = { id: 'boss', weapon: 'katana', rank: 'boss', name: '白峰の浪人', boss: true, brk: 1, time: 1, w: 1, read: 0.4, counter: 0, feint: 0, look: { tint: [1, 1, 1], hat: 'jingasa', mask: 'black', plates: true, backBow: true, scale: 1.2 } };
   // 九合目の主：白狐の剣士。こちらと同じ白狐の面と笠。山を登る間のこちらの癖を覚えていて、それを咎める（docs/40）
-  const KITSUNE = Object.assign({}, BOSS, { id: 'kitsune', name: '白狐の剣士', lord: true, learner: true, brk: 0.8, time: 0.9, read: 0.6, look: { tint: [0.96, 0.96, 1.0], hat: 'kasa', mask: 'white', plates: false, backBow: false, scale: 1.12 } });
+  const KITSUNE = Object.assign({}, BOSS, { id: 'kitsune', name: '白狐の剣士', lord: true, learner: true, brk: 0.8, time: 0.9, read: 0.6, look: { pal: FACTIONS.mamori.pals[0], hat: 'kasa', mask: 'white', plates: false, backBow: false, scale: 1.12, acc: { scarf: '#eef0f6', noHair: false } } });
   // ───────── 武器ごとの構えと技の形：同じ体でも、持つ物で立ち方が変わる ─────────
   const WNEUTRAL = {
     // 槍：半身に開き、穂先を真っ直ぐ相手へ向けて低く構える
@@ -3860,9 +3987,15 @@
     const one = (tok) => {
       if (tok === 'BOSS') return BOSS;
       if (tok === 'KITSUNE') return KITSUNE;
-      if (typeof tok === 'object') return tok;
-      const pool = ROSTER.filter((t) => t.rank === RANK_OF[tok] && !used.has(t.id));
-      const t = pick(pool.length ? pool : ROSTER.filter((q) => q.rank === RANK_OF[tok])); used.add(t.id); return t;
+      // 合目の勢力から選ぶ（その勢力が使う武器の者）。装いは勢力と格と法則で決まる。同じ者でも登るたびに色の組み合わせは少し変わる
+      const fk = pick(STAGE_FACTIONS[stage] || ['kenkaku']), F = FACTIONS[fk], salt = Math.floor(Math.random() * 1e6);
+      if (typeof tok === 'object') return tok.boss ? tok : Object.assign({}, tok, { look: factionLook(fk, tok, salt), faction: fk });
+      const ok = (t) => t.rank === RANK_OF[tok] && (!F.weapons || F.weapons.includes(t.weapon));
+      let pool = ROSTER.filter((t) => ok(t) && !used.has(t.id));
+      if (!pool.length) pool = ROSTER.filter(ok);
+      if (!pool.length) pool = ROSTER.filter((q) => q.rank === RANK_OF[tok]);
+      const t = pick(pool); used.add(t.id);
+      return Object.assign({}, t, { look: factionLook(fk, t, salt), faction: fk });
     };
     return STAGES[stage].road.map((e) => (Array.isArray(e) ? e.map(one) : one(e)));
   }
@@ -3874,7 +4007,7 @@
     // 山小屋を通り過ぎた所で、合目の名が静かに浮かぶ（画面を切り替えず、歩いたまま次の合目へ入る）
     const next = S.stage + 1;
     S.road = makeRoad(next); S.roadIdx = 0;
-    startTravel(clearD(next, 0), S.road[0], { speed: 2.9, cross: { d: stageStart(next) + HUT_AT, fn: () => { S.stage = next; saveStage(next); showStageCard(next); } } });
+    startTravel(clearD(next, 0), S.road[0], { speed: 5.2, cross: { d: stageStart(next) + HUT_AT, fn: () => { S.stage = next; saveStage(next); showStageCard(next); } } });
   }
   function showStageCard(n) {
     const card = document.getElementById('stageCard');
@@ -4697,7 +4830,7 @@
     pts.push(localAt(d1, 0));
     if (pts.length < 3) pts.splice(1, 0, pts[0].clone().lerp(pts[pts.length - 1], 0.5));
     const curve = new THREE.CatmullRomCurve3(pts);
-    S.travel = { curve, len: curve.getLength(), s: 0, t0: S.gt, targetD, amb, speed: opt.speed || 2.3, cross: opt.cross || null };
+    S.travel = { curve, len: curve.getLength(), s: 0, t0: S.gt, targetD, amb, speed: opt.speed || 4.4, cross: opt.cross || null };
     S.rule = null; S.wind = null; S.windK = 1; WORLD_WIND.set(0, 0, 0);
     S.mode = 'travel'; S.modeStart = S.gt; S.modeUntil = S.gt + 1e9;
   }
@@ -4705,9 +4838,9 @@
   function updateTravel() {
     const T = S.travel; if (!T) return;
     const dt = Math.min(0.05, (S.gt - (T.last || S.gt)) / 1000); T.last = S.gt;
-    const start = smooth((S.gt - T.t0) / 900), end = clamp((T.len - T.s) / 2.2, 0.22, 1);
+    const start = smooth((S.gt - T.t0) / 650), end = clamp((T.len - T.s) / 3.6, 0.12, 1);   // 走り出しと、着く前の減速
     // 石段と上り坂では、足取りが少し重くなる
-    const pd = playerD(), climb = onStairs(pd) ? 0.72 : 1 - clamp((pathH(pd + 1, 0) - pathH(pd - 1, 0)) * 0.25, 0, 0.25);
+    const pd = playerD(), climb = onStairs(pd) ? 0.8 : 1 - clamp((pathH(pd + 1, 0) - pathH(pd - 1, 0)) * 0.2, 0, 0.2);
     T.climb = lerp(T.climb || 1, climb, Math.min(1, dt * 3));
     T.s = Math.min(T.len, T.s + T.speed * start * end * T.climb * dt);
     const u = T.s / T.len, p = T.curve.getPointAt(u);
@@ -5033,7 +5166,7 @@
       } else {
         S.mode = 'victory'; S.victoryAt = performance.now();
         // 終わりの画面は、追撃で斬り刻む時間を置いてから出す
-        S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 4200);
+        S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 3200);
       }
     }
 
@@ -5252,7 +5385,7 @@
     const out = S.playerPose, pa = S.pa;
     // 相手が近いほど、構えが低く締まる
     blend(PL.guard, PL.low, clamp((3.6 - dist()) / 1.8, 0, 1) * 0.6, P_BASE);
-    if (S.mode === 'travel') { blend(PL.guard, PL.low, 1, P_BASE); P_BASE.crouch -= 0.08; P_BASE.yaw *= 0.4; P_BASE.hand.y -= 0.08; }   // 歩く間：刀を下げ、背を伸ばして歩く
+    if (S.mode === 'travel') { blend(PL.guard, PL.low, 1, P_BASE); P_BASE.crouch -= 0.16; P_BASE.yaw *= 0.4; P_BASE.hand.y -= 0.08; }   // 歩く間：刀を下げ、背を伸ばして歩く
     // 構えは止まらない：重心がゆっくり左右に移り、刀先がわずかに円を描く（生きている構え）
     { const g = S.gt * 0.001; P_BASE.hipX += Math.sin(g * 1.3) * 0.035; P_BASE.yaw += Math.sin(g * 0.9 + 1) * 0.08; P_BASE.crouch += Math.sin(g * 2.1) * 0.015;
       P_BASE.hand.x += Math.sin(g * 1.7) * 0.02; P_BASE.hand.y += Math.cos(g * 1.7) * 0.015; }
@@ -5678,6 +5811,7 @@
     soundDump(n, i) { return Sound.dump(n, i); },
     tips() { return { p: player.tip.toArray(), e: enemy.tip.toArray(), gt: S.gt }; },
     renderInfo() { return { calls: SCENE_INFO.calls, tris: SCENE_INFO.tris, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
+    lookTest(fk, id, salt) { const t = ROSTER.find((q) => q.id === id) || ROSTER[0]; applyEnemyType(Object.assign({}, t, { look: fk === 'kitsune' ? KITSUNE.look : fk === 'boss' ? BOSS.look : factionLook(fk, t, salt || 0) }), enemy); enemy.present(true); },
     camApproach(back) { const y = gyRoot(0, back) + 3.3; S.camDebug = { pos: V(1.0, y, back), look: V(0, gyRoot(0, -8) + 1.6, -8) }; },
     camDebug(pos, look) { S.camDebug = pos ? { pos: V(...pos), look: V(...look) } : null; },
     who(e) { const f = e ? enemy : player; return { player: f.root.position.toArray(), yaw: f.root.rotation.y, head: f.headWorld.toArray() }; },

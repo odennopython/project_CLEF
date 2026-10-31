@@ -26,6 +26,7 @@
 | [20-quality-bar.md](20-quality-bar.md) | 高品質の定義と、低品質な部分の洗い出しと補修（試作 1.1） |
 | [21-wafuku-cool.md](21-wafuku-cool.md) | 和装の自然な格好よさの定義と、主人公の作り直し（試作 1.2） |
 | [22-sound-realism.md](22-sound-realism.md) | 音のリアリティ：物理に基づく合成で作り直す（試作 2.0） |
+| [42-world-and-characters.md](42-world-and-characters.md) | 世界と登場人物：設定の上位方針（見た目は法則の手がかり、言葉で語らない）、白峰と風の伝説、山の掟と面の色、七つの勢力、見た目の文法、名のある者（試作 4.8） |
 | [41-terrain-craft.md](41-terrain-craft.md) | 地形の作り込み：飽きの原因の分解、登る道（坂と石段）、夜から夜明けへの光と遠景、45の開けの情景、先に挑んだ者の跡、動く空気（試作 4.7） |
 | [40-continuous-mountain.md](40-continuous-mountain.md) | 地続きの山：一本の道、歩いて次の開けへ、九つの合目の地形と法則、六〜九合目、白狐の剣士（試作 4.6） |
 | [39-mountain-stages.md](39-mountain-stages.md) | 一〜五合目の構成、山小屋からの再開、開発者モード、震えの解消、斬り抜けの演出（試作 4.5） |
