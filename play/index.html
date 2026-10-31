@@ -185,6 +185,24 @@
   .t-ver { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center; font-size: 10px; letter-spacing: 0.12em; color: rgba(214, 220, 232, 0.28); pointer-events: none; }
   @keyframes tIn { to { opacity: 1; } }
   @keyframes tBreath { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.12; } }
+
+  /* 合目の題：静かに浮かんで消える */
+  #stageCard { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 15; font-family: var(--display); font-size: clamp(28px, 8vw, 44px); letter-spacing: 0.6em; padding-left: 0.6em; color: #eef1f6; opacity: 0; text-shadow: 0 0 24px rgba(0,0,0,0.6); }
+  #stageCard.show { animation: stageIn 3.2s ease forwards; }
+  @keyframes stageIn { 0% { opacity: 0; } 25% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+
+  .t-stage { font-family: var(--display); font-size: 11px; letter-spacing: 0.4em; color: rgba(214, 220, 232, 0.35); }
+  .t-dev { all: unset; position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); font-size: 10px; letter-spacing: 0.2em; color: rgba(214, 220, 232, 0.22); padding: 6px; cursor: pointer; z-index: 21; }
+  #devPanel { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(4, 6, 12, 0.88); padding: 16px; overflow-y: auto; }
+  #devPanel[hidden] { display: none !important; }
+  .dv { display: grid; gap: 10px; width: min(26em, 100%); font-size: 13px; color: #d6dce8; }
+  .dv h3 { margin: 0 0 4px; font-family: var(--display); font-weight: 500; letter-spacing: 0.3em; font-size: 15px; }
+  .dv label { display: grid; gap: 4px; }
+  .dv label:has(input[type=checkbox]) { display: flex; gap: 8px; align-items: center; }
+  .dv select { font: inherit; padding: 6px; background: #121722; color: #e8ecf3; border: 1px solid rgba(154, 166, 186, 0.35); border-radius: 6px; }
+  .dvb { display: flex; gap: 10px; margin-top: 6px; }
+  .dvb button { font: inherit; padding: 8px 18px; border-radius: 999px; border: 0; background: #d6dce8; color: #0a0f1c; cursor: pointer; }
+  .dvb button.ghost { background: transparent; color: #9aa6ba; border: 1px solid rgba(154, 166, 186, 0.4); }
 </style>
 
 <div id="stage" aria-label="対戦の画面"></div>
@@ -201,12 +219,37 @@
     <span class="t-rule" aria-hidden="true"></span>
     <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
     <span class="t-tap">触れて始める</span>
+    <span class="t-stage" id="tStage"></span>
   </button>
-  <span class="t-ver"><span id="ver">試作 4.4 · 10/31 10:51 · 28923de</span></span>
+  <button id="devBtn" type="button" class="t-dev">開発</button>
+  <span class="t-ver"><span id="ver">試作 4.5 · 10/31 14:08 · da2429b</span></span>
+</div>
+
+<div id="devPanel" hidden>
+  <div class="dv">
+    <h3>開発者モード</h3>
+    <label>試すもの
+      <select id="dvMode">
+        <option value="stage">合目を通しで</option>
+        <option value="enemy">一人の相手</option>
+        <option value="group">群れ（同じ格）</option>
+      </select></label>
+    <label>合目 <select id="dvStage"></select></label>
+    <label>合目の何戦目から <select id="dvStart"><option value="0">1</option><option value="1">2</option><option value="2">3</option><option value="3">4</option><option value="4">5（主）</option></select></label>
+    <label>相手 <select id="dvEnemy"></select></label>
+    <label>群れの人数 <select id="dvCount"><option>1</option><option selected>2</option><option>3</option></select></label>
+    <label>群れの格 <select id="dvRank"><option value="z">雑兵</option><option value="a">足軽</option><option value="t">手練</option><option value="r">流派の者</option><option value="k">頭</option></select></label>
+    <label><input type="checkbox" id="dvGod"> 倒れない（崩しが溜まらない）</label>
+    <label><input type="checkbox" id="dvAuto"> 自動で遊ぶ（弾き中心）</label>
+    <label>時間の速さ <select id="dvSpeed"><option value="0.5">0.5倍</option><option value="1" selected>1倍</option><option value="1.5">1.5倍</option><option value="2">2倍</option></select></label>
+    <label><input type="checkbox" id="dvSave"> 進み具合を一合目に戻す</label>
+    <div class="dvb"><button id="dvGo" type="button">始める</button><button id="dvClose" type="button" class="ghost">閉じる</button></div>
+  </div>
 </div>
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
 
+<div id="stageCard" aria-live="polite"></div>
 <div id="end" class="veil" hidden>
   <div class="card end">
     <h2 id="endTitle">勝負あり</h2>
@@ -468,7 +511,8 @@
     riseEnd: PS({ hand: V(-0.48, 1.72, 0.2), sword: N(-0.8, 0.5, -0.32), yaw: -1.55, lift: 0.12, crouch: 0.22 }),
     // 弾き：前へ大きく踏み込み、刀を横一文字に突き出して受け、跳ね上げる
     // 弾き：一瞬でぐっと腰を落とし、刀を真横に寝かせて前へ突き出し、刃の腹で受ける（ひと目で弾きとわかる形）
-    deflect: PS({ hand: V(0.0, 1.3, 0.66), sword: N(1, 0.1, 0.12), crouch: 0.6, pitch: 0.24, yaw: -1.0, hipX: -0.1, hipZ: 0.16, roll: 0.12 }),
+    // 弾き：さらに低く沈み、刀を斜め（右下から左上）に立てて前へ突き出し、刃の腹で受ける
+    deflect: PS({ hand: V(-0.04, 1.12, 0.62), sword: N(0.78, 0.6, 0.18), crouch: 0.74, pitch: 0.3, yaw: -1.1, hipX: -0.14, hipZ: 0.2, roll: 0.22 }),
     deflectSnap: PS({ hand: V(0.34, 2.1, 0.28), sword: N(0.45, 0.88, -0.2), crouch: 0.28, yaw: 0.7, pitch: -0.3, lift: 0.14, roll: -0.1 }),   // 弾き返し：刀を大きく跳ね上げる
     dodge:   PS({ hand: V(0.1, 0.95, 0.3), sword: N(0.05, 0.3, 0.95), crouch: 0.5, pitch: 0.2 }),
     stomp:   PS({ hand: V(0.14, 1.6, 0.12), sword: N(0.35, 0.8, -0.45), crouch: 0.3, pitch: 0.38, lift: 0.22, hipZ: 0.22 }),
@@ -935,10 +979,14 @@
     if (s.y === null) { s.y = x; s.xp = x; s.yd = 0; return x; }
     if (T <= 0) return s.y;
     const k1 = z / (Math.PI * f), k2 = 1 / ((2 * Math.PI * f) * (2 * Math.PI * f)), k3 = r * z / (2 * Math.PI * f);
-    const xd = (x - s.xp) / T; s.xp = x;
-    const k2s = Math.max(k2, T * T / 2 + T * k1 / 2, T * k1);
-    s.y += T * s.yd;
-    s.yd += T * (x + k3 * xd - s.y - k1 * s.yd) / k2s;
+    // 目標の速さ：時間がごく遅いとき（1コマが短い）に、目標がわずかに動くだけで値が跳ね上がり、体が震えていた。上限を設け、細かく刻んで解く
+    const xd = clamp((x - s.xp) / Math.max(T, 0.004), -25, 25); s.xp = x;
+    const n = Math.max(1, Math.ceil(T / 0.008)), h = T / n;
+    for (let i = 0; i < n; i++) {
+      const k2s = Math.max(k2, h * h / 2 + h * k1 / 2, h * k1);
+      s.y += h * s.yd;
+      s.yd += h * (x + k3 * xd - s.y - k1 * s.yd) / k2s;
+    }
     return s.y;
   }
   const CHANNELS = ['hx', 'hy', 'hz', 'sx', 'sy', 'sz', 'hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift'];
@@ -1550,12 +1598,16 @@
       out.set(sx, 0, i === 0 ? 0.18 : -0.16);
       return root.localToWorld(out);
     }
+    let fastK = 0;
     function animate(p, T, fast) {
       // 揺れ戻りの少ないばね（減衰を強く）。行き過ぎて戻る動きは、ゼリーのように見えて気持ち悪い
       // 硬く、揺れ戻りのないばね：体が姿勢にきびきびと追いつく（柔らかいと、ふにゃっと崩れて見える）
-      const H = fast ? [20, 0.9, 1.15] : [7.5, 1.0, 1.0];
-      const Sw = fast ? [18, 0.88, 1.2] : [7, 1.0, 1.0];
-      const Bd = fast ? [13, 0.95, 1.05] : [6.2, 1.0, 1.0];
+      // 速いばねと遅いばねは、切り替えずに滑らかに混ぜる（急に切り替えると、そこでガクッと動く）。行き過ぎ（揺れ戻り）は無し
+      fastK += ((fast ? 1 : 0) - fastK) * Math.min(1, T * 14);
+      const mixS = (a, b) => [lerp(a[0], b[0], fastK), lerp(a[1], b[1], fastK), lerp(a[2], b[2], fastK)];
+      const H = mixS([7.5, 1.0, 1.0], [19, 0.95, 1.0]);
+      const Sw = mixS([7, 1.0, 1.0], [17, 0.92, 1.0]);
+      const Bd = mixS([6.2, 1.0, 1.0], [12, 0.98, 1.0]);
       sm.hand.set(soStep(springs.hx, p.hand.x, T, ...H), soStep(springs.hy, p.hand.y, T, ...H), soStep(springs.hz, p.hand.z, T, ...H));
       sm.sword.set(soStep(springs.sx, p.sword.x, T, ...Sw), soStep(springs.sy, p.sword.y, T, ...Sw), soStep(springs.sz, p.sword.z, T, ...Sw)).normalize();
       sm.hipX = soStep(springs.hipX, p.hipX, T, ...Bd); sm.hipZ = soStep(springs.hipZ, p.hipZ, T, ...Bd);
@@ -2999,12 +3051,13 @@
       const dx = w.e.x - S.p.x, dz = w.e.z - S.p.z;
       if (!w.e.tw && S.gt >= (w.st.nextBurst || 0)) {
         // 画面に入る前の弧（番の相手を中心に左右）に立つ：囲まれている圧が、いつも見える
+        // 左右の決まった持ち場（番の相手から離れた、画面の左右の端の手前）に立つ。一か所に固まらない
         const base = Math.atan2(S.e.x - S.p.x, S.e.z - S.p.z), side = wi % 2 ? -1 : 1;
-        const a = base + side * (0.5 + 0.12 * Math.floor(wi / 2) + S.r() * 0.3), r = 4.0 + S.r() * 0.7;
+        const a = base + side * (0.72 + S.r() * 0.14), r = 4.2 + S.r() * 0.5;
         let tx = S.p.x + Math.sin(a) * r, tz = S.p.z + Math.cos(a) * r; const rr = Math.hypot(tx, tz); if (rr > CFG.arena) { tx *= CFG.arena / rr; tz *= CFG.arena / rr; }
         tween(w.e, tx, tz, 300, easeOut); w.st.nextBurst = S.gt + 1000 + S.r() * 900;
       }
-      [S.e, ...S.waiters.filter((o) => o !== w && o.alive).map((o) => o.e)].forEach((o) => { const ox = w.e.x - o.x, oz = w.e.z - o.z, od = Math.hypot(ox, oz); if (od < 1.4 && od > 0.001) { w.e.x += ox / od * (1.4 - od) * 0.5; w.e.z += oz / od * (1.4 - od) * 0.5; } });
+      [S.e, ...S.waiters.filter((o) => o !== w && o.alive).map((o) => o.e)].forEach((o) => { const ox = w.e.x - o.x, oz = w.e.z - o.z, od = Math.hypot(ox, oz); if (od < 2.0 && od > 0.001) { w.e.x += ox / od * (2.0 - od) * 0.3; w.e.z += oz / od * (2.0 - od) * 0.3; } });
       w.e.yaw = Math.atan2(S.p.x - w.e.x, S.p.z - w.e.z);
       const t = w.st.etype, base = (t && !t.boss && WNEUTRAL[t.weapon]) || NEUTRAL, pz = w.st.enemyPose;
       blend(base, base, 0, pz); pz.crouch += 0.05 + Math.sin(S.gt * 0.003 + wi) * 0.02;
@@ -3024,7 +3077,7 @@
       const t = group[i + 1];
       if (!t) { f.present(false); return; }
       f.resetHat(); f.present(true); applyEnemyType(t, f);
-      const fd = dirPE(), a = Math.atan2(fd.x, fd.z) + (i % 2 ? -0.9 : 0.9);
+      const fd = dirPE(), a = Math.atan2(fd.x, fd.z) + (i % 2 ? -0.8 : 0.8);
       S.waiters.push({ fig: f, st: freshSlot(t), e: { x: S.p.x + Math.sin(a) * 4.6, z: S.p.z + Math.cos(a) * 4.6, tw: null, vx: 0, vz: 0, yaw: 0 }, alive: true });
       f.resetFeet();
     });
@@ -3039,9 +3092,37 @@
     return [...pick(W2.open), ...pick(W2.link), ...pick(W2.end)];
   }
   // 道：雑兵を三人斬り抜けて、五合目の主に挑む（縦の切り身の試作）
-  function makeRoad() {
-    const zakoish = ROSTER.filter((t) => t.rank === 'zako' || t.rank === 'ashigaru'), skilled = ROSTER.filter((t) => t.rank === 'tedare' || t.rank === 'ryuha' || t.rank === 'kashira');
-    return [pick(zakoish), [pick(zakoish), pick(zakoish)], [pick(zakoish), pick(zakoish), pick(zakoish)], pick(skilled), BOSS];   // 二人がかり、三人の群れを挟む
+  // ───────── 山（docs/39-mountain-stages.md）：合目ごとに五つの戦い。山小屋（合目の始め）から始まり、負けたら山小屋から ─────────
+  // 格の記号：z 雑兵、a 足軽、t 手練、r 流派の者、k 頭。配列は二人がかり・群れ（最大三人）。主は名を持つ特別な相手
+  const LORD = (id, name, o) => Object.assign({}, ROSTER.find((t) => t.id === id), { id: 'lord:' + id, name, lord: true }, o || {});
+  const STAGES = [
+    null,
+    { name: '一合目', road: ['z', ['z', 'z'], ['z', 'z', 'z'], 'a', LORD('katana:tedare', '一合目の門番', { brk: 1.2 })] },
+    { name: '二合目', road: ['a', ['a', 'z'], ['a', 'a', 'z'], 't', LORD('spear:kashira', '槍の老兵', { brk: 0.9 })] },
+    { name: '三合目', road: ['t', ['a', 't'], ['a', 'a', 'a'], 'r', LORD('ninjato:kashira', '霧の追跡者', { brk: 0.85 })] },
+    { name: '四合目', road: ['r', ['t', 't'], ['a', 'a', 't'], 'r', [LORD('bow:kashira', '弓の兄', { brk: 0.9 }), LORD('bow:ryuha', '弓の弟', { brk: 0.95 })]] },
+    { name: '五合目', road: ['t', ['r', 't'], ['t', 'a', 'a'], 'k', 'BOSS'] },
+  ];
+  const RANK_OF = { z: 'zako', a: 'ashigaru', t: 'tedare', r: 'ryuha', k: 'kashira' };
+  function makeRoad(stage) {
+    const used = new Set();
+    const one = (tok) => {
+      if (tok === 'BOSS') return BOSS;
+      if (typeof tok === 'object') return tok;
+      const pool = ROSTER.filter((t) => t.rank === RANK_OF[tok] && !used.has(t.id));
+      const t = pick(pool.length ? pool : ROSTER.filter((q) => q.rank === RANK_OF[tok])); used.add(t.id); return t;
+    };
+    return STAGES[stage].road.map((e) => (Array.isArray(e) ? e.map(one) : one(e)));
+  }
+  const saveStage = (n) => { try { localStorage.setItem('kaze.stage', String(n)); } catch (e) { /* 保存できなくても遊べる */ } };
+  const loadStage = () => { try { return clamp(parseInt(localStorage.getItem('kaze.stage') || '1', 10) || 1, 1, STAGES.length - 1); } catch (e) { return 1; } };
+  // 合目を越えた：題を静かに浮かべ、次の合目の山小屋から
+  function advanceStage() {
+    if (S.stage >= STAGES.length - 1) { showEnd(true); return; }
+    S.stage++; saveStage(S.stage);
+    const card = document.getElementById('stageCard');
+    card.textContent = STAGES[S.stage].name; card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+    S.newRoad = true; setTimeout(() => begin(1), 1400);
   }
   function kamae(kind, dur, then) { S.kamae = { kind, then }; setMode('kamae', dur); }
   function flip(then) {
@@ -3106,7 +3187,7 @@
 
   function doInput(dir, tDown) {
     if (!S.started || !dir) return;
-    if (S.mode === 'victory' && dir === 'U') { chopFollow(); clearTimeout(S.endTimer); S.endTimer = setTimeout(() => showEnd(true), 2600); return; }
+    if (S.mode === 'victory' && dir === 'U') { chopFollow(); clearTimeout(S.endTimer); S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 2600); return; }
     if (['victory', 'defeat', 'falling'].includes(S.mode)) return;
     if (S.mode === 'broken') { issen(); return; }
     if (S.gt < S.playerLockUntil) return;
@@ -3505,22 +3586,27 @@
     S.slowUntil = performance.now() + 1500; S.slowScale = 0.3;
     startPA('issen');
     Sound.issen();
-    fxFlash(0.55, 0.55, 0.6); fxShock(enemy.chestWorld, 1.4); fxKick(0.016, 0.2, enemy.chestWorld);
+    fxFlash(0.18, 0.18, 0.2); fxShock(enemy.chestWorld, 0.8); fxKick(0.006, 0.06, enemy.chestWorld);   // 画面を白く飛ばさない（斬り抜けの画を見せる）
     const finalCut = S.phase === 2 || (S.etype && !S.etype.boss);
     if (!finalCut) enemy.dropHat();
-    else setTimeout(finishCut, 300);   // 勝負の一閃：相手を斬り分ける
-    brushSlash();
+    else S.pendingCut = S.gt + 330;   // 勝負の一閃：駆け抜けたあと、一拍おいて相手が斬り分かれる
     snowBurst(S.e.x, S.e.z, 1.6);
-    camKick(enemy.chestWorld, 1.4, 0.6);
-    glowAt(enemy.chestWorld, 1.8, 200, 0xffffff); glowAt(enemy.chestWorld, 2.0, 500, 0xffe8d0, true);
+    glowAt(enemy.chestWorld, 0.8, 160, 0xffffff);
     tA.copy(enemy.chestWorld);
     burst(tA, 60, 2.2, 'warm'); lightAt(tA, 6, 0xfff1dc);
     ring(S.e.x, S.e.z, 4.5);
-    const f = dirPE();
-    const far = camera.aspect < 1 ? 7.6 : 4.4;
-    const cx = S.e.x + f.x * 0.8, cz = S.e.z + f.z * 0.8;
-    S.cine = { until: S.gt + 1700, pos: V(cx - f.z * far, 1.3, cz + f.x * far), look: V(cx, 1.0, cz) };
-    tween(S.p, S.e.x + f.x * 1.7, S.e.z + f.z * 1.7, 180);
+    // 斬り抜け：相手の体を駆け抜けて、背中合わせに止まる。カメラは二つの画で見せる
+    // 一の画：相手の前の低い位置から、こちらへ駆けてくる主人公と、すれ違う瞬間を見上げる
+    // 二の画：駆け抜けた主人公の前の低い位置から。手前に残心の主人公、奥で相手が斬り分かれる。ゆっくり回り込む
+    const f = dirPE(), sx = -f.z, sz = f.x, side = S.r() < 0.5 ? 1 : -1;
+    const ex = S.e.x, ez = S.e.z, px = ex + f.x * 2.1, pz = ez + f.z * 2.1;
+    S.passDir = V(f.x, 0, f.z);
+    tween(S.p, px, pz, 230, easeIn);
+    const port = camera.aspect < 1 ? 1.35 : 1;
+    S.cine = { t0: S.gt, until: S.gt + (finalCut ? 1650 : 1300), shots: [
+      { t: 0, pos: V(ex + f.x * 3.6 * port + sx * side * 3.0, 0.8, ez + f.z * 3.6 * port + sz * side * 3.0), look: V(ex - f.x * 0.6, 1.2, ez - f.z * 0.6), orbit: 0.12 * side },
+      { t: 250, pos: V(px + f.x * 3.4 * port - sx * side * 2.6, 0.9, pz + f.z * 3.4 * port - sz * side * 2.6), look: V((px + ex) / 2, 1.1, (pz + ez) / 2), orbit: 0.4 * side },
+    ] };
     pushLog('一閃', '', S.phase === 1 ? '前半を制した' : '勝負あり');
   }
 
@@ -3618,14 +3704,15 @@
   // 勝ちの一太刀：刀の通った斜めの面で斬り分ける
   function finishCut() {
     const c = enemy.chestWorld.clone().lerp(enemy.hipWorld, 0.35);
-    camera.getWorldDirection(_cv);
-    const slash = V(1, -0.55, 0).applyQuaternion(camera.quaternion).normalize();
-    const nrm = slash.clone().cross(_cv).normalize();
+    // 斬り口：駆け抜けた向きに垂直な、斜めの面（肩から脇腹へ）
+    const pd = S.passDir || V(0, 0, 1), sd = V(-pd.z, 0, pd.x);
+    const slash = sd.clone().multiplyScalar(S.r() < 0.5 ? 1 : -1).add(V(0, -0.65, 0)).normalize();
+    const nrm = slash.clone().cross(pd).normalize();
     Shatter.start(enemy, c, nrm);
     Sound.at(c); Sound.cut(true); Sound.kin(6);
-    burst(c, 90, 3.6, 'hot'); burst(c, 30, 2.0, 'cool'); glowAt(c, 2.2, 260, 0xffffff); glowAt(c, 2.4, 600, 0xffd0a0, true);
-    flare(c, 3.0, 420); smoke(c, 6, 0.6); lightAt(c, 7, 0xfff0d8);
-    fxShock(c, 1.6); fxFlash(0.5, 0.48, 0.45); camKick(c, 1.6, 0.8); S.shake = Math.max(S.shake, 0.12);
+    burst(c, 90, 3.6, 'hot'); burst(c, 30, 2.0, 'cool'); glowAt(c, 0.9, 220, 0xffffff);
+    flare(c, 1.0, 300); smoke(c, 6, 0.6); lightAt(c, 4, 0xfff0d8);
+    fxShock(c, 1.0); fxFlash(0.15, 0.14, 0.13); S.shake = Math.max(S.shake, 0.05);
     slashArc([c.clone().addScaledVector(slash, -1.2), c.clone().addScaledVector(slash, -0.4), c.clone(), c.clone().addScaledVector(slash, 0.4), c.clone().addScaledVector(slash, 1.2)], c, true, [1.5, 1.2, 0.8], 'slit');
     snowBurst(S.e.x, S.e.z, 2.0);
   }
@@ -3883,6 +3970,7 @@
   // ───────────────────────── 相手の進行 ─────────────────────────
   function updateAI() {
     const gt = S.gt, m = S.mode, f = dirPE();
+    if (S.pendingCut && gt >= S.pendingCut) { S.pendingCut = 0; finishCut(); }
     // 番の交代：番の相手が構え直しているときに、待っていた方が前へ出る
     const aw = aliveWaiters();
     if (aw.length && (m === 'stalk' || m === 'retreat') && !S.action && gt >= (S.nextSwap || 0) && !S.e.tw) {
@@ -3946,7 +4034,7 @@
       } else {
         S.mode = 'victory'; S.victoryAt = performance.now();
         // 終わりの画面は、追撃で斬り刻む時間を置いてから出す
-        S.endTimer = setTimeout(() => showEnd(true), 4200);
+        S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 4200);
       }
     }
 
@@ -4030,13 +4118,14 @@
     // 重ならない
     const dx = S.e.x - S.p.x, dz = S.e.z - S.p.z, d = Math.hypot(dx, dz);
     if (d < CFG.minGap && S.mode !== 'falling') {
+      // 押し戻しは、移動の行き先ごとずらす（行き先がそのままだと、移動と押し戻しが毎コマ綱引きして震える）
       const push = (CFG.minGap - d) / 2, nx = dx / (d || 1), nz = dz / (d || 1);
-      S.e.x += nx * push; S.e.z += nz * push; S.p.x -= nx * push; S.p.z -= nz * push;
+      [[S.e, 1], [S.p, -1]].forEach(([a, sg]) => { a.x += nx * push * sg; a.z += nz * push * sg; if (a.tw) { a.tw.tx += nx * push * sg; a.tw.tz += nz * push * sg; a.tw.fx += nx * push * sg; a.tw.fz += nz * push * sg; } });
     }
     // 石灯籠の輪の内側に留まる
     [S.e, S.p].forEach((a) => {
       const r = Math.hypot(a.x, a.z);
-      if (r > CFG.arena) { a.x *= CFG.arena / r; a.z *= CFG.arena / r; }
+      if (r > CFG.arena) { a.x *= CFG.arena / r; a.z *= CFG.arena / r; if (a.tw) { const tr = Math.hypot(a.tw.tx, a.tw.tz); if (tr > CFG.arena) { a.tw.tx *= CFG.arena / tr; a.tw.tz *= CFG.arena / tr; } } }
     });
     S.e.yaw = Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z);
     if (S.mode !== 'falling' || !S.cine) S.p.yaw = Math.atan2(S.e.x - S.p.x, S.e.z - S.p.z);
@@ -4178,6 +4267,7 @@
 
   function updateBodies(dtGame) {
     if (!['broken', 'falling', 'victory'].includes(S.mode) && S.gt - S.lastPressure > CFG.enemyRecoverDelay) S.B = Math.max(S.W || 0, S.B - CFG.enemyRecoverRate * dtGame / 1000);
+    if (S.dev && S.dev.god) S.P = Math.min(S.P, 60);   // 開発者モード：倒れない
     if (S.mode !== 'defeat' && S.gt - S.lastHit > CFG.playerRecoverDelay) S.P = Math.max(0, S.P - CFG.playerRecoverRate * dtGame / 1000);
     const k = 38, dmp = 9, dt = Math.min(dtGame, 50) / 1000;
     S.stagger.vx += (-k * S.stagger.x - dmp * S.stagger.vx) * dt; S.stagger.x += S.stagger.vx * dt;
@@ -4289,7 +4379,14 @@
     const dt = dtReal / 1000;
     const f = dirPE();
     if (S.cine && S.gt < S.cine.until) {
-      camPosT.copy(S.cine.pos); camLookT.copy(S.cine.look);
+      if (S.cine.shots) {
+        // 画の切り替えは一瞬で（カット）。画の中では、注視点のまわりをゆっくり回る
+        const tt = S.gt - S.cine.t0; let k2 = 0; S.cine.shots.forEach((sh, i) => { if (tt >= sh.t) k2 = i; });
+        const sh = S.cine.shots[k2], next = S.cine.shots[k2 + 1], dur = (next ? next.t : S.cine.until - S.cine.t0) - sh.t, u = clamp((tt - sh.t) / Math.max(1, dur), 0, 1);
+        const a = sh.orbit * u, dx = sh.pos.x - sh.look.x, dz = sh.pos.z - sh.look.z;
+        camPosT.set(sh.look.x + dx * Math.cos(a) - dz * Math.sin(a), sh.pos.y + u * 0.15, sh.look.z + dx * Math.sin(a) + dz * Math.cos(a)); camLookT.copy(sh.look);
+        if (S.cine.shotIdx !== k2) { S.cine.shotIdx = k2; S.cine.cut = false; }
+      } else { camPosT.copy(S.cine.pos); camLookT.copy(S.cine.look); }
     } else {
       S.cine = null;
       // 自分の背中の右肩越しに、相手を見る。離れるほど引く。
@@ -4400,7 +4497,8 @@
   }
   function begin(fromPhase) {
     // 道：新しく始めるときは道を組み直す。負けたときは、同じ相手からやり直す
-    if (!S.road || S.newRoad) { S.road = makeRoad(); S.roadIdx = 0; S.newRoad = false; }
+    S.stage = S.stage || loadStage();
+    if (!S.road || S.newRoad) { S.road = S.devRoad || makeRoad(S.stage); S.roadIdx = S.devStart || 0; S.newRoad = false; }
     const entry0 = S.road[S.roadIdx];
     if (!(Array.isArray(entry0) ? entry0[0] : entry0).boss) fromPhase = 1;
     Object.assign(S, {
@@ -4412,7 +4510,7 @@
     S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.p.x = 0; S.p.z = 2.1; S.p.tw = null;
     enemy.resetFeet(); player.resetFeet();
     enemy2.resetHat(); enemy3.resetHat(); setupEncounter(S.road[S.roadIdx]);
-    Proj.clear(); S.kamae = null; S.evade = null;
+    Proj.clear(); S.kamae = null; S.evade = null; S.pendingCut = 0;
     Shatter.clear(); player.resetHat(); S.readDodgeUntil = 0; S.dodgeLog = [];
     if (fromPhase === 1) { Shatter.clear(); clearTimeout(S.endTimer); enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
     else if (enemy.hatOn()) enemy.dropHat();
@@ -4438,20 +4536,46 @@
     enemy.setWeapon('sword');
   }
   setTimeout(warmUp, 300);
-  document.getElementById('startBtn').addEventListener('click', () => { warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; S.newRoad = true; begin(1); });
+  // ───────── 開発者モード：試すもの（合目・一人の相手・群れ）と条件を選んで始める ─────────
+  {
+    const $ = (id) => document.getElementById(id);
+    for (let i = 1; i < STAGES.length; i++) $('dvStage').insertAdjacentHTML('beforeend', `<option value="${i}">${STAGES[i].name}</option>`);
+    $('dvEnemy').insertAdjacentHTML('beforeend', `<option value="boss">五合目の主：白峰の浪人</option>`);
+    STAGES.forEach((st, i) => { if (!st) return; const last = st.road[st.road.length - 1]; (Array.isArray(last) ? last : [last]).forEach((t, k) => { if (t && t.lord) $('dvEnemy').insertAdjacentHTML('beforeend', `<option value="lord:${i}:${k}">${st.name}の主：${t.name}</option>`); }); });
+    ROSTER.forEach((t) => $('dvEnemy').insertAdjacentHTML('beforeend', `<option value="${t.id}">${WEAPONS[t.weapon].name}／${RANKS[t.rank].name}：${t.name}</option>`));
+    $('devBtn').addEventListener('click', (e) => { e.stopPropagation(); $('devPanel').hidden = false; });
+    $('dvClose').addEventListener('click', () => { $('devPanel').hidden = true; });
+    $('dvGo').addEventListener('click', () => {
+      const mode = $('dvMode').value;
+      if ($('dvSave').checked) saveStage(1);
+      S.stage = +$('dvStage').value; S.devRoad = null; S.devStart = 0;
+      const findT = (v) => { if (v === 'boss') return BOSS; if (v.startsWith('lord:')) { const [, si, k] = v.split(':'); const last = STAGES[+si].road[STAGES[+si].road.length - 1]; return Array.isArray(last) ? last[+k] : last; } return ROSTER.find((t) => t.id === v); };
+      if (mode === 'stage') S.devStart = +$('dvStart').value;
+      else if (mode === 'enemy') S.devRoad = [findT($('dvEnemy').value)];
+      else { const n = +$('dvCount').value, pool = ROSTER.filter((t) => t.rank === RANK_OF[$('dvRank').value]); S.devRoad = [Array.from({ length: n }, () => pick(pool))]; if (n === 1) S.devRoad = [S.devRoad[0][0]]; }
+      S.dev = { god: $('dvGod').checked };
+      $('devPanel').hidden = true;
+      warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; S.newRoad = true;
+      begin(1);
+      S.speed = +$('dvSpeed').value; S.auto = $('dvAuto').checked ? 'sen' : false;
+    });
+    const st0 = loadStage(); $('tStage').textContent = st0 > 1 ? STAGES[st0].name + 'から' : '';
+  }
+  document.getElementById('startBtn').addEventListener('click', () => { S.devRoad = null; S.devStart = 0; S.dev = null; warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; S.newRoad = true; begin(1); });
   function showEnd(won) {
     const st = S.stats;
     const secs = Math.round((S.gt - st.start) / 1000);
-    document.getElementById('endTitle').textContent = won ? '勝負あり' : '倒れた';
+    document.getElementById('endTitle').textContent = won ? (S.devRoad ? '勝負あり' : '五合目を越えた') : '倒れた';
     document.getElementById('endText').textContent = won
       ? `${secs}秒。弾き ${st.parry}・見切り ${st.mikiri}・反撃 ${st.counter}・出鼻 ${st.debana}・踏み ${st.stomp}・斬り ${st.cut}・被弾 ${st.hits}・最高 ${S.bestChain}連`
-      : `${S.phase === 1 ? '前半' : '後半'}から、すぐにやり直せます。`;
+      : `${STAGES[S.stage] ? STAGES[S.stage].name : ''}の山小屋から、すぐにやり直せます。`;
     document.getElementById('endSummary').textContent = teleSummary();
     document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
     endEl.hidden = false;
     S.lastWon = won;
   }
-  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.lastWon) S.newRoad = true; begin(S.lastWon ? 1 : S.phase); });
+  // 負けたら、この合目の山小屋（始め）から。勝ちきったら、もう一度山を
+  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
   // 試遊の記録：刃が届くたびの結果と、入力のずれ（刃が届く何ミリ秒前に入れたか）
   function teleSummary() {
     const T = S.tele;
@@ -4496,6 +4620,7 @@
     setType(id) { S.road = [ROSTER.find((t) => t.id === id) || BOSS, BOSS]; S.roadIdx = 0; applyEnemyType(S.road[0]); },
     roster() { return ROSTER.map((t) => t.id + ' ' + t.name); },
     roadNow() { return { idx: S.roadIdx, names: S.road.map((t) => Array.isArray(t) ? t.map((q) => q.name).join('＋') : t.name), pair: !!S.w2alive }; },
+    stageTest(n, idx) { S.stage = n; S.devRoad = null; S.devStart = idx || 0; S.newRoad = true; begin(1); },
     pairTest() { S.road = [[ROSTER[0], ROSTER[30], ROSTER[45]], BOSS]; S.roadIdx = 0; setupEncounter(S.road[0]); setMode('stalk', 300); },
     evadeCount() { return S.evadeCount || 0; },
     readDodgeTest() { S.readDodgeUntil = S.gt + 999999; },
