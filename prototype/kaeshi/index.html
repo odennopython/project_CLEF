@@ -187,7 +187,7 @@
     <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
     <span class="t-tap">触れて始める</span>
   </button>
-  <span class="t-ver"><span id="ver">試作 4.1</span></span>
+  <span class="t-ver"><span id="ver">試作 4.2</span></span>
 </div>
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
@@ -1365,7 +1365,7 @@
 
   function makeFigure({ scale, kind, blade, tsukaLen, bladeLen }) {
     let backBow = null;   // 背の弓（弓を射るときは隠す）
-    let armShowBackBow = true, strawKasa = null; const maskSet = {}; const _dualDir = V(0, 0, 1);
+    let armShowBackBow = true, strawKasa = null; const maskSet = {}; const _dualDir = V(0, 0, 1), dualHist = []; let dualClock = 0;
     const big = kind === 'enemy';
     const D = window.CLEF_CHARS[kind];
     const root = new THREE.Group();
@@ -1627,6 +1627,9 @@
         setLocal(foot, qR, qShin);
       });
       // 腕：右手は鍔の近く、左手は柄頭の近く。手首は拳の中心から少し戻した所。
+      // 二刀：右手の動きを覚えておき、左手は0.12秒遅れて左右反対に追う（右の一太刀に、左の一太刀が続く）
+      if (dual) { dualClock += T; dualHist.push({ t: dualClock, h: p.hand.clone(), s: p.sword.clone() }); while (dualHist.length > 2 && dualHist[1].t < dualClock - 0.12) dualHist.shift(); }
+      const dLag = dual && dualHist.length ? dualHist[0] : null;
       const clav = clamp((p.hand.y - 1.3) * 0.12, -0.03, 0.08);
       ['R', 'L'].forEach((s, i) => {
         const sgn = i === 0 ? -1 : 1;
@@ -1635,7 +1638,7 @@
         sh.copy(ua.position).applyQuaternion(qChest);
         tC.copy(chestG.position).applyQuaternion(hips.quaternion.clone().multiply(waist.quaternion)).add(tD.copy(waist.position).applyQuaternion(hips.quaternion)).add(hips.position);
         sh.add(tC);
-        if (dual && i === 1) { hand.set(-p.hand.x * 0.6 + 0.12, p.hand.y - 0.12, p.hand.z * 0.8); }   // 二刀：左手は自分の刀を持って左に構える
+        if (dual && i === 1) { const hh = dLag ? dLag.h : p.hand; hand.set(-hh.x * 0.85 + 0.06, hh.y - 0.1, hh.z * 0.9); }   // 二刀：左手は自分の刀を持ち、右を遅れて映す
         else hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.04 : -TK * 0.72);
         tB.copy(hand).sub(sh).normalize();
         wrist.copy(hand).addScaledVector(tB, -BODY.grip);
@@ -1648,7 +1651,7 @@
         prim.copy(wrist).sub(joint); basisQuat(prim, out1, qFore).multiply(bindQ['fore' + s]);
         setLocal(fa, qFore, qUp);
         tB.copy(wrist).sub(joint);
-        if (dual && i === 1) { _dualDir.set(-p.sword.x, p.sword.y * 0.6 + 0.3, p.sword.z).normalize(); basisQuat(_dualDir, tB, qR).multiply(bindQ['hand' + s]); }
+        if (dual && i === 1) { const ss = dLag ? dLag.s : p.sword; _dualDir.set(-ss.x, ss.y, ss.z).normalize(); basisQuat(_dualDir, tB, qR).multiply(bindQ['hand' + s]); }
         else basisQuat(p.sword, tB, qR).multiply(bindQ['hand' + s]);
         setLocal(hd, qR, qFore);
       });
@@ -2896,6 +2899,51 @@
   }));
   // 五合目の主：白峰の浪人（今までの相手）。前半と後半の二段
   const BOSS = { id: 'boss', weapon: 'katana', rank: 'boss', name: '白峰の浪人', boss: true, brk: 1, time: 1, w: 1, read: 0.4, counter: 0, feint: 0, look: { tint: [1, 1, 1], hat: 'jingasa', mask: 'black', plates: true, backBow: true, scale: 1.2 } };
+  // ───────── 武器ごとの構えと技の形：同じ体でも、持つ物で立ち方が変わる ─────────
+  const WNEUTRAL = {
+    // 槍：半身に開き、穂先を真っ直ぐ相手へ向けて低く構える
+    spear:    pose({ hand: V(0.02, 1.12, 0.42), sword: N(0, 0.12, 1), crouch: 0.26, yaw: 0.95, hipX: -0.04, pitch: 0.1 }),
+    // 薙刀：刃を高く、斜め後ろへ寝かせて構える（八相）
+    naginata: pose({ hand: V(0.22, 1.45, 0.2), sword: N(0.35, 0.75, -0.55), crouch: 0.22, yaw: 0.55, pitch: -0.02 }),
+    // 大太刀：刀を後ろへ下げ、刃先を隠す（脇構え）
+    otachi:   pose({ hand: V(0.32, 1.02, 0.08), sword: N(0.45, -0.2, -0.87), crouch: 0.3, yaw: 0.7, pitch: 0.12 }),
+    // 金砕棒：肩に担ぐ
+    tetsubo:  pose({ hand: V(0.26, 1.55, 0.05), sword: N(0.25, 0.55, -0.8), crouch: 0.2, yaw: 0.4, pitch: 0.05 }),
+    // 棒：体の前で斜めに構える
+    staff:    pose({ hand: V(0.02, 1.2, 0.42), sword: N(0.85, 0.35, 0.4), crouch: 0.22, yaw: -0.2, pitch: 0.08 }),
+    // 小太刀：身を低く、刃を前に短く
+    kodachi:  pose({ hand: V(0.12, 1.1, 0.5), sword: N(0.15, 0.25, 0.95), crouch: 0.36, pitch: 0.18 }),
+    // 忍者刀：深く沈み、刃先を下げる
+    ninjato:  pose({ hand: V(0.22, 0.98, 0.38), sword: N(0.3, -0.25, 0.92), crouch: 0.42, pitch: 0.22, yaw: 0.3 }),
+    // クナイ：低く前のめりに、手を前へ
+    kunai:    pose({ hand: V(0.18, 1.12, 0.5), sword: N(0.2, 0.5, 0.85), crouch: 0.4, pitch: 0.24 }),
+    // 鎖鎌：鎌を前、低く
+    kusarigama: pose({ hand: V(0.2, 1.15, 0.48), sword: N(0.25, 0.75, 0.6), crouch: 0.32, pitch: 0.16, yaw: 0.2 }),
+    // 二刀：右を高く、左を低く（左は右を映して少し遅れて動く）
+    dual:     pose({ hand: V(0.16, 1.4, 0.4), sword: N(0.25, 0.75, 0.6), crouch: 0.28, pitch: 0.08 }),
+    // 弓：弓を下げて持つ
+    bow:      pose({ hand: V(-0.05, 1.15, 0.45), sword: N(0.1, 1, 0.1), crouch: 0.16, yaw: 0.5 }),
+  };
+  const WKEY = {
+    // 槍の突き：半身のまま穂先を引き絞り、腕と腰で一直線に突き出す
+    spear: {
+      T:  { wind: pose({ hand: V(0.12, 1.15, -0.28), sword: N(0, 0.08, 1), crouch: 0.3, yaw: 1.15, hipZ: -0.3, pitch: -0.05 }), hit: pose({ hand: V(0.0, 1.22, 1.15), sword: N(0, 0.04, 1), crouch: 0.3, yaw: 0.5, hipZ: 0.42, pitch: 0.22 }), follow: pose({ hand: V(0.0, 1.2, 1.0), sword: N(0, 0.02, 1), crouch: 0.3, yaw: 0.6, hipZ: 0.36, pitch: 0.2 }) },
+      TH: { wind: pose({ hand: V(0.14, 1.55, -0.3), sword: N(0, 0.15, 1), crouch: 0.22, yaw: 1.15, hipZ: -0.3, pitch: -0.12 }), hit: pose({ hand: V(0.0, 1.6, 1.15), sword: N(0, 0.08, 1), crouch: 0.22, yaw: 0.5, hipZ: 0.42, pitch: 0.12 }), follow: pose({ hand: V(0.0, 1.58, 1.0), sword: N(0, 0.06, 1), crouch: 0.24, yaw: 0.6, hipZ: 0.36, pitch: 0.1 }) },
+      TL: { wind: pose({ hand: V(0.12, 0.85, -0.25), sword: N(0, -0.12, 1), crouch: 0.48, yaw: 1.15, hipZ: -0.3, pitch: 0.25 }), hit: pose({ hand: V(0.0, 0.9, 1.15), sword: N(0, -0.1, 1), crouch: 0.5, yaw: 0.5, hipZ: 0.45, pitch: 0.42 }), follow: pose({ hand: V(0.0, 0.92, 1.0), sword: N(0, -0.06, 1), crouch: 0.48, yaw: 0.6, hipZ: 0.4, pitch: 0.4 }) },
+    },
+    // 薙刀の大回し：高く掲げた刃を、体を大きく回して低く払う
+    naginata: {
+      S: { wind: pose({ hand: V(0.55, 1.6, -0.2), sword: N(0.6, 0.55, -0.6), crouch: 0.25, yaw: 1.5, pitch: -0.1 }), hit: pose({ hand: V(0.0, 0.85, 0.8), sword: N(-1, -0.25, 0.25), crouch: 0.5, yaw: -0.4, pitch: 0.35 }), follow: pose({ hand: V(-0.6, 0.9, 0.3), sword: N(-0.8, -0.2, -0.55), crouch: 0.46, yaw: -1.5, pitch: 0.3 }) },
+    },
+    // 金砕棒の打ち下ろし：肩から大きく振りかぶり、全身で叩きつける
+    tetsubo: {
+      D: { wind: pose({ hand: V(0.1, 2.25, -0.3), sword: N(0.05, 0.3, -0.95), crouch: 0.1, pitch: -0.55, lift: 0.1, hipZ: -0.25 }), hit: pose({ hand: V(0.02, 0.95, 0.85), sword: N(0, -0.7, 0.7), crouch: 0.5, pitch: 0.6, hipZ: 0.25 }), follow: pose({ hand: V(0.02, 0.7, 0.8), sword: N(0, -0.95, 0.3), crouch: 0.55, pitch: 0.7, hipZ: 0.28 }) },
+    },
+  };
+  // 刀で設計した姿勢と同じく、大袈裟にする
+  [...Object.values(WNEUTRAL), ...Object.values(WKEY).flatMap((w) => Object.values(w).flatMap((k) => [k.wind, k.follow]))].forEach((q) => { if (!q || q._big) return; q._big = true; q.yaw *= 1.2; q.crouch += 0.04; });
+  const curNeutral = () => (S.etype && !S.etype.boss && WNEUTRAL[S.etype.weapon]) || NEUTRAL;
+  const curKey = (k) => (S.etype && !S.etype.boss && WKEY[S.etype.weapon] && WKEY[S.etype.weapon][k]) || KEY[k] || KEY.D;
   function applyEnemyType(t) {
     S.etype = t;
     enemy.setArms(t.weapon === 'katana' && t.boss ? 'katana' : t.weapon);
@@ -3902,8 +3950,9 @@
   function enemyPoseNow() {
     const gt = S.gt, out = S.enemyPose, a = S.action, m = S.mode;
     const since = gt - S.modeStart;
+    const NEUTRAL = curNeutral();   // 武器ごとの構え
     if (m === 'attack' && a) {
-      const K = KEY[a.move.key] || KEY.D;
+      const K = curKey(a.move.key);
       const t = gt - a.t0;
       if (a.feint) {
         // 虚：腕と刀だけが動き、腰は動かない
