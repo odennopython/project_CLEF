@@ -202,7 +202,7 @@
     <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
     <span class="t-tap">触れて始める</span>
   </button>
-  <span class="t-ver"><span id="ver">試作 4.2 · 10/31 09:43 · d97d2ef</span></span>
+  <span class="t-ver"><span id="ver">試作 4.4 · 10/31 10:51 · 28923de</span></span>
 </div>
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
@@ -947,7 +947,12 @@
   // 骨の素の姿勢は「腕を少し開いて下ろした姿勢」で、回転はすべて無し。ゲームの動きが計算した関節の位置に合わせて、毎フレーム骨を回す。
   const BODY = { hip: 1.02, thigh: 0.5, shin: 0.49, ankle: 0.075, upper: 0.31, fore: 0.29, grip: 0.065 };
   function decode(b64, T) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); }
+  const BODY_CACHE = new Map();   // 同じ人物の形は一つを使い回す（二人目の相手を足しても、形の分は重くならない）
   function buildBody(D) {
+    if (BODY_CACHE.has(D)) return BODY_CACHE.get(D);
+    const g = buildBodyRaw(D); BODY_CACHE.set(D, g); return g;
+  }
+  function buildBodyRaw(D) {
     const n = D.n, p = decode(D.pos, Uint16Array), no = decode(D.nor, Int8Array), c = decode(D.col, Uint8Array), si = decode(D.si, Uint8Array), swt = decode(D.sw, Uint8Array), fxb = D.fx ? decode(D.fx, Uint8Array) : new Uint8Array(n);
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), idx4 = new Uint16Array(n * 4), w4 = new Float32Array(n * 4);
     for (let i = 0; i < n; i++) {
@@ -1754,6 +1759,7 @@
         armShowBackBow = !!o.backBow; if (backBow) backBow.visible = armShowBackBow;
         root.scale.setScalar(o.scale || scale);
       },
+      present(on) { root.visible = on; shadow.visible = on; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = on; }); },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
       showBody() { body.visible = true; headMesh.visible = true; shadow.visible = true; },
       resetFeet() { feetReady = false; lastX = null; chains.forEach((c) => c.c.reset()); CHANNELS.forEach((c) => { springs[c] = so(); }); },
@@ -1807,7 +1813,13 @@
     };
   }
 
-  const enemy = makeFigure({ scale: 1.2, kind: 'enemy', blade: 0xdfe7f2, bladeLen: 1.65, tsukaLen: 0.4 });
+  let enemy = makeFigure({ scale: 1.2, kind: 'enemy', blade: 0xdfe7f2, bladeLen: 1.65, tsukaLen: 0.4 });
+  // 二人がかりの、番を待つ方（docs/38-two-on-one.md）
+  let enemy2 = makeFigure({ scale: 1.2, kind: 'enemy', blade: 0xdfe7f2, bladeLen: 1.65, tsukaLen: 0.4 });
+  enemy2.present(false);
+  // 群れの三人目
+  let enemy3 = makeFigure({ scale: 1.2, kind: 'enemy', blade: 0xdfe7f2, bladeLen: 1.65, tsukaLen: 0.4 });
+  enemy3.present(false);
   const player = makeFigure({ scale: 0.9, kind: 'player', blade: 0xe8eef7, bladeLen: 1.85, tsukaLen: 0.46 });
 
   // ───────────────────────── 効果 ─────────────────────────
@@ -2959,11 +2971,68 @@
   [...Object.values(WNEUTRAL), ...Object.values(WKEY).flatMap((w) => Object.values(w).flatMap((k) => [k.wind, k.follow]))].forEach((q) => { if (!q || q._big) return; q._big = true; q.yaw *= 1.2; q.crouch += 0.04; });
   const curNeutral = () => (S.etype && !S.etype.boss && WNEUTRAL[S.etype.weapon]) || NEUTRAL;
   const curKey = (k) => (S.etype && !S.etype.boss && WKEY[S.etype.weapon] && WKEY[S.etype.weapon][k]) || KEY[k] || KEY.D;
-  function applyEnemyType(t) {
-    S.etype = t;
-    enemy.setArms(t.weapon === 'katana' && t.boss ? 'katana' : t.weapon);
-    enemy.dress(t.look);
+  function applyEnemyType(t, fig) {
+    fig = fig || enemy;
+    if (fig === enemy) S.etype = t;
+    fig.setArms(t.weapon === 'katana' && t.boss ? 'katana' : t.weapon);
+    fig.dress(t.look);
   }
+  // ───────── 二人がかり：攻める番を二人で交代する。番でない方は間合いの外で構え、回り込み、隙を見て入れ替わる ─────────
+  const SLOT_KEYS = ['B', 'W', 'wStage', 'etype', 'action', 'queue', 'mode', 'modeStart', 'modeUntil', 'phase', 'kamae', 'evade', 'tacticUse', 'flinch', 'stalkDir', 'nextBurst', 'enemyDeflects', 'guardUntil', 'lastPressure', 'buckleUntil', 'enemyPose', 'actionFrom', 'openHits', 'eSpin', 'readDodgeUntil', 'dodgeLog'];
+  function freshSlot(t) {
+    return { B: 0, W: 0, wStage: 0, etype: t, action: null, queue: [], mode: 'waiting', modeStart: S.gt, modeUntil: S.gt, phase: 1, kamae: null, evade: null, tacticUse: {}, flinch: null, stalkDir: S.r() < 0.5 ? -1 : 1, nextBurst: 0, enemyDeflects: 0, guardUntil: 0, lastPressure: S.gt, buckleUntil: 0, enemyPose: clonePose(NEUTRAL), actionFrom: clonePose(NEUTRAL), openHits: 0, eSpin: 0, readDodgeUntil: 0, dodgeLog: [] };
+  }
+  // 待つ相手の一覧：{ fig, st（番の状態）, e（位置）, alive }
+  S.waiters = [];
+  function swapEnemies(w) {
+    SLOT_KEYS.forEach((k) => { const v = S[k]; S[k] = w.st[k]; w.st[k] = v; });
+    const pe = S.e; S.e = w.e; w.e = pe;
+    const f = enemy; enemy = w.fig; w.fig = f;
+    w.st.mode = 'waiting'; w.st.action = null; w.st.queue = [];
+  }
+  const aliveWaiters = () => S.waiters.filter((w) => w.alive);
+  // 番を待つ相手：間合いの外（4.5m）で構え、ときどき鋭く回り込む。互いに重ならない
+  function updateWaiting(dtGame) {
+    S.waiters.forEach((w, wi) => {
+      if (!w.alive) return;
+      updateActor(w.e, dtGame / 1000);
+      const dx = w.e.x - S.p.x, dz = w.e.z - S.p.z;
+      if (!w.e.tw && S.gt >= (w.st.nextBurst || 0)) {
+        // 画面に入る前の弧（番の相手を中心に左右）に立つ：囲まれている圧が、いつも見える
+        const base = Math.atan2(S.e.x - S.p.x, S.e.z - S.p.z), side = wi % 2 ? -1 : 1;
+        const a = base + side * (0.5 + 0.12 * Math.floor(wi / 2) + S.r() * 0.3), r = 4.0 + S.r() * 0.7;
+        let tx = S.p.x + Math.sin(a) * r, tz = S.p.z + Math.cos(a) * r; const rr = Math.hypot(tx, tz); if (rr > CFG.arena) { tx *= CFG.arena / rr; tz *= CFG.arena / rr; }
+        tween(w.e, tx, tz, 300, easeOut); w.st.nextBurst = S.gt + 1000 + S.r() * 900;
+      }
+      [S.e, ...S.waiters.filter((o) => o !== w && o.alive).map((o) => o.e)].forEach((o) => { const ox = w.e.x - o.x, oz = w.e.z - o.z, od = Math.hypot(ox, oz); if (od < 1.4 && od > 0.001) { w.e.x += ox / od * (1.4 - od) * 0.5; w.e.z += oz / od * (1.4 - od) * 0.5; } });
+      w.e.yaw = Math.atan2(S.p.x - w.e.x, S.p.z - w.e.z);
+      const t = w.st.etype, base = (t && !t.boss && WNEUTRAL[t.weapon]) || NEUTRAL, pz = w.st.enemyPose;
+      blend(base, base, 0, pz); pz.crouch += 0.05 + Math.sin(S.gt * 0.003 + wi) * 0.02;
+      w.fig.apply(pz, w.e.x, w.e.z, w.e.yaw, dtGame, null, { look: player.headWorld });
+    });
+  }
+  function setupEncounter(entry) {
+    const group = Array.isArray(entry) ? entry : [entry];
+    // 前の遭遇で入れ替わった人物を、すべて片づけてから並べ直す
+    const figs = [enemy, ...S.waiters.map((w) => w.fig)];
+    [enemy2, enemy3].forEach((f) => { if (!figs.includes(f)) figs.push(f); });
+    enemy = figs[0];
+    const spare = figs.slice(1);
+    applyEnemyType(group[0], enemy); enemy.present(true);
+    S.waiters = [];
+    spare.forEach((f, i) => {
+      const t = group[i + 1];
+      if (!t) { f.present(false); return; }
+      f.resetHat(); f.present(true); applyEnemyType(t, f);
+      const fd = dirPE(), a = Math.atan2(fd.x, fd.z) + (i % 2 ? -0.9 : 0.9);
+      S.waiters.push({ fig: f, st: freshSlot(t), e: { x: S.p.x + Math.sin(a) * 4.6, z: S.p.z + Math.cos(a) * 4.6, tw: null, vx: 0, vz: 0, yaw: 0 }, alive: true });
+      f.resetFeet();
+    });
+    S.w2alive = S.waiters.length > 0;
+    S.nextSwap = S.gt + 3500;
+  }
+
+
   // 雑兵の連撃：武器の句から、その場で組む
   function weaponPattern() {
     const W2 = WEAPONS[S.etype.weapon];
@@ -2972,7 +3041,7 @@
   // 道：雑兵を三人斬り抜けて、五合目の主に挑む（縦の切り身の試作）
   function makeRoad() {
     const zakoish = ROSTER.filter((t) => t.rank === 'zako' || t.rank === 'ashigaru'), skilled = ROSTER.filter((t) => t.rank === 'tedare' || t.rank === 'ryuha' || t.rank === 'kashira');
-    return [pick(zakoish), pick(zakoish), pick(skilled), BOSS];
+    return [pick(zakoish), [pick(zakoish), pick(zakoish)], [pick(zakoish), pick(zakoish), pick(zakoish)], pick(skilled), BOSS];   // 二人がかり、三人の群れを挟む
   }
   function kamae(kind, dur, then) { S.kamae = { kind, then }; setMode('kamae', dur); }
   function flip(then) {
@@ -3511,9 +3580,9 @@
         const B0 = fig.bakeWorld();
         fig.hideBody(); fig.scatterAttachments(0.8);
         const whole = makePiece(B0.pos, B0.nor, B0.col, V(0, 0, 0), V(0, 0, 0));
-        pieces = split(whole, pt, nrm, 0.9);
+        const fresh = split(whole, pt, nrm, 0.9); pieces.push(...fresh);   // 前に斬った相手の破片も残す
         // 上の半身は斬られた面に沿って滑り落ち、下の半身は膝から崩れる
-        pieces.forEach((pc) => { if (pc.m.position.y > pt.y) { pc.v.addScaledVector(nrm, 0.6); pc.v.y += 0.6; } else { pc.v.multiplyScalar(0.25); pc.w.multiplyScalar(0.2); } });
+        fresh.forEach((pc) => { if (pc.m.position.y > pt.y) { pc.v.addScaledVector(nrm, 0.6); pc.v.y += 0.6; } else { pc.v.multiplyScalar(0.25); pc.w.multiplyScalar(0.2); } });
         cuts = 1;
       },
       // 追撃：残った塊をすべて、新しい向きの面でさらに斬る
@@ -3716,15 +3785,15 @@
   // 道の次の相手：斬り分けた跡を片づけ、次の剣士が雪の向こうから現れる
   function nextEnemy() {
     S.roadIdx++;
-    const t = S.road[S.roadIdx];
-    Shatter.clear(); Proj.clear(); enemy.resetHat(); enemy.clearTears();
-    applyEnemyType(t);
+    const entry = S.road[S.roadIdx], t = Array.isArray(entry) ? entry[0] : entry;
+    Shatter.clear(); Proj.clear(); enemy.resetHat(); enemy2.resetHat(); enemy3.resetHat(); enemy.clearTears();
     enemy.bladeMat.emissive.set(0x1a2230);
     S.phase = 1; S.B = 0; S.W = 0; S.wStage = 0; S.action = null; S.queue = []; S.cine = null; S.kamae = null; S.evade = null; S.readDodgeUntil = 0;
     S.P = Math.max(0, S.P - 35);   // 一息つく
     const f = dirPE(); S.e.tw = null; S.e.x = S.p.x + f.x * 5.2; S.e.z = S.p.z + f.z * 5.2;
     const r = Math.hypot(S.e.x, S.e.z); if (r > CFG.arena) { S.e.x *= CFG.arena / r; S.e.z *= CFG.arena / r; }
     enemy.resetFeet();
+    setupEncounter(entry);
     setMode('intro', 1800);
     pushLog(t.name, '', `${S.roadIdx + 1}人目`);
   }
@@ -3814,6 +3883,12 @@
   // ───────────────────────── 相手の進行 ─────────────────────────
   function updateAI() {
     const gt = S.gt, m = S.mode, f = dirPE();
+    // 番の交代：番の相手が構え直しているときに、待っていた方が前へ出る
+    const aw = aliveWaiters();
+    if (aw.length && (m === 'stalk' || m === 'retreat') && !S.action && gt >= (S.nextSwap || 0) && !S.e.tw) {
+      swapEnemies(aw[Math.floor(S.r() * aw.length)]); setMode('stalk', 250 + S.r() * 250); S.nextSwap = gt + (aw.length > 1 ? 2400 : 3200) + S.r() * 2800;
+      kickSnow(enemy.hipWorld, 0.9); Sound.step(1); return;
+    }
     if (m === 'intro') { S.e.vx = S.e.vz = 0; if (gt >= S.modeUntil) setMode('stalk', 600); return; }
     if (m === 'kamae') {
       S.e.vx = S.e.vz = 0;
@@ -3852,6 +3927,14 @@
     if (m === 'staggered' && gt >= S.modeUntil) { if (S.r() < 0.35) setMode('retreatStart', 0); else setMode('stalk', 300 + S.r() * 300); }
     if (m === 'broken' && gt >= S.modeUntil) { S.B = 62; setMode('retreatStart', 0); pushLog('立ち直り', '', '一閃の機会を逃した'); }
     if (m === 'falling' && gt >= S.modeUntil) {
+      if (aliveWaiters().length) {
+        // 二人がかり・群れの一人を斬った：待っていた一人が前へ出る（斬った人物は待つ側へ回し、隠したまま）
+        const w = aliveWaiters()[0]; swapEnemies(w); w.alive = false; S.w2alive = aliveWaiters().length > 0;
+        S.P = Math.max(0, S.P - 20); S.cine = null;
+        setMode('stalk', 500); kickSnow(enemy.hipWorld, 0.8);
+        pushLog('残る一人', '', S.etype.name);
+        return;
+      }
       if (S.etype && !S.etype.boss && S.road && S.roadIdx < S.road.length - 1) { nextEnemy(); return; }
       if (S.phase === 1 && (!S.etype || S.etype.boss)) {
         S.phase = 2; S.B = 0; S.W = 0; S.wStage = 0; S.P = Math.max(0, S.P - 40);
@@ -4105,6 +4188,7 @@
     const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge'].includes(pa.kind) && S.gt - pa.t0 < 480;
     enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
     enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld });
+    updateWaiting(dtGame);
     player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: enemy.headWorld });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
     const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
@@ -4123,7 +4207,7 @@
     updateArcs(now);
     updateShreds(dt);
     updateFX(dt);
-    enemy.updateHat(dt); player.updateHat(dt);   // 飛び散った笠や鞘も動かす（主人公の分を動かしていなかったので、宙に残っていた）
+    enemy.updateHat(dt); enemy2.updateHat(dt); enemy3.updateHat(dt); player.updateHat(dt);   // 飛び散った笠や鞘も動かす（主人公の分を動かしていなかったので、宙に残っていた）
     Shatter.update(dt);
     updateWisps(dt);
     Proj.update(dt);
@@ -4317,8 +4401,8 @@
   function begin(fromPhase) {
     // 道：新しく始めるときは道を組み直す。負けたときは、同じ相手からやり直す
     if (!S.road || S.newRoad) { S.road = makeRoad(); S.roadIdx = 0; S.newRoad = false; }
-    applyEnemyType(S.road[S.roadIdx]);
-    if (!S.road[S.roadIdx].boss) fromPhase = 1;
+    const entry0 = S.road[S.roadIdx];
+    if (!(Array.isArray(entry0) ? entry0[0] : entry0).boss) fromPhase = 1;
     Object.assign(S, {
       started: true, phase: fromPhase, B: 0, P: 0, W: 0, wStage: 0, flinch: null, action: null, queue: [], pa: null, bufferU: false, comboStep: 0,
       guardStart: -1e9, lastGuard: -1e9, dodgeStart: -1e9, stompStart: -1e9, counterUntil: 0, playerLockUntil: 0,
@@ -4327,6 +4411,7 @@
     });
     S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.p.x = 0; S.p.z = 2.1; S.p.tw = null;
     enemy.resetFeet(); player.resetFeet();
+    enemy2.resetHat(); enemy3.resetHat(); setupEncounter(S.road[S.roadIdx]);
     Proj.clear(); S.kamae = null; S.evade = null;
     Shatter.clear(); player.resetHat(); S.readDodgeUntil = 0; S.dodgeLog = [];
     if (fromPhase === 1) { Shatter.clear(); clearTimeout(S.endTimer); enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
@@ -4410,7 +4495,8 @@
     finishTest() { finishCut(); },
     setType(id) { S.road = [ROSTER.find((t) => t.id === id) || BOSS, BOSS]; S.roadIdx = 0; applyEnemyType(S.road[0]); },
     roster() { return ROSTER.map((t) => t.id + ' ' + t.name); },
-    roadNow() { return { idx: S.roadIdx, names: S.road.map((t) => t.name) }; },
+    roadNow() { return { idx: S.roadIdx, names: S.road.map((t) => Array.isArray(t) ? t.map((q) => q.name).join('＋') : t.name), pair: !!S.w2alive }; },
+    pairTest() { S.road = [[ROSTER[0], ROSTER[30], ROSTER[45]], BOSS]; S.roadIdx = 0; setupEncounter(S.road[0]); setMode('stalk', 300); },
     evadeCount() { return S.evadeCount || 0; },
     readDodgeTest() { S.readDodgeUntil = S.gt + 999999; },
     chopTest() { chopFollow(); },
