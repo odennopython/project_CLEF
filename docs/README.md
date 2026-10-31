@@ -26,6 +26,7 @@
 | [20-quality-bar.md](20-quality-bar.md) | 高品質の定義と、低品質な部分の洗い出しと補修（試作 1.1） |
 | [21-wafuku-cool.md](21-wafuku-cool.md) | 和装の自然な格好よさの定義と、主人公の作り直し（試作 1.2） |
 | [22-sound-realism.md](22-sound-realism.md) | 音のリアリティ：物理に基づく合成で作り直す（試作 2.0） |
+| [40-continuous-mountain.md](40-continuous-mountain.md) | 地続きの山：一本の道、歩いて次の開けへ、九つの合目の地形と法則、六〜九合目、白狐の剣士（試作 4.6） |
 | [39-mountain-stages.md](39-mountain-stages.md) | 一〜五合目の構成、山小屋からの再開、開発者モード、震えの解消、斬り抜けの演出（試作 4.5） |
 | [38-two-on-one.md](38-two-on-one.md) | 二人がかりと三人の群れ：攻める番を交代する仕組み（試作 4.3〜4.4） |
 | [37-enemy-roster.md](37-enemy-roster.md) | 敵の名簿：武器12種 × 格5 ＝ 60種（固有の法則、装束）。雑兵を斬り抜けて主に挑む「道」（試作 4.1） |
