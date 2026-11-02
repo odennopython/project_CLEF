@@ -222,7 +222,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev">開発</button>
-  <span class="t-ver"><span id="ver">試作 4.10 · 11/02 18:22 · 0a753ee</span></span>
+  <span class="t-ver"><span id="ver">試作 5.0 · 11/03 07:07 · df67652</span></span>
 </div>
 
 <div id="devPanel" hidden>
@@ -1446,6 +1446,21 @@
     });
   }
   function resetWatchers() { WATCH.forEach((w) => { if (w.how === 'stay') return; w.state = 'idle'; w.t = 0; w.a = 1; w.fig.visible = true; w.fig.userData.mats.forEach((m) => { m.opacity = 1; }); w.d = w.d0; const q = along(w.d, w.lat, pathH(w.d, 1) - pathH(w.d, 0) + w.y); w.fig.position.copy(q); }); }
+  // ── 記憶の残る刀：柄に赤い下げ緒を結び、かすかに光る。走って横を通ると刀が鳴る（docs/45 規則5・7）──
+  const MEM_SPOTS = { raikiri: { stage: 2, k: 3, dd: 12, lat: 1.9 } };
+  const MEM_SWORD = {};
+  function placeMemSwords(s, g) {
+    Object.entries(MEM_SPOTS).forEach(([id, m]) => {
+      if (m.stage !== s) return;
+      const grp = new THREE.Group(); grp.userData.dyn = true;
+      const sw = new THREE.Mesh(PROP.sword, PROP_STEEL); grp.add(sw);
+      const tas = mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.32, 5), toon(0xb01818), 0.06, 0.82, 0.02, grp); tas.rotation.z = -0.25;
+      const gl = glowSprite('rgba(255,110,90,0.9)', 0.4, 1.4); gl.position.set(0.05, 0.85, 0); grp.add(gl);
+      const d = clearD(s, m.k) + m.dd; put(g, grp, d, m.lat, { face: false });
+      MEM_SWORD[id] = { grp, gl, d, lat: m.lat, stage: s };
+      ANIM.push({ stage: s, fn: (t) => { gl.material.opacity = 0.25 + 0.2 * Math.sin(t * 2.4) + (S.memCall ? 0.45 : 0); gl.scale.setScalar(1.2 + 0.3 * Math.sin(t * 2.4) + (S.memCall ? 0.8 : 0)); } });
+    });
+  }
   // ── 合目の景色を組む ──
   const STAGE_G = {};
   const BAMBOO_STALKS = {};   // 二合目の開けに立つ竹（斬れる）：{ stage: [ [ {mesh, pos, cut} ] × 開け ] }
@@ -1649,7 +1664,7 @@
       placeAt(g, PROP.rock, PROP_MAT, scatter(s, 40, 1.3, 4, 92, { s0: 0.3, s1: 0.9, clear: 4 }));
       for (let k = 0; k < 5; k++) { const a1 = clearD(s, k) + FLAT, b0 = clearD(s, k + 1) - FLAT; if (k === 4) break; [-1, 1].forEach((sd) => { for (let d = a1; d < b0; d += 2.2) { const p = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), IRON); put(g, p, d, sd * 1.05, { y: pathH(d, 1) - pathH(d, 0) + 0.45, face: false }); } }); }
     }
-    placeWatchers(s, g);
+    placeWatchers(s, g); placeMemSwords(s, g);
     if (s === 10) {
       placeAt(g, PROP.spire, PROP_MAT, scatter(s, 40, 8, 42, 101, { s0: 1.2, s1: 3.2, clear: 9, maxH: -6 }));
       placeAt(g, PROP.rock, PROP_MAT, scatter(s, 50, 5.5, 14, 102, { s0: 0.4, s1: 1.4, clear: 9 }));
@@ -1660,6 +1675,37 @@
     return g;
   }
   for (let s = 1; s <= 10; s++) buildStage(s);
+  // ───────── 刀の記憶（docs/44・45）：雷雨の河原。夏の夜、石の河原、黒い川、葦、折れた橋 ─────────
+  const MEM_G = new THREE.Group(); MEM_G.visible = false; scene.add(MEM_G);
+  {
+    const R = rng(777);
+    // 河原：小石の灰色。川へ向かって下がる
+    const geo = new THREE.PlaneGeometry(110, 110, 80, 80); geo.rotateX(-Math.PI / 2);
+    const pa = geo.attributes.position, col = new Float32Array(pa.count * 3);
+    for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), z = pa.getZ(i); const bank = smooth((-x - 9) / 5) * 1.1, n = noise2(x * 0.8, z * 0.8) * 0.06 + noise2(x * 3.1, z * 2.7) * 0.02; pa.setY(i, n - bank + (x > 18 ? smooth((x - 18) / 12) * 4 : 0)); const v = 0.24 + 0.06 * noise2(x * 4.3, z * 3.9) + 0.04 * Math.sin(x * 9.1 + z * 7.3); col.set(lin([v * 0.95, v, v * 1.06]), i * 3); }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true, roughness: 0.55, metalness: 0.05 })); ground.receiveShadow = true; MEM_G.add(ground);
+    // 川：黒く、稲光を映す
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(40, 110), toon(0x0a1018, { roughness: 0.08, metalness: 0.4, envMapIntensity: 1.6 })); river.rotation.x = -Math.PI / 2; river.position.set(-32, -0.95, 0); MEM_G.add(river);
+    // 葦の茂み（岸辺）と、河原の石
+    { const g = new THREE.ConeGeometry(0.02, 1.6, 4); g.translate(0, 0.8, 0); const reed = paint(g, [0.18, 0.2, 0.12]); const items = []; for (let i = 0; i < 700; i++) { const z = (R() - 0.5) * 100, x = -10.5 - R() * 3.5 + Math.sin(z * 0.2) * 1.2; items.push({ p: V(x, -0.5 - (R() * 0.3), z), r: R() * 6, s: 0.7 + R() * 0.7 }); } placeAt(MEM_G, reed, PROP_MAT, items); }
+    { const items = []; for (let i = 0; i < 90; i++) { const x = (R() - 0.5) * 60, z = (R() - 0.5) * 80; if (Math.hypot(x, z) < 9) continue; items.push({ p: V(x, -0.15, z), r: R() * 6, s: 0.3 + R() * 1.1 }); } placeAt(MEM_G, PROP.rock, PROP_MAT, items); }
+    // 折れた橋：川に立つ杭と、落ちかけた板
+    for (let i = 0; i < 7; i++) { const z = -6 - i * 0.1, x = -12 - i * 2.6; [-1, 1].forEach((sd) => { const p2 = mesh(new THREE.CylinderGeometry(0.12, 0.14, 2.6 - (i % 3) * 0.5, 7), DARKWOOD, x, -0.2, z + sd * 1.1, MEM_G); p2.rotation.z = (R() - 0.5) * 0.2; }); if (i < 3 || i === 5) { const pl = mesh(new THREE.BoxGeometry(2.4, 0.08, 2.4), WOOD, x, 0.75 - i * 0.12, z, MEM_G); pl.rotation.set((R() - 0.5) * 0.3, R() * 0.2, (R() - 0.5) * 0.4); } }
+    // 遠くの森の影と、柳
+    placeAt(MEM_G, PROP.pine, PROP_MAT, Array.from({ length: 40 }, () => ({ p: V(20 + R() * 25, 2.5, (R() - 0.5) * 100), r: R() * 6, s: 1.6 + R() * 1.4 })));
+    placeAt(MEM_G, PROP.bareBig, PROP_MAT, Array.from({ length: 8 }, () => ({ p: V(9 + R() * 8, 0, (R() - 0.5) * 60), r: R() * 6, s: 1.2 + R() * 0.8 })));
+    // 打ち捨てられた祠と、記憶の主の刀を立てた塚
+    { const h = makeHokora(); h.position.set(7, 0, -9); h.lookAt(0, 0, 0); MEM_G.add(h); }
+    bakeStatic(MEM_G);
+  }
+  // 雨：カメラのまわりに、斜めに降る細い筋
+  const RAIN = (() => { const n = 700, pos = new Float32Array(n * 6); for (let i = 0; i < n; i++) { const x = (Math.random() - 0.5) * 24, y = Math.random() * 12, z = (Math.random() - 0.5) * 24; pos.set([x, y, z, x + 0.05, y - 0.45, z + 0.02], i * 6); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x8fa2bf, transparent: true, opacity: 0.32, depthWrite: false })); m.frustumCulled = false; m.visible = false; scene.add(m); return m; })();
+  // 稲光の光：上から白い光がすべてを照らす
+  const BOLT = new THREE.DirectionalLight(0xdce6ff, 0); BOLT.position.set(6, 30, -10); scene.add(BOLT);
+  // 夜の河原の映り込み：雪山の明るい空を映すと、濡れた石と川が灰色に光ってしまう。同じ形式の暗い空に入れ替える（材質を作り直さずに済む）
+  const ENV_NIGHT = (() => { const faces = []; for (let f = 0; f < 6; f++) { const c = document.createElement('canvas'); c.width = c.height = 8; const x = c.getContext('2d'); x.fillStyle = f === 2 ? '#141a26' : f === 3 ? '#050608' : '#0a0d14'; x.fillRect(0, 0, 8, 8); faces.push(c); } const t = new THREE.CubeTexture(faces); t.encoding = THREE.sRGBEncoding; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true; return t; })();
+  let ENV_DAY = null;
   // 灯りの光：灯籠のうち、主人公に近い四つにだけ点の光を置く（光の数を変えると、描き方の準備がやり直しになって止まる）
   const lanternLights = [0, 1, 2, 3].map(() => new THREE.PointLight(0xffa860, 1.3, 11, 1.4));
   lanternLights.forEach((l) => scene.add(l));
@@ -2326,7 +2372,7 @@
 
     // 相手の鎧の板（袖と草摺）。前半は傷の節目で一枚ずつ落ち、後半に入る瞬間に残りがすべて落ちる（鎧を捨てて速くなる）
     const plates = [], chips = [], cracks = [], tears = [];
-    let hat = null, hatFall = null, hitGlow = 0; const acc = {};
+    let hat = null, hatFall = null, hitGlow = 0; const acc = {}; let tassel = null;
     if (big) {
       const crackMat = toon(0xe8d8c8), crackGeo = new THREE.BoxGeometry(0.008, 0.07, 0.006);
       for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(crackGeo, crackMat); c.position.copy(atBone(chestG, -0.06 + i * 0.04, 1.47 + (i % 2) * 0.03, 0.155)); c.rotation.z = 0.6 - i * 0.4; c.visible = false; chestG.add(c); cracks.push(c); }
@@ -2719,6 +2765,8 @@
         root.scale.setScalar(o.scale || scale);
       },
       castShadows(on) { body.castShadow = on; },
+      // 流儀の印：鞘の下げ緒（背負った流儀の色）
+      setTassel(col) { if (big) return; if (!tassel) { tassel = new THREE.Group(); const m = toon(0xffffff); tassel.userData.mat = m; [-0.012, 0.012].forEach((x) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.34, 5), m); c.position.set(x, -0.17, 0); c.rotation.z = x * 6; tassel.add(c); }); const k = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), m); tassel.add(k); tassel.position.copy(atBone(hips, -0.16, 1.02, -0.13)); hips.add(tassel); } tassel.visible = col !== null && col !== undefined; if (tassel.visible) tassel.userData.mat.color.set(col).convertSRGBToLinear(); },
       feetDbg() { return feet.map((f) => [f.pos.x, f.pos.y, f.pos.z, f.planted ? 1 : 0, f.stepping ? 1 : 0]).concat([[root.position.x, root.position.y, root.position.z, gait.phase, gait.on ? 1 : 0]]); },
       present(on) { root.visible = on; shadow.visible = on; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = on && !c.off; }); },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
@@ -3673,6 +3721,12 @@
       mikiri() { play(B.stompMetal, 0.75, 0.25); },
       // 鎧の板が落ちる
       plate() { play(B.stompMetal, 0.25, 0.1, 0, 1.6); },
+      // 雷鳴（刀の記憶「雷雨の河原」だけで鳴らす。稲光の後いつ来るかを数える手がかりなので、刀の音だけに絞る方針の例外とする）
+      thunder(delay) {
+        if (!ctx) return;
+        if (!B.thunder) { const sr = ctx.sampleRate, n = Math.floor(sr * 3.2), b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0); let y = 0, y2 = 0; for (let i = 0; i < n; i++) { const t = i / sr, env = (t < 0.04 ? t / 0.04 : Math.exp(-(t - 0.04) * 1.4)) * (0.6 + 0.4 * Math.sin(t * 7 + Math.sin(t * 3) * 2)); y += (Math.random() * 2 - 1 - y) * 0.06; y2 += (y - y2) * 0.12; d[i] = y2 * env * 6; } B.thunder = [b]; }
+        play(B.thunder, 0.9, 0.5, delay || 0, 0.9 + Math.random() * 0.2);
+      },
       // 危険な技の予兆：刃が光を返すような、細く高い刃鳴り
       peril() { play(B.glint, 0.45, 0.5, 0, 1.4); },
       // 相手の構えが変わる：刀を握り直す低い響き
@@ -3709,6 +3763,9 @@
   };
 
   const dist = () => Math.hypot(S.e.x - S.p.x, S.e.z - S.p.z);
+  // 新しい模様の記録（docs/45 確かめ方）：初めて出会った技・戦術・法則・奥の手・主の問いの時刻。燃え尽きの兆しを数字で見る
+  S.novel = { seen: new Set(), events: [], t0: 0 };
+  function noteNovel(kind, name) { const k = kind + ':' + name; if (S.novel.seen.has(k)) return; S.novel.seen.add(k); S.novel.events.push({ t: S.gt, k }); }
   function dirPE() { const dx = S.e.x - S.p.x, dz = S.e.z - S.p.z, d = Math.hypot(dx, dz) || 1; return { x: dx / d, z: dz / d, d }; }
   function tween(actor, tx, tz, dur, easing) { actor.tw = { fx: actor.x, fz: actor.z, tx, tz, t0: S.gt, dur, easing: easing || easeOut }; }
 
@@ -3927,6 +3984,16 @@
     mamori:  { pref: 3.4, lat: [0.8, 1.3], pause: [260, 400], tac: {} },
   };
   const curStyle = () => (S.etype && FSTYLE[S.etype.faction]) || null;
+  // 戦いの転（docs/45 規則2）：手練以上は、崩しが半分を越えると一度だけ奥の手に切り替わる。読みの三要素（手がかり・拍子・応え）のうち一つだけを変える
+  const OKU = {
+    nobushi: { tac: { press: 2.2, rush: 2 }, pause: 0.35 },   // 拍子：休まず押す
+    bansho:  { peril: 0.35 },   // 応え：弾けない危険な技が増える（避けを使わせる）
+    shugen:  { tac: { iai: 3.5, wait: 0.2 } },   // 拍子：居合を連ねる
+    shinobi: { feint: 0.4 },   // 手がかり：虚が増え、腰でしか見分けられない
+    kenkaku: { delay: 0.5 },   // 拍子：溜め遅らせが増える
+    tengu:   { tac: { aerial: 3.5 } },   // 手がかり：上から来る
+    mamori:  { counter: 0.35 },   // 応え：弾き返しが鋭い
+  };
   const defaultFaction = (t) => (t.weapon === 'ninjato' || t.weapon === 'kunai' ? 'shinobi' : t.weapon === 'naginata' ? 'shugen' : t.rank === 'zako' ? 'nobushi' : t.rank === 'ashigaru' ? 'bansho' : 'kenkaku');
   const hashStr = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
   // 装いを決める：勢力（色・頭・背）＋ 格（鎧の板、頭の兜）＋ 固有の法則の印
@@ -4022,9 +4089,9 @@
     fig.dress(t.look);
   }
   // ───────── 二人がかり：攻める番を二人で交代する。番でない方は間合いの外で構え、回り込み、隙を見て入れ替わる ─────────
-  const SLOT_KEYS = ['B', 'W', 'wStage', 'etype', 'action', 'queue', 'mode', 'modeStart', 'modeUntil', 'phase', 'kamae', 'evade', 'tacticUse', 'flinch', 'stalkDir', 'nextBurst', 'enemyDeflects', 'guardUntil', 'lastPressure', 'buckleUntil', 'enemyPose', 'actionFrom', 'openHits', 'eSpin', 'readDodgeUntil', 'dodgeLog'];
+  const SLOT_KEYS = ['B', 'W', 'wStage', 'etype', 'action', 'queue', 'mode', 'modeStart', 'modeUntil', 'phase', 'kamae', 'evade', 'tacticUse', 'flinch', 'stalkDir', 'nextBurst', 'enemyDeflects', 'guardUntil', 'lastPressure', 'buckleUntil', 'enemyPose', 'actionFrom', 'openHits', 'eSpin', 'readDodgeUntil', 'dodgeLog', 'oku', 'okuDone'];
   function freshSlot(t) {
-    return { B: 0, W: 0, wStage: 0, etype: t, action: null, queue: [], mode: 'waiting', modeStart: S.gt, modeUntil: S.gt, phase: 1, kamae: null, evade: null, tacticUse: {}, flinch: null, stalkDir: S.r() < 0.5 ? -1 : 1, nextBurst: 0, enemyDeflects: 0, guardUntil: 0, lastPressure: S.gt, buckleUntil: 0, enemyPose: clonePose(NEUTRAL), actionFrom: clonePose(NEUTRAL), openHits: 0, eSpin: 0, readDodgeUntil: 0, dodgeLog: [] };
+    return { B: 0, W: 0, wStage: 0, etype: t, action: null, queue: [], mode: 'waiting', modeStart: S.gt, modeUntil: S.gt, phase: 1, kamae: null, evade: null, tacticUse: {}, flinch: null, stalkDir: S.r() < 0.5 ? -1 : 1, nextBurst: 0, enemyDeflects: 0, guardUntil: 0, lastPressure: S.gt, buckleUntil: 0, enemyPose: clonePose(NEUTRAL), actionFrom: clonePose(NEUTRAL), openHits: 0, eSpin: 0, readDodgeUntil: 0, dodgeLog: [], oku: null, okuDone: false };
   }
   // 待つ相手の一覧：{ fig, st（番の状態）, e（位置）, alive }
   S.waiters = [];
@@ -4057,7 +4124,7 @@
       w.e.yaw = Math.atan2(S.p.x - w.e.x, S.p.z - w.e.z);
       const t = w.st.etype, base = (t && !t.boss && WNEUTRAL[t.weapon]) || NEUTRAL, pz = w.st.enemyPose;
       blend(base, base, 0, pz); pz.crouch += 0.05 + Math.sin(S.gt * 0.003 + wi) * 0.02;
-      w.fig.apply(pz, w.e.x, w.e.z, w.e.yaw, dtGame, null, { look: player.headWorld, gy: gyFeet, rootY: gyRoot(w.e.x, w.e.z) });
+      w.fig.apply(pz, w.e.x, w.e.z, w.e.yaw, dtGame, null, { look: player.headWorld, gy: gyFeet, rootY: gyRoot(w.e.x, w.e.z), walk: S.mode === 'memArrive' });
     });
   }
   function setupEncounter(entry) {
@@ -4068,6 +4135,7 @@
     enemy = figs[0];
     const spare = figs.slice(1);
     applyEnemyType(group[0], enemy); enemy.present(true);
+    S.oku = null; S.okuDone = false; S.vanished = false;
     S.waiters = [];
     spare.forEach((f, i) => {
       const t = group[i + 1];
@@ -4097,7 +4165,7 @@
     null,
     { name: '一合目', road: ['z', ['z', 'z'], ['z', 'z', 'z'], 'a', LORD('katana:tedare', '蓑の大頭', { brk: 1.2 })] },
     { name: '二合目', road: ['a', ['a', 'z'], 't', ['a', 'a', 'z'], LORD('spear:kashira', '関の老槍', { brk: 0.9 })] },
-    { name: '三合目', road: [['t', 'a'], 'r', ['a', 'a', 'a'], 't', LORD('ninjato:kashira', '霧縫い', { brk: 0.85 })] },
+    { name: '三合目', road: [['t', 'a'], 'r', ['a', 'a', 'a'], 't', LORD('ninjato:kashira', '霧縫い', { brk: 0.85, vanish: true })] },
     { name: '四合目', road: ['r', 't', ['t', 't'], ['a', 'a', 't'], [LORD('bow:kashira', '双弓の兄', { brk: 0.9 }), LORD('bow:ryuha', '双弓の弟', { brk: 0.95 })]] },
     { name: '五合目', road: ['t', ['r', 't'], ['t', 'a', 'a'], 'k', 'BOSS'] },
     { name: '六合目', road: ['r', ['t', 't', 'a'], 'k', ['t', 'r'], LORD('otachi:kashira', '垂氷の行者', { brk: 0.8 })] },
@@ -4130,6 +4198,7 @@
   const loadStage = () => { try { return clamp(parseInt(localStorage.getItem('kaze.stage') || '1', 10) || 1, 1, STAGES.length - 1); } catch (e) { return 1; } };
   // 合目を越えた：題を静かに浮かべ、次の合目の山小屋から
   function advanceStage() {
+    if (S.memory) { memEnd(); return; }
     // 十合目の三人を越えた：風の社まで駆け上がり、雲海の上に日が昇るのを見て終わる
     if (S.stage >= STAGES.length - 1) { startTravel(clearD(S.stage, 3) - 1, null, { final: true, speed: 3.4 }); return; }
     // 山小屋を通り過ぎた所で、合目の名が静かに浮かぶ（画面を切り替えず、歩いたまま次の合目へ入る）
@@ -4150,18 +4219,20 @@
   }
   function think() {
     const d = dist();
+    if (S.etype && S.etype.thunder && !S.queue.length) { setMode('stalk', 500); return; }   // 雷切は、稲光のときだけ斬りかかる
     if (S.queue.length) { startAction(S.queue.shift()); return; }
     Object.keys(S.habit).forEach((k) => { S.habit[k] *= 0.93; });
     S.tacticUse = S.tacticUse || {};
     const names = Object.keys(TACTICS);
     const tw = S.etype && !S.etype.boss ? WEAPONS[S.etype.weapon].tactics : null;   // 雑兵は、武器に合った戦術だけを使う
     const fs = curStyle();
-    const ws = names.map((n) => (tw ? (tw[n] || 0) : 1) * Math.max(0.01, TACTICS[n].w(d)) / (1 + (S.tacticUse[n] || 0) * 1.5) * (S.etype && S.etype.learner ? learnerWeight(n) : 1) * (fs && fs.tac[n] !== undefined ? fs.tac[n] : 1));
+    const ws = names.map((n) => (tw ? (tw[n] || 0) : 1) * Math.max(0.01, TACTICS[n].w(d)) / (1 + (S.tacticUse[n] || 0) * 1.5) * (S.etype && S.etype.learner ? learnerWeight(n) : 1) * (fs && fs.tac[n] !== undefined ? fs.tac[n] : 1) * (S.oku && S.oku.tac && S.oku.tac[n] !== undefined ? S.oku.tac[n] : 1));
     let r = S.r() * ws.reduce((x, y) => x + y, 0), choice = names[0];
     for (let i = 0; i < names.length; i++) { r -= ws[i]; if (r <= 0) { choice = names[i]; break; } }
     Object.keys(S.tacticUse).forEach((k) => { S.tacticUse[k] *= 0.6; });
     S.tacticUse[choice] = (S.tacticUse[choice] || 0) + 1;
     S.tactic = choice;
+    noteNovel('戦術', choice);
     TACTICS[choice].run();
   }
   function startAction(token) {
@@ -4170,9 +4241,12 @@
       const pick = S.lastResult === token.if ? token.then : token.else;
       if (Array.isArray(pick)) { S.queue.unshift(...pick.slice(1)); token = pick[0]; } else token = pick;
     }
-    const feint = token === '~' || (S.etype && S.etype.feint && typeof token === 'string' && !MOVES[token.replace('*', '')]?.fixed && S.r() < S.etype.feint && S.queue.length > 0);
-    const delayed = token.endsWith('*');
+    const fRate = (S.etype && S.etype.feint || 0) + (S.oku && S.oku.feint || 0);
+    const feint = token === '~' || (fRate && typeof token === 'string' && !MOVES[token.replace('*', '')]?.fixed && S.r() < fRate && S.queue.length > 0);
+    const delayed = token.endsWith('*') || !!(S.oku && S.oku.delay && !MOVES[token]?.fixed && S.r() < S.oku.delay);
     let key = token.replace('*', '');
+    // 奥の手（関守）：連撃の一手が、弾けない危険な技に置き換わる
+    if (S.oku && S.oku.peril && !feint && MOVES[key] && !MOVES[key].fixed && !MOVES[key].peril && S.r() < S.oku.peril) key = S.r() < 0.5 ? 'sweep' : 'pierce';
     // 様式を変える：同じ斬り方でも、回る・跳ぶ・沈む・速める…のどれで来るかは毎回違う
     const et = S.etype || BOSS;
     const varRate = et.boss ? (S.phase === 1 ? 0.5 : 0.7) : ({ zako: 0, ashigaru: 0.15, tedare: 0.35, ryuha: 0.45, kashira: 0.55 }[et.rank] || 0);
@@ -4196,6 +4270,7 @@
     a.T = a.t0 + a.O + a.W + a.D + a.S;
     if (feint) a.end = a.t0 + a.O + 320;
     S.action = a;
+    noteNovel('技', move.name + (move.mod ? '・' + (move.modName || '') : ''));
     S.mode = 'attack'; S.modeStart = S.gt;
     S.actionFrom = clonePose(S.enemyPose);
     if (!feint) { Sound.crunch(move.w / 1.6); kickSnow(enemy.hipWorld, move.dash ? 1 : 0.35); }
@@ -4209,7 +4284,8 @@
   function doInput(dir, tDown) {
     if (!S.started || !dir) return;
     if (S.mode === 'victory' && dir === 'U') { chopFollow(); clearTimeout(S.endTimer); S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 2600); return; }
-    if (['victory', 'defeat', 'falling', 'travel'].includes(S.mode)) return;
+    if (S.mode === 'travel' && S.memCall && S.gt < S.memCall.until) { memStart(S.memCall.id); return; }   // 鳴った刀に触れる：記憶へ
+    if (['victory', 'defeat', 'falling', 'travel', 'memArrive'].includes(S.mode)) return;
     if (S.mode === 'broken') { issen(); return; }
     S.run[dir === 'U' ? 'attack' : dir === 'D' ? 'parry' : 'dodge']++;   // 山を登る間の癖（白狐の剣士が覚える）
     if (S.gt < S.playerLockUntil) return;
@@ -4224,7 +4300,7 @@
     if (attacking && t < 110) return;
     if (dir === 'D') {
       const spam = tDown - S.lastGuard < CFG.spamGap;
-      S.guardPerfect = spam ? CFG.spamGuard : CFG.perfectGuard;
+      S.guardPerfect = (spam ? CFG.spamGuard : CFG.perfectGuard) * (S.ryugi && RYUGI[S.ryugi] ? RYUGI[S.ryugi].guard : 1);   // 流儀「稲妻」：弾きの間が狭い
       S.lastGuard = S.guardStart = tDown;
       S.habit.guard += spam ? 1 : 0.2;
       startPA('deflect');
@@ -4334,7 +4410,7 @@
       S.queue = []; S.action = null;
       const mik = S.counterUsed === 'mikiri';
       S.stats.counter++;
-      landHit(mik ? CFG.brk.counterMikiri : CFG.brk.counter, '反撃', 'cut', true);
+      landHit((mik ? CFG.brk.counterMikiri : CFG.brk.counter) * (S.ryugi && RYUGI[S.ryugi] ? RYUGI[S.ryugi].counter : 1), '反撃', 'cut', true);   // 流儀「稲妻」：反撃が深く入る
       if (S.mode !== 'broken') setMode('staggered', 950);
       return;
     }
@@ -4454,7 +4530,7 @@
     glyphAt('弾', 'miss', tA);
     pushLog('弾かれた', '', '隙のない相手に斬りかかった');
     S.shake = Math.max(S.shake, 0.04);
-    const rd = !S.etype || S.etype.boss ? 0.45 : 0.15 + 0.35 * S.etype.read + S.etype.counter;
+    const rd = !S.etype || S.etype.boss ? 0.45 : 0.15 + 0.35 * S.etype.read + S.etype.counter + (S.oku && S.oku.counter || 0);
     if (forceCounter || S.enemyDeflects >= 2 || S.r() < clamp(rd + S.habit.attack * 0.08, 0, 0.85)) {   // 無理に斬りかかるほど、弾いて斬り返される
       S.enemyDeflects = 0; S.queue = [];
       setTimeout(() => { if (!['broken', 'falling', 'victory', 'defeat'].includes(S.mode)) startAction(S.r() < 0.5 ? 'counterR' : 'counterL'); }, 0);
@@ -4905,7 +4981,7 @@
             p.m.position.lerpVectors(p.from, p.to, u);
             if (p.kind === 'arrow') p.m.position.y += Math.sin(Math.PI * Math.min(1, u)) * 0.08;
             else if (p.kind === 'kunai') p.m.rotateZ(dt * 30);
-            else { p.m.scale.setScalar(1 + u * 0.35); p.m.userData.ghosts[0].material.opacity = 0.85 + 0.15 * Math.sin(S.gt * 0.06); }
+            else if (p.m.userData.ghosts && p.m.userData.ghosts.length) { p.m.scale.setScalar(1 + u * 0.35); p.m.userData.ghosts[0].material.opacity = 0.85 + 0.15 * Math.sin(S.gt * 0.06); }   // 鎖鎌の分銅には残像が無い（以前は、ここで止まり画面が固まった）
             if (u >= 1.05 && !p.a.resolved) p.state = 'pass';
           } else if (p.state === 'deflect' || p.state === 'pass') {
             p.life -= dt; if (p.state === 'deflect') { p.v.y -= 9 * dt; p.m.rotation.x += dt * 12; }
@@ -4925,22 +5001,22 @@
   const localAt = (d, lat, out) => { const P = pathP(d), dir = pathDir(d), O = pathP(S.originD); return (out || V(0, 0, 0)).set(P.x - dir.z * lat - O.x, 0, P.z + dir.x * lat - O.z); };
   const playerD = () => S.originD - S.p.z;   // 道の上の距離（道の点の z は -d なので、z から d がわかる）
   // 原点からの地面の高さ（足が踏む高さ）と、腰の基準の高さ
-  const gyFeet = (x, z) => pathH(S.originD - z, 1) - pathH(S.originD, 1);
-  const gyRoot = (x, z) => pathH(S.originD - z, 2) - pathH(S.originD, 1);
+  const gyFeet = (x, z) => (S.memory ? 0 : pathH(S.originD - z, 1) - pathH(S.originD, 1));
+  const gyRoot = (x, z) => (S.memory ? 0 : pathH(S.originD - z, 2) - pathH(S.originD, 1));
   // 原点からの、ある点の地面の高さ（道の外の坂や谷も含む）
-  const groundLocal = (x, z) => { const d = S.originD - z, P = pathP(d), O = pathP(S.originD), dir = pathDir(d); const lat = (x - (P.x - O.x)) * -dir.z + (z - (P.z - O.z)) * dir.x; return heightAt(d, lat) - pathH(S.originD, 1); };
+  const groundLocal = (x, z) => { if (S.memory) return 0; const d = S.originD - z, P = pathP(d), O = pathP(S.originD), dir = pathDir(d); const lat = (x - (P.x - O.x)) * -dir.z + (z - (P.z - O.z)) * dir.x; return heightAt(d, lat) - pathH(S.originD, 1); };
   const CAM_RC = new THREE.Raycaster(), _rcO = V(0, 0, 0), _rcD = V(0, 0, 0);
   // 演出のカメラを置けるか：地面より十分上、戦える範囲（細い尾根・岩場では狭い）の内、見る点までの間を地面が遮らない
   function camSpotOK(x, y, z, look) {
     // 開けの外の木立には入れない。崖の外（谷の上の宙）は、地面にめり込まないので置いてよい
     const T = themeAt(S.originD), r = Math.hypot(x, z);
-    if (r > (T.side === 'chasm' ? 9 : 9.2)) return false;
+    if (!S.memory && r > (T.side === 'chasm' ? 9 : 9.2)) return false;
     if (Math.hypot(x - S.e.x, z - S.e.z) < 3.2 || Math.hypot(x - S.p.x, z - S.p.z) < 3.0) return false;   // 二人に寄りすぎない
     for (let i = 0; i <= 6; i++) { const u = i / 6, qx = lerp(x, look.x, u), qy = lerp(y, look.y, u), qz = lerp(z, look.z, u); if (groundLocal(qx, qz) > qy - (i === 0 ? 0.55 : 0.2)) return false; }
     // 置いた物（杭、岩、木、灯籠）が、見る点との間を遮らないか
     _rcO.set(x, y, z); _rcD.copy(look).sub(_rcO); const L = _rcD.length(); _rcD.normalize();
     CAM_RC.set(_rcO, _rcD); CAM_RC.far = Math.max(0.1, L - 0.6); CAM_RC.camera = camera;
-    const g = STAGE_G[stageOfD(S.originD)]; if (g && CAM_RC.intersectObject(g, true).some((h) => !h.object.isSprite)) return false;
+    const g = S.memory ? MEM_G : STAGE_G[stageOfD(S.originD)]; if (g && CAM_RC.intersectObject(g, true).some((h) => !h.object.isSprite)) return false;
     return true;
   }
   function setOrigin(d) { S.originD = d; const P = pathP(d); worldG.position.set(-P.x, -pathH(d, 1), -P.z); worldG.updateMatrixWorld(true); updateWorldVis(d); }
@@ -5001,7 +5077,9 @@
     // 石段と上り坂では、足取りが少し重くなる
     const pd = playerD(), climb = onStairs(pd) ? 0.8 : 1 - clamp((pathH(pd + 1, 0) - pathH(pd - 1, 0)) * 0.2, 0, 0.2);
     T.climb = lerp(T.climb || 1, climb, Math.min(1, dt * 3));
-    T.s = Math.min(T.len, T.s + T.speed * start * end * T.climb * dt);
+    checkMemCall();
+    T.callK = lerp(T.callK === undefined ? 1 : T.callK, S.memCall ? 0.3 : 1, Math.min(1, dt * 4));   // 刀が鳴ると、足が緩む
+    T.s = Math.min(T.len, T.s + T.speed * start * end * T.climb * T.callK * dt);
     const u = T.s / T.len, p = T.curve.getPointAt(u);
     T.curve.getTangentAt(Math.min(0.999, u), _tan);
     S.p.x = p.x; S.p.z = p.z; S.p.tw = null;
@@ -5017,7 +5095,7 @@
     const T = S.travel; S.travel = null;
     worldShift(T.targetD);
     if (T.final) { S.mode = 'victory'; S.modeStart = S.gt; S.p.yaw = Math.PI; clearTimeout(S.endTimer); S.endTimer = setTimeout(() => showEnd(true), 3200); return; }
-    S.rule = THEMES[stageOfD(T.targetD)].rule;
+    S.rule = THEMES[stageOfD(T.targetD)].rule; noteNovel('法則', S.rule);
     if (S.rule === 'wind') S.wind = { dir: S.r() < 0.5 ? 1 : -1, next: S.gt + 3000 + S.r() * 2500 };
     const entry = S.road[S.roadIdx], t = Array.isArray(entry) ? entry[0] : entry;
     pushLog(t.name, '', `${S.roadIdx + 1}人目`);
@@ -5103,7 +5181,7 @@
   const FIX_KIND = (k) => FIXED.filter((q) => q.o.userData.kind === k).map((q) => q.o);
   let STARS = null, MOONS = null, RINGS = null;
   function updateAtmos(dt) {
-    const d = S.started ? playerD() : S.originD, T = themeAt(d), k = 1 - Math.exp(-dt * 1.2);
+    const d = S.started ? playerD() : S.originD, T = S.memory ? S.memory.M.theme : themeAt(d), k = 1 - Math.exp(-dt * (S.memory ? 6 : 1.2));
     scene.fog.color.lerp(_fc2.set(T.fog[0]), k); scene.fog.near = lerp(scene.fog.near, T.fog[1], k); scene.fog.far = lerp(scene.fog.far, T.fog[2], k);
     scene.background.copy(scene.fog.color);
     ['uTop', 'uMid', 'uHor'].forEach((u, i) => { const c = T.sky[i]; SKY_U[u].value.r = lerp(SKY_U[u].value.r, c[0], k); SKY_U[u].value.g = lerp(SKY_U[u].value.g, c[1], k); SKY_U[u].value.b = lerp(SKY_U[u].value.b, c[2], k); });
@@ -5118,10 +5196,14 @@
     if (!RINGS) { RINGS = FIX_KIND('ring'); RINGS.forEach((m) => { m.material.transparent = true; }); }
     RINGS.forEach((m) => { m.material.opacity = clamp(ATM.peakA * 1.15, 0, 1); m.visible = ATM.peakA > 0.15; });
     PANO.drop = ATM.drop;
+    if (S.memory) { ATM.peakA = 0; RINGS.forEach((m) => { m.visible = false; }); }
+    // 稲光：闇の中のすべてを一瞬照らす
+    const fl = updateLightning(); BOLT.intensity = fl * 2.6;
+    if (fl > 0) { scene.fog.color.lerp(_fc3.setRGB(0.32, 0.36, 0.48), fl * 0.8); scene.background.copy(scene.fog.color); hemi.intensity += fl * 1.8; scene.fog.far += fl * 30; }
     // 灯籠の光：主人公に近い四つの灯籠に、点の光を置く
     const O = pathP(S.originD), oy = pathH(S.originD, 1), px = S.p.x + O.x, pz = S.p.z + O.z;
     const near = LANTERN_SPOTS.map((q) => ({ q, d: Math.hypot(q.x - px, q.z - pz) })).sort((a, b) => a.d - b.d);
-    lanternLights.forEach((l, i) => { const n = near[i]; if (!n || n.d > 18) { l.userData.on = 0; return; } l.position.set(n.q.x - O.x, n.q.y - oy + 1.1, n.q.z - O.z); l.userData.on = 1; });
+    lanternLights.forEach((l, i) => { const n = near[i]; if (S.memory || !n || n.d > 18) { l.userData.on = 0; return; } l.position.set(n.q.x - O.x, n.q.y - oy + 1.1, n.q.z - O.z); l.userData.on = 1; });
     updateAmbient(dt);
   }
   // 遠景を、カメラのまわりに置く。頂は登るほど近く大きく。雲海は足もとの深さに
@@ -5162,14 +5244,124 @@
     // 細氷：氷の粒が、光を受けてまたたく
     const D = AMB.dust; D.visible = ATM.dust > 0.02;
     if (D.visible) { const p = D.geometry.attributes.position, c = D.geometry.attributes.color; for (let i = 0; i < p.count; i++) { let x = p.getX(i) + (0.05 + wx * 0.3) * dt, y = p.getY(i) - dt * 0.05, z = p.getZ(i) + wz * 0.3 * dt; if (x - cx > 9) x -= 18; if (x - cx < -9) x += 18; if (z - cz > 9) z -= 18; if (z - cz < -9) z += 18; if (y < gy) y = gy + 6; p.setXYZ(i, x, y, z); const tw = Math.pow(0.5 + 0.5 * Math.sin(t * (1.5 + (i % 7) * 0.6) + i * 1.7), 6) * ATM.dust; c.setXYZ(i, tw, tw, tw * 1.1); } p.needsUpdate = true; c.needsUpdate = true; }
+    // 雨（刀の記憶）：カメラのまわりで、斜めに速く降る
+    if (RAIN.visible) { const p = RAIN.geometry.attributes.position, cy = camera.position.y; for (let i = 0; i < p.count; i += 2) { let x = p.getX(i) + dt * 1.2, y = p.getY(i) - dt * 15, z = p.getZ(i) + dt * 0.4; if (y < cy - 4) { y += 13; x = cx + (Math.random() - 0.5) * 24; z = cz + (Math.random() - 0.5) * 24; } if (x - cx > 12) x -= 24; if (x - cx < -12) x += 24; if (z - cz > 12) z -= 24; if (z - cz < -12) z += 24; p.setXYZ(i, x, y, z); p.setXYZ(i + 1, x + 0.06, y - 0.5, z + 0.02); } p.needsUpdate = true; }
     // 動く物（風車、幟、旗、焚き火）
     ANIM.forEach((a) => { if (STAGE_G[a.stage].visible) a.fn(t, dt); });
     updateWatchers(dt);
   }
 
   setOrigin(clearD(loadStage(), 0));   // 始めの画面の背景：続きの合目の、最初の開け
+  // ───────── 刀の記憶（docs/44・45）：刀に触れると、その持ち主の最後の戦いの記憶に入る ─────────
+  // 雷雨の河原：夏の夜。闇の中、相手は稲光の一瞬にしか見えない（読みの三要素のうち「手がかり」だけを変える：規則1・4）
+  // 記憶の主の相手「雷切」は、稲光と同時に斬りかかる。稲光から一拍おいて刃が届く（主の問い：規則3）
+  const RAIKIRI = Object.assign({}, ROSTER.find((t) => t.id === 'katana:kashira'), { id: 'raikiri', name: '雷切', lord: true, keepLook: true, thunder: true, brk: 0.7, time: 0.95,
+    look: { pal: { kimono: '#1a1e2c', lapel: '#d8b020', hakama: '#22263a', sash: '#d8b020', armor: '#14161e', glove: '#1a1e2a', hood: '#10121a' }, hat: 'kasa', mask: 'kage', plates: true, scale: 1.22, acc: { scarf: '#d8b020' } } });
+  const MEMORIES = {
+    raikiri: { road: ['t', ['a', 't'], RAIKIRI], faction: 'nobushi', ryugi: 'inazuma', tassel: 0xd8b020,
+      theme: { fog: [0x07090f, 7, 34], sky: [[0.00003, 0.00004, 0.0001], [0.00008, 0.0001, 0.0003], [0.0004, 0.0005, 0.001]],   // 空は仕上げの処理で明るさの補正が二度かかるので、ごく小さい値にする
+      moon: [0x8090b0, 0.08], hemi: [0x44506a, 0x0a0c12, 0.16], stars: 0, moonA: 0, drop: 30, cloud: null, dawn: 0, mist: 0.18, amb: 'none' } },
+  };
+  // 流儀（docs/45 規則6）：強くならず、遊び方が変わる引き換え。背負えるのは一つ。鞘の下げ緒の色で分かる
+  //  稲妻：弾きの間が狭くなる代わりに、弾いた後の反撃が深く入る
+  const RYUGI = { inazuma: { guard: 0.65, counter: 1.7, tassel: 0xd8b020 } };
+  const memDone = () => { try { return JSON.parse(localStorage.getItem('kaze.mem') || '[]'); } catch (e) { return []; } };
+  const saveMem = (list) => { try { localStorage.setItem('kaze.mem', JSON.stringify(list)); } catch (e) { /* 保存できなくても遊べる */ } };
+  const loadRyugi = () => { try { return localStorage.getItem('kaze.ryugi') || null; } catch (e) { return null; } };
+  S.ryugi = loadRyugi();
+  function refreshMemSwords() { const done = memDone(); Object.entries(MEM_SWORD).forEach(([id, m]) => { m.grp.visible = !done.includes(id); }); player.setTassel(S.ryugi && RYUGI[S.ryugi] ? RYUGI[S.ryugi].tassel : null); }
+  // 走っている間に、記憶の残る刀の横を通ると、刀が鳴り、足が緩み、カメラが刀を向く。触れれば記憶へ
+  function checkMemCall() {
+    const T = S.travel; if (!T || S.memory) return;
+    const done = memDone(), pd = playerD();
+    if (S.memCall && S.gt > S.memCall.until) S.memCall = null;
+    if (S.memCall) return;
+    Object.entries(MEM_SWORD).forEach(([id, m]) => {
+      if (done.includes(id) || T.called === id || stageOfD(pd) !== m.stage || Math.abs(pd - m.d) > 2.5) return;
+      T.called = id; S.memCall = { id, until: S.gt + 2800 };
+      const O = pathP(S.originD), q = along(m.d, m.lat, 0.9); Sound.at(V(q.x - O.x, q.y - pathH(S.originD, 1), q.z - O.z)); Sound.kin(4);
+    });
+  }
+  function memSwordLocal() { const m = S.memCall && MEM_SWORD[S.memCall.id]; if (!m) return null; const O = pathP(S.originD), q = along(m.d, m.lat, 0.9); return V(q.x - O.x, q.y - pathH(S.originD, 1), q.z - O.z); }
+  // 画面を暗転させる幕
+  const FADE = (() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 0.6s ease;z-index:30'; document.body.appendChild(d); return d; })();
+  function fadeOutIn(mid, hold) { FADE.style.opacity = '1'; setTimeout(() => { mid(); setTimeout(() => { FADE.style.opacity = '0'; }, hold || 250); }, 650); }
+  function memStart(id) {
+    const M = MEMORIES[id]; S.memCall = null;
+    if (!S.memSave) S.memSave = { originD: S.originD, road: S.road, roadIdx: S.roadIdx, travel: S.travel, p: { x: S.p.x, z: S.p.z, yaw: S.p.yaw }, stage: S.stage };
+    S.travel = null;
+    fadeOutIn(() => {
+      S.memory = { id, M };
+      worldG.visible = false; MEM_G.visible = true; RAIN.visible = true; snow.visible = false;
+      ENV_DAY = ENV_DAY || scene.environment; scene.environment = ENV_NIGHT;
+      remains.forEach((m) => scene.remove(m)); remains.length = 0; Shatter.clear(); Proj.clear(); prints.forEach((q) => { q.m.visible = false; });
+      [enemy, enemy2, enemy3].forEach((f) => { f.resetHat(); f.clearTears(); });
+      S.road = makeMemRoad(M); S.roadIdx = 0; S.rule = 'lightning'; noteNovel('法則', 'lightning'); S.wind = null; WORLD_WIND.set(0, 0, 0);
+      S.lightning = { next: S.gt + 1600, t: -1e9 };
+      Object.assign(S, { phase: 1, B: 0, P: 0, W: 0, action: null, queue: [], cine: null, pa: null, kamae: null, evade: null, counterUntil: 0 });
+      S.p.x = 0; S.p.z = 3; S.p.y = 0; S.p.tw = null; S.p.yaw = Math.PI; player.resetFeet(); camInit = false;
+      memArrive();
+    }, 500);
+  }
+  function makeMemRoad(M) {
+    const one = (tok) => { if (typeof tok === 'object') return tok; const pool = ROSTER.filter((t) => t.rank === RANK_OF[tok] && FACTIONS[M.faction].weapons.includes(t.weapon)); const t = pick(pool.length ? pool : ROSTER); return Object.assign({}, t, { look: factionLook(M.faction, t, Math.floor(Math.random() * 1e6)), faction: M.faction }); };
+    return M.road.map((e) => (Array.isArray(e) ? e.map(one) : one(e)));
+  }
+  // 次の相手が、闇の向こうから歩いて来る
+  function memArrive() {
+    const entry = S.road[S.roadIdx];
+    setupEncounter(entry);
+    const f = V(Math.sin(S.p.yaw), 0, Math.cos(S.p.yaw)), sd = S.r() < 0.5 ? 1 : -1;
+    S.e.x = S.p.x + f.x * 15 + f.z * sd * 3; S.e.z = S.p.z + f.z * 15 - f.x * sd * 3; S.e.tw = null; enemy.resetFeet();
+    tween(S.e, S.p.x + f.x * 4.5, S.p.z + f.z * 4.5, 3800, smooth);
+    S.waiters.forEach((w, i) => { w.e.x = S.e.x + (i % 2 ? -2.5 : 2.5); w.e.z = S.e.z - 1.5; tween(w.e, S.p.x + f.x * 5 + (i % 2 ? -2.6 : 2.6), S.p.z + f.z * 5, 4200, smooth); w.fig.resetFeet(); w.st.nextBurst = S.gt + 5000; });
+    enemy.bladeMat.emissive.set(0x3a4a66);   // 闇の中でも、刃先だけはかすかに光る（手がかり）
+    setMode('memArrive', 4000);
+  }
+  function memNext() { S.roadIdx++; S.P = Math.max(0, S.P - 35); [enemy, enemy2, enemy3].forEach((f) => { f.resetHat(); f.clearTears(); }); Shatter.clear(); memArrive(); }
+  // 記憶を越えた：刀を抜き、流儀を背負い、山の刀の前へ戻る
+  function memEnd() {
+    const id = S.memory.id, M = S.memory.M, sv = S.memSave;
+    fadeOutIn(() => {
+      const done = memDone(); if (!done.includes(id)) { done.push(id); saveMem(done); }
+      S.ryugi = M.ryugi; try { localStorage.setItem('kaze.ryugi', S.ryugi); } catch (e) { /* 保存できなくても遊べる */ }
+      S.memory = null; S.memSave = null; S.lightning = null; BOLT.intensity = 0;
+      worldG.visible = true; MEM_G.visible = false; RAIN.visible = false; snow.visible = true;
+      if (ENV_DAY) scene.environment = ENV_DAY;
+      Shatter.clear(); Proj.clear(); [enemy, enemy2, enemy3].forEach((f) => { f.resetHat(); f.clearTears(); });
+      setOrigin(sv.originD); S.stage = sv.stage; S.road = sv.road; S.roadIdx = sv.roadIdx; S.rule = null;
+      Object.assign(S, { phase: 1, B: 0, P: 0, W: 0, action: null, queue: [], cine: null, pa: null });
+      S.p.x = sv.p.x; S.p.z = sv.p.z; S.p.yaw = sv.p.yaw; S.p.tw = null; player.resetFeet(); camInit = false;
+      refreshMemSwords();
+      const T = sv.travel; setupEncounter(S.road[S.roadIdx]);
+      if (T) { placeGroup(T.targetD); T.t0 = S.gt; T.last = S.gt; S.travel = T; S.mode = 'travel'; S.modeStart = S.gt; S.modeUntil = S.gt + 1e9; }
+      else { S.e.x = 0; S.e.z = -2.4; enemy.resetFeet(); S.rule = THEMES[S.stage].rule; setMode('intro', 1500); }
+      Sound.kin(6); burst(V(S.p.x, 1.2, S.p.z), 30, 2.0, 'warm');
+    }, 600);
+  }
+  // 稲光：一定の拍子で走り、雷鳴が少し遅れて届く。稲光の間だけ、闇の中のすべてが見える
+  function updateLightning() {
+    const L = S.lightning; if (!L || !S.started) return 0;
+    if (S.gt >= L.next && !['victory', 'defeat'].includes(S.mode)) {
+      L.t = performance.now(); L.next = S.gt + 2500 + (S.r() < 0.5 ? 0 : 450);
+      Sound.thunder(0.45 + S.r() * 0.2);
+      // 雷切：稲光と同時に斬りかかる。稲光から一拍（0.56秒）おいて刃が届く
+      if (S.etype && S.etype.thunder && ['stalk', 'open', 'retreat', 'approach'].includes(S.mode) && !S.action) thunderStrike();
+    }
+    const t = performance.now() - L.t;
+    return t < 60 ? 1 : t < 110 ? 0.25 : t < 170 ? 0.85 : Math.max(0, 1 - (t - 170) / 380) * 0.7;
+  }
+  refreshMemSwords();
+  function thunderStrike() {
+    S.queue = [];
+    startAction(pick(['kesa', 'gyaku', 'cutR', 'cutL', 'over', 'kesaL']));
+    const a = S.action; if (!a) return;
+    a.O = 130; a.W = 190; a.D = 0; a.S = 240; a.T = a.t0 + a.O + a.W + a.S;
+    if (S.r() < 0.35) S.queue = [S.r() < 0.5 ? 'kiriageF' : 'kesaF'];   // 時に、返しの一太刀が続く
+  }
   // 道の次の相手：斬り倒した跡を残して、次の開けへ歩いて行く（次の相手は、そこで待っている）
   function nextEnemy() {
+    if (S.memory) { memNext(); return; }
     S.roadIdx++;
     S.P = Math.max(0, S.P - 35);   // 一息つく
     startTravel(clearD(S.stage, Math.min(4, S.roadIdx)), S.road[S.roadIdx]);
@@ -5262,6 +5454,8 @@
     const gt = S.gt, m = S.mode, f = dirPE();
     if (S.pendingCut && gt >= S.pendingCut) { S.pendingCut = 0; finishCut(); }
     if (m === 'travel') { S.e.vx = S.e.vz = 0; return; }
+    if (m === 'memArrive') { S.e.vx = S.e.vz = 0; if (!S.e.tw) setMode('intro', 1200); return; }
+    if (!S.okuDone && S.etype && !S.etype.boss && ['tedare', 'ryuha', 'kashira'].includes(S.etype.rank) && S.B >= 50 && ['stalk', 'open', 'retreat', 'staggered'].includes(m) && !S.action) { revealOku(); return; }
     // 番の交代：番の相手が構え直しているときに、待っていた方が前へ出る
     const aw = aliveWaiters();
     if (aw.length && (m === 'stalk' || m === 'retreat') && !S.action && gt >= (S.nextSwap || 0) && !S.e.tw) {
@@ -5286,7 +5480,10 @@
     if (m === 'stalk' || m === 'approach') {
       // メリハリ：構えてじっと止まり、次の瞬間、大きく鋭く一歩で動き、また止まる（ずっと歩き続けると、ちょこちょこして見える）
       S.e.vx = S.e.vz = 0;
-      if (!S.e.tw && gt >= (S.nextBurst || 0)) {
+      // 次の一手を考える番は、回り込みの一歩より先（一歩が終わるとすぐ次の一歩が始まると、考える番が回らず、延々と回り込むだけになる）
+      const decide = !S.e.tw && ((m === 'approach' && f.d <= 2.75) || gt >= S.modeUntil);
+      if (decide) think();
+      else if (!S.e.tw && gt >= (S.nextBurst || 0)) {
         const fs = curStyle(), pref = (fs ? fs.pref : 3.4) - (S.phase === 1 ? 0 : 0.4);
         const side = V(-f.z, 0, f.x).multiplyScalar(S.stalkDir);
         let lat = 0, rad = 0;
@@ -5296,10 +5493,8 @@
         const dur = 230 + Math.hypot(dx, dz) * 60;
         tween(S.e, S.e.x + dx, S.e.z + dz, dur, easeOut);
         kickSnow(enemy.hipWorld, 0.6); Sound.step(1);
-        { const fs2 = curStyle(); S.nextBurst = gt + dur + (fs2 ? lerp(fs2.pause[0], fs2.pause[1], S.r()) * (S.phase === 1 ? 1 : 0.7) : (S.phase === 1 ? 260 + S.r() * 380 : 180 + S.r() * 260)); }
+        { const fs2 = curStyle(); S.nextBurst = gt + dur + (fs2 ? lerp(fs2.pause[0], fs2.pause[1], S.r()) * (S.phase === 1 ? 1 : 0.7) * (S.oku && S.oku.pause ? S.oku.pause : 1) : (S.phase === 1 ? 260 + S.r() * 380 : 180 + S.r() * 260)); }
       }
-      if (m === 'approach' && f.d <= 2.75 && !S.e.tw) think();
-      else if (gt >= S.modeUntil && !S.e.tw) think();
     } else { S.e.vx = 0; S.e.vz = 0; }
 
     if ((m === 'open' || m === 'bait') && gt >= S.modeUntil) afterOpening();
@@ -5386,6 +5581,19 @@
         else if (gt >= end) { S.action = null; afterPattern(a); }
       }
     }
+  }
+  // 奥の手を見せる：刀を大きく振り払い、足元の雪が輪になって爆ぜ、面の目が一瞬白く光る。鎧の板があれば脱ぎ捨てる
+  function revealOku() {
+    S.okuDone = true; S.oku = OKU[S.etype.faction] || OKU.kenkaku; noteNovel('奥の手', S.etype.faction || '');
+    S.queue = []; S.action = null;
+    const c = enemy.chestWorld.clone();
+    ring(S.e.x, S.e.z, 4.2, 0xe8f0ff); snowBurst(S.e.x, S.e.z, 1.6); kickSnow(enemy.hipWorld, 1.4);
+    [-1, 1].forEach((sd) => { const e = enemy.eyeWorld(sd, V(0, 0, 0)); glowAt(e, 0.35, 420, 0xffffff); });
+    Sound.at(c); Sound.peril(); Sound.swing(1.6);
+    S.slowUntil = performance.now() + 380; S.slowScale = 0.4; fxKick(0.004, 0.05, c);
+    if (S.etype.look && S.etype.look.plates) enemy.dropHat();
+    S.B = Math.max(0, S.B - 12);   // 立て直して、まだ崩れていない
+    flip([]); pushLog('奥の手', '', S.etype.name);
   }
   function afterPattern(a) {
     const baitChance = S.phase === 2 ? clamp(0.2 + S.habit.attack * 0.06, 0, 0.5) : 0;
@@ -5593,9 +5801,15 @@
     const eFast = S.mode === 'attack' && act && !act.feint && S.gt >= act.T - act.S - 40 && S.gt <= act.T + act.F;
     const pa = S.pa;
     enemy.castShadows(true);
+    // 主の問い（霧縫い）：間合いを測る間は霧に消え、足跡と雪を蹴る音だけが近づく。起こりの瞬間に、雪煙とともに姿を現す（docs/45 規則3）
+    if (S.etype && S.etype.vanish) {
+      const hide = ['stalk', 'approach', 'retreat', 'retreatStart', 'flip'].includes(S.mode);
+      if (hide !== !!S.vanished) { S.vanished = hide; enemy.present(!hide); if (!hide) { snowBurst(S.e.x, S.e.z, 1.2); kickSnow(V(S.e.x, 1.0, S.e.z), 1.2); Sound.at(V(S.e.x, 1, S.e.z)); Sound.step(1); } }
+      if (hide && S.e.tw && Math.random() < dtGame / 90) { kickSnow(V(S.e.x, 0.05, S.e.z), 0.35); Sound.at(V(S.e.x, 0.2, S.e.z)); Sound.step(0.6); }
+    } else if (S.vanished) { S.vanished = false; enemy.present(true); }
     const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge'].includes(pa.kind) && S.gt - pa.t0 < 480;
     enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
-    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z) });
+    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z), walk: S.mode === 'memArrive' });
     updateWaiting(dtGame);
     player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: S.mode === 'travel' ? null : enemy.headWorld, walk: S.mode === 'travel', gy: gyFeet, rootY: S.p.y || 0 });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
@@ -5717,6 +5931,7 @@
         // 歩く間：背中の少し後ろ、高めから、行く手（道の先と、待つ相手）を見る
         const yw = S.p.yaw, fx = Math.sin(yw), fz = Math.cos(yw);
         f.x = fx; f.z = fz; f.d = Math.min(6, Math.max(3, Math.hypot(S.e.x - S.p.x, S.e.z - S.p.z) * 0.5));
+        const ms = memSwordLocal(); if (ms) { const dx = ms.x - S.p.x, dz = ms.z - S.p.z, dd = Math.hypot(dx, dz) || 1; f.x = lerp(fx, dx / dd, 0.55); f.z = lerp(fz, dz / dd, 0.55); const l = Math.hypot(f.x, f.z) || 1; f.x /= l; f.z /= l; f.d = 3; }   // 刀の方を向く
       }
       // 自分の背中の右肩越しに、相手を見る。離れるほど引く。
       const back = 4.3 + Math.max(0, f.d - 3) * 0.4;
@@ -5810,9 +6025,11 @@
     updateBamboo(dtGame / 1000);
     updateAtmos(dtReal / 1000);
     const tl0 = performance.now();
-    updateBodies(dtGame);
-    updateEffects(dtReal * Math.max(0.15, scale));
-    updateCamera(dtReal);
+    // 一つの処理が例外を出しても、残りの処理と描画は必ず進める（一か所の不具合で画面が固まらないように）
+    const guard = (name, fn) => { try { fn(); } catch (e) { if (!S.errs) S.errs = {}; if (!S.errs[name]) { S.errs[name] = true; console.error(name, e); } } };
+    guard('bodies', () => updateBodies(dtGame));
+    guard('effects', () => updateEffects(dtReal * Math.max(0.15, scale)));
+    guard('camera', () => updateCamera(dtReal));
     const tl1 = performance.now();
     S.frameNo = (S.frameNo || 0) + 1; if (S.frameNo % 2 === 0) renderer.shadowMap.needsUpdate = true;
     Post.render();
@@ -5846,7 +6063,7 @@
     // 始める所：合目の始め（山小屋の前）から歩いて最初の開けへ。開発者モードの一人の相手や途中からは、開けから
     const atHut = fromPhase === 1 && !S.devRoad && S.roadIdx === 0 && !S.noHut;
     const cd = clearD(S.stage, Math.min(4, S.roadIdx));
-    S.travel = null; S.rule = null; S.wind = null; WORLD_WIND.set(0, 0, 0); resetBamboo(); resetWatchers();
+    S.travel = null; S.rule = null; S.wind = null; WORLD_WIND.set(0, 0, 0); resetBamboo(); resetWatchers(); refreshMemSwords(); S.memCall = null;
     remains.forEach((m) => scene.remove(m)); remains.length = 0;
     setOrigin(atHut ? stageStart(S.stage) + HUT_AT + 1.5 : cd);
     S.p.y = 0; S.e.x = 0; S.e.z = -2.4; S.e.tw = null; S.e.slide = null; S.p.x = 0; S.p.z = atHut ? 0 : 2.1; S.p.tw = null; S.p.slide = null;
@@ -5922,8 +6139,14 @@
     S.lastWon = won;
   }
   // 負けたら、この合目の山小屋（始め）から。勝ちきったら、もう一度山を
-  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
+  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.memory) { player.resetHat(); player.clearTears(); S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt }; memStart(S.memory.id); return; } S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
   // 試遊の記録：刃が届くたびの結果と、入力のずれ（刃が届く何ミリ秒前に入れたか）
+  // 新しい模様の補充：一分あたりの数と、新しい模様が来なかった最も長い間（遊び始めからの記録）
+  function novelSummary() {
+    const E = S.novel.events; if (!E.length) return '';
+    const span = Math.max(1, (S.gt - E[0].t) / 60000); let gap = 0; for (let i = 1; i < E.length; i++) gap = Math.max(gap, E[i].t - E[i - 1].t); gap = Math.max(gap, S.gt - E[E.length - 1].t);
+    return `新しい模様 ${E.length}（1分あたり ${(E.length / span).toFixed(1)}、来なかった最長 ${Math.round(gap / 1000)}秒）`;
+  }
   function teleSummary() {
     const T = S.tele;
     if (!T.length) return '';
@@ -5935,7 +6158,7 @@
     const worst = {};
     T.filter((e) => e.r === 'hit' || e.r === 'guardBreak').forEach((e) => { worst[e.m] = (worst[e.m] || 0) + 1; });
     const w = Object.entries(worst).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k}（${v}回）`).join('、');
-    return [rate !== null ? `弾きの成功 ${rate}%（${parried.length}/${guardTries.length}）` : '', early !== null ? `受けになった時は、平均 ${early}ms 早い` : '', w ? `よく斬られた技：${w}` : ''].filter(Boolean).join('。');
+    return [novelSummary(), rate !== null ? `弾きの成功 ${rate}%（${parried.length}/${guardTries.length}）` : '', early !== null ? `受けになった時は、平均 ${early}ms 早い` : '', w ? `よく斬られた技：${w}` : ''].filter(Boolean).join('。');
   }
   document.getElementById('copyBtn').addEventListener('click', () => {
     const data = JSON.stringify({ v: '0.6', ua: navigator.userAgent.slice(0, 80), summary: teleSummary(), stats: S.stats, log: S.tele });
@@ -5985,6 +6208,14 @@
     probe2() { return { pa: S.pa && S.pa.kind, pat: S.pa ? Math.round(S.gt - S.pa.t0) : -1, cine: !!S.cine, p: [S.p.x, S.p.z, S.p.yaw], e: [S.e.x, S.e.z, S.e.yaw], ph: player.headWorld.toArray(), pm: player.mid.toArray(), ehd: enemy.headWorld.toArray(), em: enemy.mid.toArray(), mode: S.mode, gt: S.gt }; },
     stageWhy(n) { const out = {}; STAGE_G[n].traverse((o) => { if (!o.isMesh || o.isInstancedMesh) return; let dyn = false; for (let p = o; p && p !== STAGE_G[n]; p = p.parent) if (p.userData.dyn) dyn = true; const k = [o.material.type, o.material.map ? 'map' : '', dyn ? 'dyn' : '', o.geometry.attributes.position.count > 5000 ? 'big' : '', o.parent === STAGE_G[n] ? 'top' : 'child', o.material.transparent ? 'tr' : ''].join('|'); out[k] = (out[k] || 0) + 1; }); return out; },
     stageStats(n) { const c = { mesh: 0, inst: 0, sprite: 0, points: 0, byName: {} }; STAGE_G[n].traverse((o) => { if (o.isInstancedMesh) c.inst++; else if (o.isMesh) { c.mesh++; const k = (o.parent && o.parent.userData.dyn ? 'dyn:' : '') + (o.material.map ? 'map' : 'plain'); c.byName[k] = (c.byName[k] || 0) + 1; } else if (o.isSprite) c.sprite++; }); return c; },
+    memTest(id) { S.memSave = null; memStart(id || 'raikiri'); },
+    aiDbg() { return { mode: S.mode, gt: Math.round(S.gt), until: Math.round(S.modeUntil), tw: !!S.e.tw, nb: Math.round(S.nextBurst || 0), act: S.action && S.action.move && S.action.move.name, tactic: S.tactic, d: +dist().toFixed(2), etype: S.etype && S.etype.name, fac: S.etype && S.etype.faction }; },
+    vis() { return { enemy: enemy.root.visible, oku: !!S.okuDone, mode: S.mode, name: S.etype && S.etype.name }; },
+    novel() { return { n: S.novel.events.length, sum: novelSummary(), list: S.novel.events.map((e) => [Math.round(e.t / 1000), e.k]) }; },
+    memState() { return { mem: S.memory && S.memory.id, idx: S.roadIdx, mode: S.mode, ryugi: S.ryugi, done: memDone(), call: S.memCall && S.memCall.id, name: S.etype && S.etype.name }; },
+    memDbg(o) { if (o.rain !== undefined) RAIN.visible = o.rain; if (o.mist !== undefined) AMB.mist.forEach((m) => { m.visible = o.mist; m.material.opacity = o.mist ? m.material.opacity : 0; }); if (o.post !== undefined) Post.enabled = o.post; return { sky: ['uTop', 'uMid', 'uHor'].map((u) => SKY_U[u].value.toArray().map((v) => +v.toFixed(3))), fog: scene.fog.color.toArray().map((v) => +v.toFixed(3)), bg: scene.background.toArray().map((v) => +v.toFixed(3)), hemi: +hemi.intensity.toFixed(2), bolt: +BOLT.intensity.toFixed(2), exp: renderer.toneMappingExposure, tm: renderer.toneMapping }; },
+    hideTest(k) { const L = { fixed: FIXED.map((q) => q.o), pano: [PANO.peak, PANO.cloud, PANO.dawn], mem: [MEM_G], amb: [AMB.dust, AMB.leaves], snow: [snow] }[k] || []; L.forEach((o) => { o.visible = false; o.userData.forceHide = true; }); return L.length; },
+    sceneList() { const out = []; scene.children.forEach((o) => { if (o.visible) out.push((o.type || '') + ':' + (o.name || '') + ':' + (o.userData.kind || '') + ':' + (o.geometry && o.geometry.boundingSphere ? Math.round(o.geometry.boundingSphere.radius) : '')); }); return out; },
     camApproach(back) { const y = gyRoot(0, back) + 3.3; S.camDebug = { pos: V(1.0, y, back), look: V(0, gyRoot(0, -8) + 1.6, -8) }; },
     camDebug(pos, look) { S.camDebug = pos ? { pos: V(...pos), look: V(...look) } : null; },
     who(e) { const f = e ? enemy : player; return { player: f.root.position.toArray(), yaw: f.root.rotation.y, head: f.headWorld.toArray() }; },
