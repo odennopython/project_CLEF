@@ -207,7 +207,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev">開発</button>
-  <span class="t-ver"><span id="ver">試作 4.9</span></span>
+  <span class="t-ver"><span id="ver">試作 4.10</span></span>
 </div>
 
 <div id="devPanel" hidden>
@@ -1617,7 +1617,8 @@
       placeAt(g, PROP.pine, PROP_MAT, scatter(s, 30, 14, 45, 42, { maxH: -5 }));
       placeAt(g, PROP.rock, PROP_MAT, scatter(s, 26, 2.3, 4, 43, { s0: 0.3, s1: 0.8, clear: 3 }));
       const bd = d0 + CLEAR0 + CLEAR_GAP * 1.5; const br = makeBridge(10); br.position.copy(along(bd - 5, 0, 0)); br.lookAt(along(bd + 5, 0, 0)); br.rotateY(Math.PI); br.userData.dyn = false; g.add(br);
-      for (let d = d0 + 4; d < d0 + STAGE_LEN; d += 3) { if (Math.abs(d - bd) < 6) continue; [-1, 1].forEach((sd) => { const p = mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.9, 5), DARKWOOD); p.position.copy(along(d, sd * 1.82, 0.45)); g.add(p); }); }
+      for (let d = d0 + 4; d < d0 + STAGE_LEN; d += 3) { if (Math.abs(d - bd) < 6) continue; let inClear = false; for (let k = 0; k < 5; k++) if (Math.abs(d - clearD(s, k)) < FLAT + 0.5) inClear = true; if (inClear) continue;   // 戦う開けの中には杭を立てない（視界と演出の邪魔）
+       [-1, 1].forEach((sd) => { const p = mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.9, 5), DARKWOOD); p.position.copy(along(d, sd * 1.82, 0.45)); g.add(p); }); }
     }
     if (s === 5) { placeAt(g, PROP.pine, PROP_MAT, scatter(s, 40, 16, 45, 51)); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 30, 8, 30, 52, { s0: 0.6, s1: 2 })); placeAt(g, PROP.grass, PROP_MAT, scatter(s, 120, 7, 30, 53, { clear: 9 })); placeAt(g, PROP.drift, PROP_MAT, scatter(s, 60, 8, 34, 54, { s0: 1.2, s1: 3.2 })); }
     if (s === 6) {
@@ -2502,7 +2503,7 @@
       }
 
       // 足
-      const air = p.lift > 0.035;
+      const air = p.lift > 0.035 && !(opts && opts.walk);   // 走りの弾みは跳躍ではない（空中と見なすと歩きの周期が止まり、足が体に貼り付いて滑る）
       if (!feetReady) { feet.forEach((f, i) => { idealFoot(i, p, f.pos); f.pos.y = G(f.pos.x, f.pos.z); f.t = 1; }); feetReady = true; }
       const anyStepping = feet.some((f) => f.stepping);
       const spd = Math.hypot(vel.x, vel.z), walking = !!(opts && opts.walk) && spd > 0.6 && !air, vDir = vDirV.copy(vel).multiplyScalar(1 / Math.max(spd, 1e-4));
@@ -2703,6 +2704,7 @@
         root.scale.setScalar(o.scale || scale);
       },
       castShadows(on) { body.castShadow = on; },
+      feetDbg() { return feet.map((f) => [f.pos.x, f.pos.y, f.pos.z, f.planted ? 1 : 0, f.stepping ? 1 : 0]).concat([[root.position.x, root.position.y, root.position.z, gait.phase, gait.on ? 1 : 0]]); },
       present(on) { root.visible = on; shadow.visible = on; chains.forEach((c) => { if (c.c.mesh) c.c.mesh.visible = on && !c.off; }); },
       hideBody() { body.visible = false; headMesh.visible = false; shadow.visible = false; chains.forEach((c) => { c.c.mesh && (c.c.mesh.visible = false); }); },
       showBody() { body.visible = true; headMesh.visible = true; shadow.visible = true; },
@@ -4624,16 +4626,21 @@
     tween(S.p, px, pz, 230, easeIn);
     const port = camera.aspect < 1 ? 1.35 : 1;
     // 画を置く前に、地面と戦える範囲を確かめる（坂の地面の中、崖の外、岩場の外にカメラを置かない）。入れなければ寄せるか、反対側へ回す
+    // 寄せすぎない：まず高さを上げ、反対側へ回り、道の向き（前後）へ回る。距離を縮めるのは最後
     const shot = (bx, bz, fw, lat, y, look, orbit) => {
-      for (const k of [1, 0.8, 0.62, 0.45, 0.3]) for (const sg of [1, -1]) {
-        const x = bx + f.x * fw * port * k + sx * side * sg * lat * k, z = bz + f.z * fw * port * k + sz * side * sg * lat * k;
-        if (camSpotOK(x, y, z, look)) return { pos: V(x, y, z), look, orbit: orbit * sg };
+      const tries = [];
+      for (const dy of [0, 0.7, 1.5]) for (const sg of [1, -1]) tries.push([1, sg, dy, 1]);
+      for (const dy of [0.5, 1.4]) for (const ax of [1, -1]) tries.push([1, 0, dy, ax]);   // 横へ回れない所（細い尾根・岩場）は、前後から
+      for (const dy of [0.8, 1.8]) for (const sg of [1, -1]) tries.push([0.8, sg, dy, 1]);
+      for (const [k, sg, dy, ax] of tries) {
+        const x = bx + f.x * fw * port * k * ax + sx * side * sg * lat * k, z = bz + f.z * fw * port * k * ax + sz * side * sg * lat * k;
+        if (camSpotOK(x, y + dy, z, look)) return { pos: V(x, y + dy, z), look, orbit: orbit * (sg || 1) * (dy > 0.6 ? 0.5 : 1) };
       }
-      return { pos: V(bx + f.x * 1.6, Math.max(y, groundLocal(bx, bz) + 1.6), bz + f.z * 1.6), look, orbit: 0 };
+      return { pos: V(bx + f.x * fw * 0.7, Math.max(y, groundLocal(bx, bz) + 2.2), bz + f.z * fw * 0.7), look, orbit: 0 };
     };
     S.cine = { t0: S.gt, until: S.gt + (finalCut ? 1650 : 1300), shots: [
-      Object.assign(shot(ex, ez, 3.6, 3.0, 0.8, V(ex - f.x * 0.6, 1.2, ez - f.z * 0.6), 0.12 * side), { t: 0 }),
-      Object.assign(shot(px, pz, 3.4, -2.6, 0.9, V((px + ex) / 2, 1.1, (pz + ez) / 2), 0.4 * side), { t: 250 }),
+      Object.assign(shot(ex, ez, 4.2, 3.4, 0.95, V(ex - f.x * 0.6, 1.2, ez - f.z * 0.6), 0.12 * side), { t: 0 }),
+      Object.assign(shot(px, pz, 4.0, -3.0, 1.05, V((px + ex) / 2, 1.1, (pz + ez) / 2), 0.32 * side), { t: 250 }),
     ] };
     pushLog('一閃', '', S.phase === 1 ? '前半を制した' : '勝負あり');
   }
@@ -4907,13 +4914,18 @@
   const gyRoot = (x, z) => pathH(S.originD - z, 2) - pathH(S.originD, 1);
   // 原点からの、ある点の地面の高さ（道の外の坂や谷も含む）
   const groundLocal = (x, z) => { const d = S.originD - z, P = pathP(d), O = pathP(S.originD), dir = pathDir(d); const lat = (x - (P.x - O.x)) * -dir.z + (z - (P.z - O.z)) * dir.x; return heightAt(d, lat) - pathH(S.originD, 1); };
+  const CAM_RC = new THREE.Raycaster(), _rcO = V(0, 0, 0), _rcD = V(0, 0, 0);
   // 演出のカメラを置けるか：地面より十分上、戦える範囲（細い尾根・岩場では狭い）の内、見る点までの間を地面が遮らない
   function camSpotOK(x, y, z, look) {
+    // 開けの外の木立には入れない。崖の外（谷の上の宙）は、地面にめり込まないので置いてよい
     const T = themeAt(S.originD), r = Math.hypot(x, z);
-    if (T.rule === 'narrow') { const A = pathDir(S.originD); if (Math.abs(x * -A.z + z * A.x) > 1.7) return false; }
-    else if (T.rule === 'platform') { if (r > 3.3) return false; }
-    else if (r > (T.cr || 8) - 1.0) return false;
+    if (r > (T.side === 'chasm' ? 9 : 9.2)) return false;
+    if (Math.hypot(x - S.e.x, z - S.e.z) < 3.2 || Math.hypot(x - S.p.x, z - S.p.z) < 3.0) return false;   // 二人に寄りすぎない
     for (let i = 0; i <= 6; i++) { const u = i / 6, qx = lerp(x, look.x, u), qy = lerp(y, look.y, u), qz = lerp(z, look.z, u); if (groundLocal(qx, qz) > qy - (i === 0 ? 0.55 : 0.2)) return false; }
+    // 置いた物（杭、岩、木、灯籠）が、見る点との間を遮らないか
+    _rcO.set(x, y, z); _rcD.copy(look).sub(_rcO); const L = _rcD.length(); _rcD.normalize();
+    CAM_RC.set(_rcO, _rcD); CAM_RC.far = Math.max(0.1, L - 0.6); CAM_RC.camera = camera;
+    const g = STAGE_G[stageOfD(S.originD)]; if (g && CAM_RC.intersectObject(g, true).some((h) => !h.object.isSprite)) return false;
     return true;
   }
   function setOrigin(d) { S.originD = d; const P = pathP(d); worldG.position.set(-P.x, -pathH(d, 1), -P.z); worldG.updateMatrixWorld(true); updateWorldVis(d); }
@@ -5954,6 +5966,7 @@
     renderInfo() { return { calls: SCENE_INFO.calls, tris: SCENE_INFO.tris, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
     lookTest(fk, id, salt) { const t = ROSTER.find((q) => q.id === id) || ROSTER[0]; applyEnemyType(Object.assign({}, t, { look: fk === 'kitsune' ? KITSUNE.look : fk === 'boss' ? BOSS.look : factionLook(fk, t, salt || 0) }), enemy); enemy.present(true); },
     defeatNow() { S.action = null; S.queue = []; defeat(); },
+    probe3() { return { f: player.feetDbg(), h: player.hipWorld.toArray(), hd: player.headWorld.toArray(), cam: camera.position.toArray(), mode: S.mode, gt: S.gt }; },
     probe2() { return { pa: S.pa && S.pa.kind, pat: S.pa ? Math.round(S.gt - S.pa.t0) : -1, cine: !!S.cine, p: [S.p.x, S.p.z, S.p.yaw], e: [S.e.x, S.e.z, S.e.yaw], ph: player.headWorld.toArray(), pm: player.mid.toArray(), ehd: enemy.headWorld.toArray(), em: enemy.mid.toArray(), mode: S.mode, gt: S.gt }; },
     stageWhy(n) { const out = {}; STAGE_G[n].traverse((o) => { if (!o.isMesh || o.isInstancedMesh) return; let dyn = false; for (let p = o; p && p !== STAGE_G[n]; p = p.parent) if (p.userData.dyn) dyn = true; const k = [o.material.type, o.material.map ? 'map' : '', dyn ? 'dyn' : '', o.geometry.attributes.position.count > 5000 ? 'big' : '', o.parent === STAGE_G[n] ? 'top' : 'child', o.material.transparent ? 'tr' : ''].join('|'); out[k] = (out[k] || 0) + 1; }); return out; },
     stageStats(n) { const c = { mesh: 0, inst: 0, sprite: 0, points: 0, byName: {} }; STAGE_G[n].traverse((o) => { if (o.isInstancedMesh) c.inst++; else if (o.isMesh) { c.mesh++; const k = (o.parent && o.parent.userData.dyn ? 'dyn:' : '') + (o.material.map ? 'map' : 'plain'); c.byName[k] = (c.byName[k] || 0) + 1; } else if (o.isSprite) c.sprite++; }); return c; },
