@@ -161,6 +161,10 @@
 
 
   /* 操作の説明の箱：読まれない前提で、動く指の絵を主にする */
+  #kn { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 16px); bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); display: flex; gap: 6px; pointer-events: none; z-index: 9; }
+  #kn[hidden] { display: none !important; }
+  #kn i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 70, 50, 0.9); box-shadow: 0 0 8px 2px rgba(255, 60, 40, 0.55); transition: opacity 0.25s ease, transform 0.25s ease; }
+  #kn i.off { opacity: 0.18; box-shadow: none; transform: scale(0.7); }
   #tut { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); z-index: 12; display: flex; gap: 14px; padding: 12px 16px 10px; background: rgba(6, 9, 18, 0.62); border: 1px solid rgba(214, 220, 232, 0.18); border-radius: 16px; pointer-events: none; opacity: 0; transition: opacity 0.6s ease; max-width: calc(100vw - 24px); }
   #tut.on { opacity: 1; }
   .tt { display: grid; justify-items: center; gap: 5px; font-family: var(--display); font-size: 12px; letter-spacing: 0.08em; color: #dfe5f0; text-align: center; min-width: 4.4em; }
@@ -284,7 +288,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev">開発</button>
-  <span class="t-ver"><span id="ver">試作 5.0</span></span>
+  <span class="t-ver"><span id="ver">試作 6.0</span></span>
 </div>
 
 <div id="devPanel" hidden>
@@ -319,6 +323,7 @@
   <button id="pzMap" type="button" class="ghost" hidden>地図を開く</button>
   <button id="pzRetry" type="button" class="ghost">この山小屋から出直す</button>
   <p>戦いの中では、地図には戻れません。出直すと、倒れたときと同じ山小屋からになります。</p></div></div>
+<div id="kn" hidden><i></i><i></i><i></i></div>
 <div id="tut" aria-live="polite"></div>
 <div id="skillGet" hidden>
   <span class="sg-ring"></span><span class="sg-ring r2"></span>
@@ -893,7 +898,8 @@
   const clearD = (s, k) => stageStart(s) + CLEAR0 + CLEAR_GAP * k;
   const pathP = (d, out) => (out || V(0, 0, 0)).set(9 * Math.sin(d / 38) + 4 * Math.sin(d / 17 + 1), 0, -d);
   const pathDir = (d) => pathP(d + 0.5).sub(pathP(d - 0.5)).normalize();
-  const stageOfD = (d) => clamp(Math.floor(d / STAGE_LEN) + 1, 1, 10);
+  const LAST_STAGE = 31;   // 1〜10 白峰、11〜15 朱ノ宮、16〜20 水月の里、21〜25 夜桜の城跡、26〜30 風紋の海、31 雲上の回廊（エンドレス）
+  const stageOfD = (d) => clamp(Math.floor(d / STAGE_LEN) + 1, 1, LAST_STAGE);
   const lin = (c) => c.map((v) => Math.pow(v, 2.2));
   // 合目ごとの景色、地形の法則、登り方、光と時刻（夜の麓から、夜明け前の岩稜へ）
   //  rule：戦いに効く法則。cw：道の平らな幅（片側）、cr：開けの平らな半径。side：道の外の形
@@ -923,10 +929,44 @@
   // 十合目：暁の頂。風を継いだ三人（東風・野分・颪）が、風の社を守る。夜が明け、雲海の上に日が昇る
   THEMES[10] = { name: '暁の頂', rule: 'none', cw: 5, cr: 8.6, side: 'chasm', snow: [0.52, 0.47, 0.53], rock: [0.26, 0.21, 0.25], fog: [0x54465a, 20, 95], sky: [[0.05, 0.05, 0.14], [0.3, 0.2, 0.28], [0.82, 0.5, 0.38]],
     rise: [2, 3, 3, 2.5, 3, 0], st: 'SSSSSs', moon: [0xffd2b0, 1.15], hemi: [0xe0c0c4, 0x3a2a34, 0.8], stars: 0.04, moonA: 0.15, drop: 20, cloud: -6, dawn: 1.0, mist: 0.04, amb: 'dust', path: 'flag' };
+
+  // ───────── 白峰のほかの世界（docs/46）：朱ノ宮、水月の里、夜桜の城跡、風紋の海、そしてエンドレスの雲上の回廊 ─────────
+  // 同じ道の仕組みのまま、地面の色・光・空・霧・登り方・戦いの決まりを変え、開けごとの情景を組み替えて別の場所にする
+  const TH = (o) => Object.assign({ rule: 'none', cw: 4.5, cr: 8.6, side: 'hill', snow: [0.3, 0.3, 0.3], rock: [0.15, 0.15, 0.2], fog: [0x27304f, 11, 60], sky: [[0.012, 0.02, 0.06], [0.05, 0.07, 0.16], [0.17, 0.2, 0.33]],
+    rise: [1, 1.5, 2, 1.5, 2, 3], st: 'ssSsSs', moon: [0xbcd0f0, 0.9], hemi: [0x8fa3c8, 0x1a1f2c, 0.55], stars: 0.7, moonA: 1, drop: 0, cloud: null, dawn: 0, mist: 0.12, amb: 'none', path: 'trodden', noPeak: true }, o);
+  Object.assign(THEMES, {
+    // ── 朱ノ宮：宵の千本鳥居。夕映えから夜へ、朱と狐火 ──
+    11: TH({ name: '宵の参道口', snow: [0.34, 0.24, 0.22], rock: [0.14, 0.1, 0.12], fog: [0x3a2a3c, 10, 55], sky: [[0.03, 0.02, 0.07], [0.19, 0.09, 0.17], [0.6, 0.28, 0.22]], moon: [0xffd0b0, 0.6], hemi: [0xd09a90, 0x20141c, 0.62], stars: 0.3, dawn: 0.4, mist: 0.1, amb: 'dust', dustC: 0xffb070, rise: [1, 1.5, 2, 1.5, 2, 2.5], st: 'sSsSsS', ring: 0x6a4a5a }),
+    12: TH({ name: '千本鳥居', rule: 'ambush', cw: 3, cr: 7.8, snow: [0.3, 0.2, 0.18], rock: [0.12, 0.08, 0.1], fog: [0x2e1f2e, 8, 42], sky: [[0.02, 0.015, 0.05], [0.12, 0.05, 0.12], [0.4, 0.18, 0.18]], moon: [0xffb890, 0.5], hemi: [0xb87c78, 0x180e16, 0.55], stars: 0.4, dawn: 0.2, mist: 0.08, rise: [2, 2.5, 2.5, 2.5, 2.5, 3], st: 'SSSSSS', ring: 0x503848 }),
+    13: TH({ name: '狐火の杜', snow: [0.14, 0.22, 0.22], rock: [0.08, 0.12, 0.14], fog: [0x16282c, 6, 38], sky: [[0.01, 0.02, 0.05], [0.04, 0.1, 0.13], [0.12, 0.26, 0.3]], moon: [0x9fe0d0, 0.5], hemi: [0x6aa8a0, 0x0c1816, 0.55], stars: 0.5, mist: 0.24, amb: 'dust', dustC: 0x60ffd8, rise: [1, 2, 1.5, 2, 1.5, 2.5], st: 'sSssSs', ring: 0x24403c }),
+    14: TH({ name: '紅葉の石段', rule: 'wind', cw: 3.6, snow: [0.36, 0.18, 0.12], rock: [0.16, 0.08, 0.08], fog: [0x40222a, 9, 48], sky: [[0.02, 0.02, 0.06], [0.16, 0.06, 0.1], [0.56, 0.24, 0.2]], moon: [0xffc8a8, 0.7], hemi: [0xd08a80, 0x241014, 0.62], stars: 0.35, dawn: 0.28, mist: 0.1, amb: 'leaves', leaf: 0xc03a18, rise: [2, 2.5, 2.5, 2.5, 2.5, 3], st: 'SSSSSS', ring: 0x5a2c34 }),
+    15: TH({ name: '朱ノ奥宮', rule: 'platform', cw: 1.1, cr: 3.7, side: 'chasm', snow: [0.42, 0.2, 0.16], rock: [0.2, 0.1, 0.1], fog: [0x5a2c34, 14, 80], sky: [[0.04, 0.03, 0.1], [0.32, 0.12, 0.16], [0.9, 0.42, 0.26]], moon: [0xffd0a0, 0.9], hemi: [0xe0a090, 0x2a1418, 0.7], stars: 0.1, dawn: 0.85, cloud: -8, drop: 10, mist: 0.05, amb: 'dust', dustC: 0xff8040, rise: [2, 3, 3, 3, 3, 0], st: 'SSSSSS', path: 'rock', ring: 0x70384a }),
+    // ── 水月の里：鏡の湖に沈んだ宿場。蛍と霧と、水に映る星 ──
+    16: TH({ name: '蛍の渡し', side: 'shore', cw: 4, cr: 8.4, snow: [0.15, 0.22, 0.24], rock: [0.08, 0.12, 0.16], fog: [0x1c2a3c, 8, 46], sky: [[0.01, 0.02, 0.06], [0.04, 0.08, 0.17], [0.14, 0.24, 0.36]], moon: [0xcfe8ff, 1.0], hemi: [0x7aa6c8, 0x101820, 0.6], stars: 0.85, mist: 0.3, amb: 'dust', dustC: 0xc8ff70, rise: [0.2, 0.3, 0.2, 0.3, 0.2, 0.4], st: 'ssssss', water: true, ring: 0x1a2a40 }),
+    17: TH({ name: '沈み宿', rule: 'narrow', side: 'chasm', cw: 2.4, cr: 0, snow: [0.2, 0.17, 0.15], rock: [0.1, 0.1, 0.12], fog: [0x1a2634, 6, 36], sky: [[0.01, 0.02, 0.05], [0.04, 0.08, 0.15], [0.12, 0.2, 0.3]], moon: [0xb8d4f0, 0.8], hemi: [0x6a90b0, 0x0e1620, 0.55], stars: 0.7, mist: 0.36, rise: [0.2, 0.2, 0.2, 0.2, 0.2, 0.3], st: 'ssssss', water: true, path: 'trodden', ring: 0x18283a }),
+    18: TH({ name: '鏡の湖', rule: 'platform', cw: 1.1, cr: 3.7, side: 'chasm', snow: [0.2, 0.22, 0.28], rock: [0.1, 0.12, 0.18], fog: [0x182436, 14, 90], sky: [[0.008, 0.015, 0.05], [0.03, 0.07, 0.16], [0.1, 0.18, 0.32]], moon: [0xe0f0ff, 1.15], hemi: [0x7aa0cc, 0x0c1420, 0.6], stars: 1, mist: 0.08, rise: [0.1, 0.1, 0.1, 0.1, 0.1, 0.2], st: 'ssssss', water: true, path: 'rock', ring: 0x14223a }),
+    19: TH({ name: '霧の舟着き', rule: 'ambush', side: 'shore', cw: 3.8, cr: 8, snow: [0.2, 0.24, 0.26], rock: [0.1, 0.13, 0.16], fog: [0x2a3a48, 4, 26], sky: [[0.03, 0.04, 0.08], [0.1, 0.14, 0.22], [0.28, 0.36, 0.46]], moon: [0xc0d4e8, 0.6], hemi: [0x8aa0b8, 0x141c24, 0.65], stars: 0.2, moonA: 0.5, mist: 0.6, rise: [0.2, 0.3, 0.2, 0.3, 0.3, 0.4], st: 'ssssss', water: true, ring: 0x2a3848 }),
+    20: TH({ name: '面打ちの庵', side: 'hill', snow: [0.24, 0.18, 0.2], rock: [0.12, 0.09, 0.12], fog: [0x2e2640, 9, 52], sky: [[0.02, 0.015, 0.06], [0.1, 0.06, 0.16], [0.34, 0.2, 0.34]], moon: [0xe8c8f0, 0.8], hemi: [0xa890c0, 0x181020, 0.6], stars: 0.55, dawn: 0.2, mist: 0.16, amb: 'dust', dustC: 0xff6a58, rise: [0.4, 0.8, 0.5, 0.8, 0.5, 0], st: 'sssssS', ring: 0x2a2040 }),
+    // ── 夜桜の城跡：花嵐の廃城。桃色の月と、止まない花びら ──
+    21: TH({ name: '花散る大手門', snow: [0.36, 0.3, 0.34], rock: [0.16, 0.13, 0.17], fog: [0x2c2236, 10, 58], sky: [[0.02, 0.02, 0.07], [0.12, 0.08, 0.18], [0.38, 0.26, 0.38]], moon: [0xffe0f0, 1.0], hemi: [0xc0a0c8, 0x1a1220, 0.6], stars: 0.6, mist: 0.1, amb: 'leaves', leaf: 0xf0b8c8, rise: [1, 1.5, 2, 1.5, 2, 3], st: 'sSsSsS', ring: 0x3a2a48 }),
+    22: TH({ name: '崩れ石垣', rule: 'platform', cw: 1.4, cr: 4.4, side: 'wall', snow: [0.3, 0.27, 0.3], rock: [0.17, 0.15, 0.2], fog: [0x30243c, 10, 52], sky: [[0.02, 0.02, 0.07], [0.11, 0.07, 0.17], [0.34, 0.22, 0.36]], moon: [0xffd8ec, 0.9], hemi: [0xb898c0, 0x1a1020, 0.6], stars: 0.55, mist: 0.12, amb: 'leaves', leaf: 0xf0b8c8, rise: [2, 3, 3, 3, 3, 3], st: 'SSSSSS', path: 'rock', ring: 0x382a48 }),
+    23: TH({ name: '花嵐の曲輪', rule: 'wind', cw: 4, snow: [0.38, 0.3, 0.36], rock: [0.17, 0.13, 0.18], fog: [0x3a2a44, 6, 34], sky: [[0.03, 0.02, 0.08], [0.14, 0.09, 0.2], [0.44, 0.3, 0.44]], moon: [0xffd0e4, 0.8], hemi: [0xc8a0c8, 0x201424, 0.65], stars: 0.3, moonA: 0.7, mist: 0.2, amb: 'leaves', leaf: 0xffc8d8, rise: [0.5, 1, 1, 1, 1, 2], st: 'ssssss', ring: 0x44304e }),
+    24: TH({ name: '月見櫓', side: 'gentle', snow: [0.34, 0.3, 0.36], rock: [0.16, 0.14, 0.2], fog: [0x30284a, 14, 80], sky: [[0.03, 0.03, 0.1], [0.16, 0.1, 0.24], [0.52, 0.36, 0.54]], moon: [0xfff0f8, 1.3], hemi: [0xc8b0d8, 0x1c1428, 0.7], stars: 0.5, drop: 8, cloud: -6, mist: 0.1, amb: 'leaves', leaf: 0xf0b8c8, rise: [2, 3, 2, 3, 2, 3], st: 'SsSsSs', ring: 0x46345a }),
+    25: TH({ name: '天守の跡', rule: 'platform', cw: 1.1, cr: 3.7, side: 'chasm', snow: [0.4, 0.3, 0.36], rock: [0.2, 0.15, 0.2], fog: [0x50384c, 14, 90], sky: [[0.04, 0.03, 0.1], [0.28, 0.14, 0.26], [0.86, 0.46, 0.5]], moon: [0xffd8e0, 1.0], hemi: [0xe0a8c0, 0x281420, 0.7], stars: 0.1, dawn: 0.6, cloud: -8, drop: 12, mist: 0.04, amb: 'leaves', leaf: 0xffc0d0, rise: [2, 3, 3, 3, 3, 0], st: 'SSSSSS', path: 'rock', ring: 0x60405a }),
+    // ── 風紋の海：月の砂。風が描く紋と、沈んだ船と、骨 ──
+    26: TH({ name: '月の砂浜', side: 'gentle', snow: [0.52, 0.47, 0.38], rock: [0.26, 0.23, 0.2], fog: [0x242c42, 12, 72], sky: [[0.01, 0.02, 0.06], [0.05, 0.08, 0.18], [0.18, 0.22, 0.34]], moon: [0xe8eeff, 1.35], hemi: [0x9aaccc, 0x1c1a20, 0.62], stars: 0.95, mist: 0.04, amb: 'dust', dustC: 0xe8dcc0, rise: [0.5, 0.8, 0.6, 0.8, 0.6, 1], st: 'ssssss', ring: 0x2a3250, path: 'trodden' }),
+    27: TH({ name: '沈んだ船の道', side: 'ridge', cw: 3.6, snow: [0.5, 0.44, 0.36], rock: [0.25, 0.21, 0.19], fog: [0x2a2c3e, 10, 62], sky: [[0.015, 0.02, 0.06], [0.07, 0.09, 0.18], [0.24, 0.24, 0.34]], moon: [0xf0ecf8, 1.25], hemi: [0xa8a8c0, 0x1e1a20, 0.6], stars: 0.85, mist: 0.06, amb: 'dust', dustC: 0xe8dcc0, rise: [0.5, 1, 0.5, 1, 0.5, 1], st: 'ssssss', ring: 0x2e3048 }),
+    28: TH({ name: '風紋の迷い', rule: 'wind', side: 'gentle', snow: [0.54, 0.46, 0.36], rock: [0.27, 0.22, 0.19], fog: [0x3a3a46, 4, 30], sky: [[0.03, 0.03, 0.08], [0.14, 0.12, 0.2], [0.4, 0.34, 0.38]], moon: [0xe8e4f0, 0.8], hemi: [0xb0a8b8, 0x24201e, 0.7], stars: 0.2, moonA: 0.5, mist: 0.16, amb: 'dust', dustC: 0xf0e0c0, rise: [0.5, 1, 1, 1, 1, 1], st: 'ssssss', ring: 0x403c4a }),
+    29: TH({ name: '骨の祭壇', rule: 'ambush', side: 'gentle', snow: [0.4, 0.36, 0.3], rock: [0.22, 0.18, 0.18], fog: [0x32242e, 8, 48], sky: [[0.03, 0.02, 0.06], [0.16, 0.08, 0.14], [0.44, 0.22, 0.22]], moon: [0xffc8c0, 1.0], hemi: [0xc09088, 0x20141a, 0.62], stars: 0.45, dawn: 0.25, mist: 0.08, amb: 'dust', dustC: 0xff9070, rise: [1, 1.5, 1, 1.5, 1, 2], st: 'sSsSsS', ring: 0x3a2634 }),
+    30: TH({ name: '月読の座', rule: 'platform', cw: 1.1, cr: 3.7, side: 'chasm', snow: [0.5, 0.5, 0.58], rock: [0.24, 0.24, 0.32], fog: [0x303a5c, 16, 100], sky: [[0.03, 0.04, 0.12], [0.14, 0.18, 0.36], [0.5, 0.56, 0.78]], moon: [0xf4f6ff, 1.6], hemi: [0xb0c0e8, 0x1c2030, 0.8], stars: 0.7, moonA: 1, cloud: -8, drop: 12, mist: 0.04, amb: 'dust', dustC: 0xe0eaff, rise: [2, 3, 3, 3, 3, 0], st: 'SSSSSS', path: 'rock', ring: 0x384468 }),
+    // ── 雲上の回廊（エンドレス）：夜明けの雲海に架かる、果てのない回廊 ──
+    31: TH({ name: '雲上の回廊', side: 'chasm', cw: 2.8, cr: 8.2, snow: [0.62, 0.52, 0.42], rock: [0.32, 0.24, 0.22], fog: [0x806068, 20, 110], sky: [[0.1, 0.1, 0.3], [0.5, 0.34, 0.46], [1.0, 0.7, 0.44]], moon: [0xffe8c0, 1.25], hemi: [0xf0d0c0, 0x40303a, 0.85], stars: 0.12, dawn: 1, cloud: -2.5, drop: 18, mist: 0.04, amb: 'dust', dustC: 0xffe0a0, rise: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3], st: 'ssssss', path: 'flag', ring: 0x806078 }),
+  });
+  Object.entries({ 11: 0xd8a890, 12: 0xc89080, 13: 0x80a0a0, 14: 0xd09078, 15: 0xe0a890, 16: 0x8898a8, 17: 0xa88868, 18: 0x90a0b8, 19: 0x90a0a8, 20: 0xb89098, 21: 0xe8c0d0, 22: 0xb0a0b0, 23: 0xf0c8d8, 24: 0xe0c0d0, 25: 0xd8b0c0, 26: 0xe8d4a8, 27: 0xe0cca0, 28: 0xe8d0a0, 29: 0xd0b890, 30: 0xd0d8f0, 31: 0xf0d8a8 }).forEach(([k, v]) => { THEMES[k].pathC = v; });
   const themeAt = (d) => THEMES[stageOfD(d)];
   // 台地：山小屋の前（短い）と、五つの開け（戦える広さ）。間は坂か石段
   const TERR = [];
-  { let h = 0; for (let s = 1; s <= 10; s++) { const T = THEMES[s];
+  { let h = 0; for (let s = 1; s <= LAST_STAGE; s++) { const T = THEMES[s];
     TERR.push({ c: stageStart(s) + HUT_AT, half: HUT_FLAT, h, st: T.st[0] }); h += T.rise[0];
     for (let k = 0; k < 5; k++) { TERR.push({ c: clearD(s, k), half: FLAT, h, st: T.st[k + 1] }); h += T.rise[k + 1]; } } }
   // 道の高さ。mode 0：地面（石段では段の中ほどを通る坂）、1：足が踏む高さ（段の上面）、2：腰の高さの基準
@@ -965,6 +1005,7 @@
     if (T.side === 'gentle') return 3.2 * (1 - Math.exp(-e / 12)) + (n + n2 * 0.5) * Math.min(1, e / 4) * 0.8;   // 雪原：風の作るゆるいうねり
     if (T.side === 'chasm') return -Math.min(30, e * 3.4 + e * e * 0.08) + (n + n2 * 2) * Math.min(1, e / 2) * 1.5;
     if (T.side === 'ridge') return -Math.min(9, e * 0.6) + (n + n2) * Math.min(1, e / 3);
+    if (T.side === 'shore') return -Math.min(2.6, e * 0.5) + (n + n2) * Math.min(1, e / 3) * 0.25;   // 水辺：道から離れるほど、水の下へ沈む
     if (T.side === 'wall') return lat > 0 ? 15 * (1 - Math.exp(-e / 4)) + n + n2 * 2 : 6 * (1 - Math.exp(-e / 12)) + n * 0.8;   // 凍った滝の側は高い崖
     return 0;
   }
@@ -1018,6 +1059,8 @@
     PATH_TEX.ice = mk((x, W, H, R) => { x.fillStyle = 'rgb(118,150,190)'; x.fillRect(0, 0, W, H); x.strokeStyle = 'rgba(225,238,255,0.55)'; for (let i = 0; i < 40; i++) { x.lineWidth = 0.5 + R() * 1.5; x.beginPath(); let cx = R() * W, cy = R() * H; x.moveTo(cx, cy); for (let k = 0; k < 5; k++) { cx += (R() - 0.5) * 60; cy += (R() - 0.5) * 60; x.lineTo(cx, cy); } x.stroke(); } });
   }
   const PATH_MAT = {}; Object.keys(PATH_TEX).forEach((k) => { PATH_MAT[k] = toon(0xffffff, { map: PATH_TEX[k], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, roughness: k === 'ice' ? 0.3 : 0.9 }); });
+  const PATH_VAR = {};
+  function pathMat(T) { if (!T.pathC) return PATH_MAT[T.path]; const k = T.path + ':' + T.pathC; if (!PATH_VAR[k]) { const m = PATH_MAT[T.path].clone(); m.color.set(T.pathC).convertSRGBToLinear(); PATH_VAR[k] = m; } return PATH_VAR[k]; }
   function buildPathStrip(s) {
     const T = THEMES[s], d0 = stageStart(s), w = T.path === 'flag' ? 2.6 : T.rule === 'platform' ? 1.6 : 2.2;
     const pos = [], uv = [], idx = [], p = V(0, 0, 0);
@@ -1028,7 +1071,7 @@
       if (i < STAGE_LEN) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, PATH_MAT[T.path]); m.receiveShadow = true; m.renderOrder = 1; m.userData.dyn = true; return m;
+    const m = new THREE.Mesh(g, pathMat(T)); m.receiveShadow = true; m.renderOrder = 1; m.userData.dyn = true; return m;
   }
   // ── 物の形（一度だけ作り、合目ごとに並べる） ──
   const PROP = {};
@@ -1076,6 +1119,19 @@
     };
     PROP.pine = pine(0.6);
     PROP.pineSnow = pine(0.95);
+    // ── 新しい世界の木と石（docs/46） ──
+    PROP.cedar = pine(0.0, 8);
+    const blobTree = (cols, n, spread, h) => {
+      const parts = [], trunk = new THREE.CylinderGeometry(0.1, 0.2, h, 7, 3); trunk.translate(0, h / 2, 0); parts.push(paint(trunk, [0.14, 0.1, 0.09]));
+      for (let i = 0; i < n; i++) { const g = new THREE.IcosahedronGeometry(0.9 + R2() * 0.7, 1); g.scale(1, 0.72, 1); const a = R2() * 6.28, r = R2() * spread; g.translate(Math.cos(a) * r, h + 0.2 + R2() * 1.5, Math.sin(a) * r); parts.push(paint(g, cols[Math.floor(R2() * cols.length)])); }
+      return mergeColored(parts);
+    };
+    PROP.maple = blobTree([[0.55, 0.1, 0.06], [0.7, 0.22, 0.06], [0.62, 0.34, 0.08]], 7, 1.5, 2.6);
+    PROP.cherry = blobTree([[0.82, 0.55, 0.66], [0.92, 0.72, 0.8], [0.72, 0.45, 0.58]], 9, 2.1, 2.4);
+    { const parts = []; for (let k = 0; k < 9; k++) { const h = 1.6 + R2() * 1.3, g = new THREE.ConeGeometry(0.035, h, 4); g.translate((R2() - 0.5) * 0.7, h / 2, (R2() - 0.5) * 0.7); const pa = g.attributes.position; for (let i = 0; i < pa.count; i++) { const y = pa.getY(i); pa.setX(i, pa.getX(i) + y * y * 0.07 * (k % 2 ? 1 : -1)); } parts.push(paint(g, [0.2 + R2() * 0.1, 0.26, 0.14])); } PROP.reed = mergeColored(parts); }
+    { const g = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); g.scale(3.4, 0.9, 2.4); const pa = g.attributes.position; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), z = pa.getZ(i); pa.setY(i, pa.getY(i) * (1 + 0.1 * Math.sin(x * 2.1 + z))); } g.computeVertexNormals(); PROP.dune = paint(g, [0.56, 0.5, 0.4]); }
+    { const parts = [], b = new THREE.CylinderGeometry(0.28, 0.34, 2.4, 8, 2); b.translate(0, 1.2, 0); parts.push(paint(b, [0.28, 0.27, 0.32])); const top = new THREE.CylinderGeometry(0.26, 0.28, 0.5, 6); top.translate(0.05, 2.5, 0.02); top.rotateZ(0.3); parts.push(paint(top, [0.3, 0.29, 0.34])); PROP.pillar = mergeColored(parts); }
+    { const parts = []; for (let i = 0; i < 6; i++) { const g = new THREE.TorusGeometry(0.7 - i * 0.04, 0.035, 5, 12, Math.PI); g.rotateY(Math.PI / 2); g.translate(0, 0, -0.5 + i * 0.2); parts.push(paint(g, [0.78, 0.74, 0.66])); } const sp = new THREE.CylinderGeometry(0.04, 0.05, 1.3, 5); sp.rotateX(Math.PI / 2); sp.translate(0, 0.05, 0.1); parts.push(paint(sp, [0.76, 0.72, 0.64])); PROP.bone = mergeColored(parts); }
     // 樹氷：杉が分厚い雪と氷に覆われ、白い怪物のような塊になる。風上に向かって「えびのしっぽ」が伸びる
     {
       const parts = [pine(1.0)];
@@ -1699,6 +1755,225 @@
       (g, c, s) => { const st = makeStele(); st.scale.setScalar(1.4); put(g, st, c + 3, 0, { look: -6 }); },   // 頂の碑。ここから雲海の上に日が昇る
     ],
   };
+
+  // ───────── 新しい世界の情景（docs/46）：作りは白峰と同じ。物の組み合わせを替えて、別の場所にする ─────────
+  const SAND = toon(0x6a5e48, { roughness: 0.95 }), WATER_MAT = toon(0x0a2038, { roughness: 0.3, metalness: 0.1, envMapIntensity: 0.5, transparent: true, opacity: 0.95 }), BOATWOOD = toon(0x3a2a22, { roughness: 0.9 });
+  function makeBoat() {
+    const g = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.34, 3.6, 5, 1, false, 0, Math.PI), BOATWOOD); hull.rotation.set(Math.PI / 2, 0, Math.PI / 2); hull.scale.set(1, 1, 0.55); hull.position.y = 0.2; g.add(hull);
+    mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), DARKWOOD, 0, 0.7, 0.8, g); const lant = mesh(new THREE.SphereGeometry(0.16, 8, 6), PAPER, 0, 1.25, 0.8, g); lant.userData.keep = true;
+    { const gl = glowSprite('rgba(255,170,90,0.9)', 0.7, 1.6); gl.position.set(0, 1.25, 0.8); g.add(gl); }
+    return g;
+  }
+  function makeWreck() {
+    const g = new THREE.Group(), L = 7;
+    for (let i = 0; i < 8; i++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(1.5 - Math.abs(i - 3.5) * 0.12, 0.07, 5, 10, Math.PI), BOATWOOD); rib.rotation.set(0, Math.PI / 2, 0); rib.position.set(0, 0.2, -L / 2 + i * (L / 7)); g.add(rib); }
+    const keel = mesh(new THREE.BoxGeometry(0.16, 0.18, L + 0.4), DARKWOOD, 0, 0.25, 0, g);
+    const mast = mesh(new THREE.CylinderGeometry(0.07, 0.1, 5, 6), DARKWOOD, 0.3, 2.6, -0.8, g); mast.rotation.z = 0.28; mast.rotation.x = 0.1;
+    const sail = mesh(new THREE.PlaneGeometry(1.6, 2.2), toon(0x8a7a60, { side: THREE.DoubleSide, roughness: 1 }), 1.1, 3.5, -0.8, g); sail.rotation.set(0.1, 0.3, 0.28);
+    g.rotation.z = 0.12;
+    return g;
+  }
+  function makeObelisk(h) { const g = new THREE.Group(); const m = mesh(new THREE.CylinderGeometry(0.2, 0.42, h, 4), toon(0x2c2e3c, { roughness: 0.7 }), 0, h / 2, 0, g); m.rotation.y = Math.PI / 4; mesh(new THREE.ConeGeometry(0.2, 0.5, 4), toon(0x3a3c4c), 0, h + 0.2, 0, g).rotation.y = Math.PI / 4; { const gl = glowSprite('rgba(180,210,255,0.8)', 0.5, 1.8); gl.position.set(0, h * 0.7, 0.3); g.add(gl); } return g; }
+  const foxes = (g, c, d0, n, lat) => { for (let i = 0; i < n; i++) { put(g, makeFox(false), c + d0 + i * 1.6, lat); put(g, makeFox(true), c + d0 + i * 1.6, -lat); } };
+  const lanternPair = (g, d, lat, tall) => [-1, 1].forEach((sd) => put(g, makeLantern(tall), d, sd * lat));
+  const islet = (g, d, lat, r) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.3, 0.6, 10), SAND); m.scale.y = 1; put(g, m, d, lat, { y: -0.35, face: false }); };
+  const WV = {
+    // 朱ノ宮
+    11: [
+      (g, c, s) => { put(g, makeTorii(1.6), c + FLAT + 0.6, 0, { look: 1 }); lanternPair(g, c + 3, 4.6, true); foxes(g, c, 9, 1, 3.6); },
+      (g, c, s) => { put(g, makeTsukubai(), c + 10, -3.8, { rot: Math.PI / 2 }); put(g, makeFence(6), c + 10, 4.6, { rot: Math.PI / 2 }); lanternPair(g, c + 11.4, 3.2); },
+      (g, c, s) => { foxes(g, c, 9, 4, 3.4); },
+      (g, c, s) => { put(g, makeEma(), c + 10, -3.6); put(g, makeHokora(), c + 10.5, 3.6); lanternPair(g, c + 12, 5.4); },
+      (g, c, s) => { put(g, makeTorii(1.35), c + FLAT + 0.6, 0, { look: 1 }); put(g, makeTeaHouse(), c + 12, -5); lanternPair(g, c + 4, 4.6, true); },
+    ],
+    12: [
+      (g, c, s) => { foxes(g, c, 9, 2, 2.6); put(g, makeBell(), c + 12, 5.2); },
+      (g, c, s) => { lanternPair(g, c + 9, 2.6, true); lanternPair(g, c + 12, 2.6, true); },
+      (g, c, s) => { put(g, makeMaskRack(), c + 11, -4.4, { rot: 0.4 }); },
+      (g, c, s) => { for (let i = 0; i < 3; i++) put(g, makeTorii(0.9 + i * 0.2), c + 9 + i * 1.4, (i - 1) * 3.2, { rot: (i - 1) * 0.5 }); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, 5.4); foxes(g, c, 8.6, 2, 3.4); },
+    ],
+    13: [
+      (g, c, s) => { put(g, makeSacredCedar(), c + 13, -5.2); foxes(g, c, 9, 1, 3.4); },
+      (g, c, s) => { put(g, makeHokora(), c + 10, 4); put(g, makeHokora(), c + 12, -4.6, { rot: 0.5 }); },
+      (g, c, s) => { put(g, makeMaskRack(), c + 11, 4.8, { rot: -0.4 }); lanternPair(g, c + 10, 3.2); },
+      (g, c, s) => { put(g, makeGraves(6, 41), c + 10, -5.2, { rot: Math.PI / 2 }); put(g, makeFox(false), c + 9.4, 3.2); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, -5.4); put(g, makeTorii(1.2), c + FLAT + 0.6, 0, { look: 1 }); },
+    ],
+    14: [
+      (g, c, s) => { for (let d = c + FLAT + 0.6; d < c + CLEAR_GAP - FLAT; d += 2.6) lanternPair(g, d, 2.25, true); },
+      (g, c, s) => { put(g, makeBell(), c + 11.5, 4.8); lanternPair(g, c + 9, 3.4); },
+      (g, c, s) => { put(g, makeTorii(1.4), c + FLAT + 0.6, 0, { look: 1 }); foxes(g, c, 9, 1, 3.6); },
+      (g, c, s) => { put(g, makeTeaHouse(), c + 11.5, -5); put(g, makeNobori(s, 0xb02a22), c + 9, 4.4); },
+      (g, c, s) => { put(g, makeGate(), c + FLAT + 1, 0, { look: 1 }); lanternPair(g, c + 4, 4.6, true); },
+    ],
+    15: [
+      (g, c, s) => { lanternPair(g, c + 9, 3.2, true); put(g, makeTorii(1.5), c + FLAT + 0.6, 0, { look: 1 }); },
+      (g, c, s) => { foxes(g, c, 9, 2, 3.2); },
+      (g, c, s) => { put(g, makeBell(), c + 11.5, -4.8); lanternPair(g, c + 9, 3.4); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, 5.2); lanternPair(g, c + 9, 3.6, true); },
+      (g, c, s) => { put(g, makeShrine(), c + 11.5, 0, { look: 1 }); [-1, 1].forEach((sd) => put(g, makeTorii(1.2 + sd * 0.0), c + 6 + sd * 0.01, sd * 3.8, { rot: sd })); foxes(g, c, 8.6, 2, 2.6); },
+    ],
+    // 水月の里
+    16: [
+      (g, c, s) => { put(g, makeBoat(), c + 11, 5.6, { face: false, rot: 0.3, y: -0.9 }); lanternPair(g, c + 9, 3.2); },
+      (g, c, s) => { put(g, makePlankWalk(8), c + 9, 4.8, { rot: Math.PI / 2, y: -0.4 }); },
+      (g, c, s) => { for (let i = 0; i < 6; i++) put(g, Object.assign(glowSprite('rgba(255,180,100,0.9)', 0.8, 0.9), {}), c + 8 + i * 1.3, -4.6 - (i % 2) * 1.5, { y: -0.7, face: false }); put(g, makeBoat(), c + 12, -6, { face: false, y: -0.9 }); },
+      (g, c, s) => { put(g, makeTorii(1.5), c + 11, 5, { y: -0.7, look: 1 }); },
+      (g, c, s) => { islet(g, c + 11, -5.6, 2.2); put(g, makeHokora(), c + 11, -5.6, { y: 0.1 }); lanternPair(g, c + 9.5, 3.2); },
+    ],
+    17: [
+      (g, c, s) => { put(g, makeTeaHouse(), c + 12, 6, { y: -0.9 }); lanternPair(g, c + 9, 2.2); },
+      (g, c, s) => { put(g, makeTower(), c + 13, -6.4, { y: -1.2 }); },
+      (g, c, s) => { put(g, makeBell(), c + 11, 4.6, { y: -0.4 }); lanternPair(g, c + 9.5, 2.3); },
+      (g, c, s) => { put(g, makeGate(), c + 11, -5.6, { y: -1, look: 1 }); put(g, makeBoat(), c + 10, 5.4, { face: false, y: -0.9 }); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, 6, { y: -0.9 }); lanternPair(g, c + 4, 3, true); },
+    ],
+    18: [
+      (g, c, s) => { put(g, makeTorii(1.8), c + 12, 0, { y: -0.6, look: 1 }); },
+      (g, c, s) => { for (let i = 0; i < 5; i++) put(g, Object.assign(glowSprite('rgba(255,190,110,0.9)', 0.8, 1.0), {}), c + 8 + i * 1.5, 4 + (i % 3) * 1.2, { y: -0.6, face: false }); },
+      (g, c, s) => { islet(g, c + 11, 5, 2.4); put(g, makeFox(false), c + 11, 5, { y: 0.1 }); },
+      (g, c, s) => { put(g, makeBoat(), c + 12, -5.6, { face: false, y: -0.9, rot: 1.2 }); put(g, makeBoat(), c + 10, 5.2, { face: false, y: -0.9, rot: 0.5 }); },
+      (g, c, s) => { islet(g, c + 11, 0, 3.2); put(g, makeShrine(), c + 11, 0, { y: 0.2, look: -1 }); },
+    ],
+    19: [
+      (g, c, s) => { put(g, makeBoat(), c + 10, 4.8, { face: false, y: -0.9 }); put(g, makeBoat(), c + 12, -5.2, { face: false, y: -0.9, rot: 2 }); },
+      (g, c, s) => { put(g, makeBuriedTorii(), c + 11, 5, { y: -0.5, look: 1 }); },
+      (g, c, s) => { put(g, makePlankWalk(9), c + 9, -4.6, { rot: Math.PI / 2, y: -0.4 }); lanternPair(g, c + 10, 3.4); },
+      (g, c, s) => { put(g, makeBoat(), c + 11, 5.4, { face: false, y: -0.9 }); put(g, makeLantern(), c + 9, 3.2); },
+      (g, c, s) => { put(g, makeGate(), c + FLAT + 1, 0, { look: 1 }); lanternPair(g, c + 4, 4.4); },
+    ],
+    20: [
+      (g, c, s) => { lanternPair(g, c + 9, 3.4); put(g, makeSign(), c + 8, -3.4); },
+      (g, c, s) => { put(g, makeMaskRack(), c + 10.5, -4.8, { rot: 0.3 }); put(g, makeMaskRack(), c + 12, 4.8, { rot: -0.3 }); },
+      (g, c, s) => { put(g, makeCampfire(s), c + 10, 3.2, { face: false }); LANTERN_SPOTS.push(along(c + 10, 3.2, 0.6)); },
+      (g, c, s) => { put(g, makeHut(false), c + 12, 6.4, { look: -4 }); },
+      (g, c, s) => { put(g, makeHut(true), c + 12, 0, { look: -8 }); [-1, 1].forEach((sd) => put(g, makeMaskRack(), c + 8, sd * 4.6, { rot: sd * 0.6 })); lanternPair(g, c + 4, 4.4, true); },
+    ],
+    // 夜桜の城跡
+    21: [
+      (g, c, s) => { put(g, makeGate(), c + FLAT + 1, 0, { look: 1 }); lanternPair(g, c + 3, 4.6, true); },
+      (g, c, s) => { put(g, makeWall(8, 2.4, 3), c + 11, -5, { rot: Math.PI / 2 }); lanternPair(g, c + 9, 3.2); },
+      (g, c, s) => { put(g, makeNobori(s, 0xf0a0b8), c + 9, 4.4); put(g, makeNobori(s, 0xf0a0b8), c + 9, -4.4); },
+      (g, c, s) => { put(g, makeTower(), c + 13, 6.4); },
+      (g, c, s) => { put(g, makeTorii(1.35, STONE, true), c + FLAT + 0.6, 0, { look: 1 }); lanternPair(g, c + 3, 4.6, true); },
+    ],
+    22: [
+      (g, c, s) => { put(g, makeWall(10, 3.2, 5), c + 12, -5, { rot: Math.PI / 2 }); },
+      (g, c, s) => { put(g, makeTower(), c + 12, 5.6); },
+      (g, c, s) => { put(g, makeWall(6, 2.6, 7), c + 10, 4.6, { rot: Math.PI / 2 }); lanternPair(g, c + 9, 3.2); },
+      (g, c, s) => { put(g, makeGate(), c + 12, -5.4, { look: 1 }); },
+      (g, c, s) => { put(g, makeStele(), c + 11, 4.4); put(g, makeWall(8, 3, 9), c + 12.5, -5.2, { rot: Math.PI / 2 }); },
+    ],
+    23: [
+      (g, c, s) => { [-1, 1].forEach((sd) => [0, 2.4].forEach((dd) => put(g, makeNobori(s, 0xe090aa), c + 8 + dd, sd * 4.6))); },
+      (g, c, s) => { put(g, makePrayerFlags(s, 8), c + 9, 0, { align: true }); },
+      (g, c, s) => { put(g, makeTower(), c + 12, -5.8); lanternPair(g, c + 9, 3.4); },
+      (g, c, s) => { put(g, makeNobori(s, 0xf0b8c8), c + 10, 4.6); put(g, makeStele(), c + 11.5, -4.6); },
+      (g, c, s) => { put(g, makeGate(), c + 11, 0, { look: 1 }); },
+    ],
+    24: [
+      (g, c, s) => { put(g, makeTower(), c + 12, 6.2); lanternPair(g, c + 9, 3.6, true); },
+      (g, c, s) => { lanternPair(g, c + 9, 3.2); put(g, makeBell(), c + 11.5, -4.8); },
+      (g, c, s) => { put(g, makeTeaHouse(), c + 11.5, 5); put(g, makeNobori(s, 0xf0a0b8), c + 9, -4); },
+      (g, c, s) => { put(g, makeTower(), c + 13, -6.4); },
+      (g, c, s) => { put(g, makeTorii(1.4), c + FLAT + 0.6, 0, { look: 1 }); lanternPair(g, c + 4, 4.6, true); },
+    ],
+    25: [
+      (g, c, s) => { put(g, makeWall(8, 2.6, 11), c + 11, 5, { rot: Math.PI / 2 }); lanternPair(g, c + 9, 3.4); },
+      (g, c, s) => { put(g, makeStele(), c + 11, 4.4); put(g, makeStele(), c + 12.4, -4.6); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, -5.4); },
+      (g, c, s) => { put(g, makeGate(), c + 12, 0, { look: 1 }); },
+      (g, c, s) => { put(g, makeTower(), c + 12.5, 0, { look: -8 }); [-1, 1].forEach((sd) => put(g, makeLantern(true), c + 5, sd * 4.4)); },
+    ],
+    // 風紋の海
+    26: [
+      (g, c, s) => { put(g, makeWreck(), c + 12, 6, { face: false, rot: 0.6, sink: 0.5 }); },
+      (g, c, s) => { put(g, makeStele(), c + 10, -4.4); put(g, makeLantern(), c + 9, 3.4); },
+      (g, c, s) => { put(g, makeObelisk(4), c + 12, 5.2, { face: false }); },
+      (g, c, s) => { put(g, makeWreck(), c + 12, -6, { face: false, rot: -0.5, sink: 0.4 }); },
+      (g, c, s) => { put(g, makeObelisk(5.5), c + 12, 0, { face: false }); lanternPair(g, c + 4, 4.4, true); },
+    ],
+    27: [
+      (g, c, s) => { put(g, makeWreck(), c + 11, 5.6, { face: false, rot: 1.3, sink: 0.3 }); put(g, makeWreck(), c + 13, -6.4, { face: false, rot: 0.2, sink: 0.6 }); },
+      (g, c, s) => { put(g, makeWreck(), c + 12, 0, { face: false, rot: Math.PI / 2, sink: 0.4 }); },
+      (g, c, s) => { put(g, makeBoat(), c + 10, 4.6, { face: false, rot: 2 }); put(g, makeStele(), c + 11, -4.4); },
+      (g, c, s) => { put(g, makeWreck(), c + 12, -5.8, { face: false, rot: -1.2, sink: 0.5 }); },
+      (g, c, s) => { put(g, makeObelisk(4.4), c + 11, 4.8, { face: false }); put(g, makeObelisk(3.6), c + 12.4, -4.8, { face: false }); },
+    ],
+    28: [
+      (g, c, s) => { put(g, makePrayerFlags(s, 8), c + 9, 0, { align: true }); },
+      (g, c, s) => { put(g, makeNobori(s, 0xd8c8a0), c + 9, 4.6); put(g, makeNobori(s, 0xd8c8a0), c + 10.4, -4.6); },
+      (g, c, s) => { put(g, makeStele(), c + 10, 4.4); },
+      (g, c, s) => { put(g, makeObelisk(4.4), c + 12, -5, { face: false }); },
+      (g, c, s) => { put(g, makeWindBells(s, 7), c + 9, 0, { align: true }); },
+    ],
+    29: [
+      (g, c, s) => { put(g, makeGraves(7, 53), c + 10, -5, { rot: Math.PI / 2 }); },
+      (g, c, s) => { put(g, makeLantern(true), c + 9, 3.4); put(g, makeStele(), c + 11, -4.4); },
+      (g, c, s) => { put(g, makeObelisk(3.6), c + 11, 4.6, { face: false }); put(g, makeGraves(5, 57), c + 10, -5.4, { rot: Math.PI / 2 }); },
+      (g, c, s) => { put(g, makeStele(), c + 11.5, 4.4); put(g, makeCampfire(s), c + 9, -3.4, { face: false }); },
+      (g, c, s) => { put(g, makeShrine(), c + 12, 0, { look: -8 }); lanternPair(g, c + 4, 4.4, true); },
+    ],
+    30: [
+      (g, c, s) => { put(g, makeObelisk(5), c + 11, 4.6, { face: false }); put(g, makeObelisk(5), c + 11, -4.6, { face: false }); },
+      (g, c, s) => { put(g, makeStele(), c + 11, 0); },
+      (g, c, s) => { lanternPair(g, c + 9, 3.6, true); },
+      (g, c, s) => { put(g, makeObelisk(6), c + 12, 0, { face: false }); },
+      (g, c, s) => { [-1, 1].forEach((sd) => [0, 1].forEach((i) => put(g, makeObelisk(5.6 - i), c + 7 + i * 2.8, sd * 4.4, { face: false }))); put(g, makeStele(), c + 10, 0); },
+    ],
+    // 雲上の回廊
+    31: [
+      (g, c, s) => { put(g, makeTorii(1.5), c + FLAT + 0.6, 0, { look: 1 }); lanternPair(g, c + 3, 4.4, true); },
+      (g, c, s) => { foxes(g, c, 9, 2, 3.4); },
+      (g, c, s) => { put(g, makeStele(), c + 11, 4.4); lanternPair(g, c + 9, 3.4); },
+      (g, c, s) => { put(g, makeBell(), c + 12, -5); },
+      (g, c, s) => { put(g, makeTorii(1.8), c + FLAT + 0.6, 0, { look: 1 }); lanternPair(g, c + 3, 4.4, true); },
+    ],
+  };
+  Object.keys(WV).forEach((k) => { VIG[k] = WV[k]; });
+  // 世界ごとの、道の外の景色（木、石、水、砂、鳥居の並び）
+  function buildWorldProps(s, g, T, R) {
+    const d0 = stageStart(s), offClear = (d) => { for (let k = 0; k < 5; k++) if (Math.abs(d - clearD(s, k)) < FLAT + 1.2) return false; return Math.abs(d - d0 - HUT_AT) > 5; };
+    const inRange = (a, b) => s >= a && s <= b;
+    if (T.water) {
+      // 水面：道に沿って広がる、鏡のような水
+      const pos = [], idx = [], N = Math.ceil(STAGE_LEN / 4);
+      for (let i = 0; i <= N; i++) { const d = d0 + i * 4, y = pathH(d, 0) - 1.0; [-70, 70].forEach((l) => { const q = along(d, l, 0); pos.push(q.x, y, q.z); }); if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); wg.setIndex(idx); wg.computeVertexNormals();
+      const w = new THREE.Mesh(wg, WATER_MAT); w.userData.dyn = true; w.renderOrder = 1; g.add(w);
+      placeAt(g, PROP.reed, PROP_MAT, scatter(s, s === 19 ? 40 : 110, 4.2, 28, 1100 + s, { s0: 0.8, s1: 1.5, clear: 8.5, maxH: 0.6, minH: -1.2 }));
+      if (s !== 17) placeAt(g, PROP.rock, PROP_MAT, scatter(s, 22, 5, 24, 1200 + s, { s0: 0.4, s1: 1.1, maxH: 0.6, minH: -1.3 }));
+    }
+    if (s === 11) { placeAt(g, PROP.cedar, PROP_MAT, scatter(s, 90, 6, 40, 1111, { s0: 0.9, s1: 1.8 })); placeAt(g, PROP.maple, PROP_MAT, scatter(s, 14, 8, 26, 1112)); }
+    if (s === 12) {
+      placeAt(g, PROP.cedar, PROP_MAT, scatter(s, 110, 6, 40, 1211, { s0: 1, s1: 2 }));
+      // 千本鳥居：道を、朱の鳥居が続けてくぐらせる（開けの中は除く）
+      for (let d = d0 + 12; d < d0 + STAGE_LEN - 2; d += 1.7) { if (!offClear(d)) continue; put(g, makeTorii(0.62), d, 0, { y: pathH(d, 1) - pathH(d, 0), look: 1 }); }
+    }
+    if (s === 13) { placeAt(g, PROP.cedar, PROP_MAT, scatter(s, 150, 5.5, 40, 1311, { s0: 1, s1: 2.2 })); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 26, 5, 24, 1312, { s0: 0.5, s1: 1.4 })); }
+    if (s === 14) { placeAt(g, PROP.maple, PROP_MAT, scatter(s, 80, 5.5, 34, 1411, { s0: 0.9, s1: 1.5 })); placeAt(g, PROP.cedar, PROP_MAT, scatter(s, 40, 12, 40, 1412)); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 20, 5, 22, 1413, { s0: 0.4, s1: 1.2 })); }
+    if (s === 15) { placeAt(g, PROP.spire, PROP_MAT, scatter(s, 30, 9, 40, 1511, { s0: 1.3, s1: 3, clear: 6, maxH: -4 })); placeAt(g, PROP.maple, PROP_MAT, scatter(s, 16, 4, 6, 1512, { maxH: 0.5 })); for (let k = 0; k < 4; k++) for (let d = clearD(s, k) + FLAT + 0.5; d < clearD(s, k + 1) - FLAT - 0.3; d += 3.2) put(g, makeTorii(0.8), d, 0, { y: pathH(d, 1) - pathH(d, 0), look: 1 }); }
+    if (s === 21) { placeAt(g, PROP.cherry, PROP_MAT, scatter(s, 70, 5.5, 34, 2111, { s0: 0.9, s1: 1.5 })); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 22, 5, 22, 2112, { s0: 0.4, s1: 1.3 })); }
+    if (s === 22) { placeAt(g, PROP.pillar, PROP_MAT, scatter(s, 30, 3.4, 12, 2211, { s0: 0.8, s1: 1.4, clear: 5 })); placeAt(g, PROP.cherry, PROP_MAT, scatter(s, 30, 8, 30, 2212, { maxH: 8 })); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 40, 4, 22, 2213, { s0: 0.5, s1: 1.8 })); }
+    if (s === 23) { placeAt(g, PROP.cherry, PROP_MAT, scatter(s, 100, 5, 34, 2311, { s0: 1, s1: 1.7 })); placeAt(g, PROP.pillar, PROP_MAT, scatter(s, 14, 6, 20, 2312)); }
+    if (s === 24) { placeAt(g, PROP.cherry, PROP_MAT, scatter(s, 80, 6, 36, 2411, { s0: 1, s1: 1.8 })); placeAt(g, PROP.rock, PROP_MAT, scatter(s, 24, 5, 22, 2412)); }
+    if (s === 25) { placeAt(g, PROP.pillar, PROP_MAT, scatter(s, 26, 3.4, 14, 2511, { s0: 0.8, s1: 1.5, clear: 5, maxH: 1 })); placeAt(g, PROP.cherry, PROP_MAT, scatter(s, 24, 7, 12, 2512, { maxH: 2 })); placeAt(g, PROP.spire, PROP_MAT, scatter(s, 26, 9, 40, 2513, { s0: 1.2, s1: 2.8, clear: 6, maxH: -4 })); }
+    if (inRange(26, 30)) {
+      const dn = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 60, 110, 70, 50][s];
+      placeAt(g, PROP.dune, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }).clone(), scatter(s, dn, 9, 54, 2600 + s, { s0: 1.2, s1: 3.4, clear: 9, maxH: 20 }));
+      placeAt(g, PROP.rock, PROP_MAT, scatter(s, 24, 5, 24, 2650 + s, { s0: 0.4, s1: 1.4 }));
+      if (s === 29) placeAt(g, PROP.bone, PROP_MAT, scatter(s, 40, 4.5, 20, 2951, { s0: 0.9, s1: 2.2, clear: 8 }));
+      if (s === 27 || s === 29) placeAt(g, PROP.bone, PROP_MAT, scatter(s, 14, 4.5, 20, 2751, { s0: 0.8, s1: 1.8, clear: 8 }));
+      if (s === 30) placeAt(g, PROP.pillar, PROP_MAT, scatter(s, 22, 3.6, 16, 3011, { s0: 0.9, s1: 1.5, clear: 5, maxH: 1 }));
+    }
+    if (s === 31) {
+      for (let d = d0 + 12; d < d0 + STAGE_LEN - 2; d += 5.2) { if (!offClear(d)) continue; put(g, makeTorii(1.0), d, 0, { y: pathH(d, 1) - pathH(d, 0), look: 1 }); }
+      placeAt(g, PROP.pillar, PROP_MAT, scatter(s, 26, 5, 16, 3111, { s0: 1, s1: 2, clear: 8, maxH: -2 }));
+      placeAt(g, PROP.spire, PROP_MAT, scatter(s, 36, 8, 40, 3112, { s0: 1.4, s1: 3.4, clear: 6, maxH: -8 }));
+    }
+  }
   function buildStage(s) {
     const T = THEMES[s], g = new THREE.Group(), d0 = stageStart(s);
     g.add(buildGround(s)); g.add(buildPathStrip(s)); buildStairs(s, g);
@@ -1706,16 +1981,17 @@
     // 合目の始めの山小屋と、道の灯籠
     const hut = makeHut(s === 5); hut.position.copy(along(d0 + HUT_AT, 8.5, 0)); hut.lookAt(along(d0 + HUT_AT, 0, 0)); g.add(hut);
     LANTERN_SPOTS.push(along(d0 + HUT_AT + 1.5, 2.8, 0.95));
-    const lanternEvery = s === 3 ? 7 : s === 4 || s === 9 ? 0 : 14;
+    const lanternEvery = s === 3 ? 7 : s === 4 || s === 9 ? 0 : s >= 11 ? ({ 12: 6, 14: 7, 15: 0, 17: 10, 18: 0, 22: 0, 25: 0, 27: 0, 28: 0, 30: 0 }[s] === undefined ? 14 : { 12: 6, 14: 7, 15: 0, 17: 10, 18: 0, 22: 0, 25: 0, 27: 0, 28: 0, 30: 0 }[s]) : 14;
     if (lanternEvery) for (let d = d0 + 10; d < d0 + STAGE_LEN; d += lanternEvery) { const sd = Math.round(d / lanternEvery) % 2 ? 1 : -1, lat = sd * (T.cw + 0.6); let near = false; for (let k = 0; k < 5; k++) if (Math.abs(d - clearD(s, k)) < 9) near = true; if (near) continue; const L = makeLantern(); L.position.copy(along(d, lat, 0)); g.add(L); LANTERN_SPOTS.push(along(d, lat, 0.95)); }
     // 開けの縁の灯籠（尾根と岩場は灯りなし）
-    if (s !== 4 && s !== 9) for (let k = 0; k < 5; k++) [0.75, -0.75, Math.PI - 0.75, Math.PI + 0.75].forEach((a) => { const r = T.cr - 0.6, dd = clearD(s, k) + Math.cos(a) * r, lat = Math.sin(a) * r; const L = makeLantern(); L.position.copy(along(dd, lat, 0)); L.rotation.y = R() * 6; g.add(L); LANTERN_SPOTS.push(along(dd, lat, 0.95)); });
+    if (s !== 4 && s !== 9 && !(s >= 26 && s <= 30 && s !== 29) && !T.water) for (let k = 0; k < 5; k++) [0.75, -0.75, Math.PI - 0.75, Math.PI + 0.75].forEach((a) => { const r = T.cr - 0.6, dd = clearD(s, k) + Math.cos(a) * r, lat = Math.sin(a) * r; const L = makeLantern(); L.position.copy(along(dd, lat, 0)); L.rotation.y = R() * 6; g.add(L); LANTERN_SPOTS.push(along(dd, lat, 0.95)); });
     // 開けごとの情景
     for (let k = 0; k < 5; k++) VIG[s][k](g, clearD(s, k), s);
+    if (s >= 11) buildWorldProps(s, g, T, R);
     // 道の脇の細部：地蔵の並び、倒木、道標、吹き溜まり（開けを避ける）
     const offClear = (d) => { for (let k = 0; k < 5; k++) if (Math.abs(d - clearD(s, k)) < 9.5) return false; return Math.abs(d - d0 - HUT_AT) > 5; };
-    if ([1, 3, 5, 7].includes(s)) for (let d = d0 + 13; d < d0 + STAGE_LEN; d += 27) { if (!offClear(d)) continue; const sd = R() < 0.5 ? 1 : -1, n = 2 + Math.floor(R() * 2); for (let i = 0; i < n; i++) put(g, makeJizo(), d + i * 0.55, sd * (T.cw + 0.5), { y: 0 }); }
-    if ([1, 2, 6, 7].includes(s)) for (let i = 0; i < 7; i++) { const d = d0 + R() * STAGE_LEN; if (!offClear(d)) continue; const lat = (R() < 0.5 ? 1 : -1) * (T.cw + 1.5 + R() * 5); put(g, makeLog(2 + R() * 2.5), d, lat, { face: false, rot: R() * 6, sink: 0.08 }); }
+    if (s <= 10 && [1, 3, 5, 7].includes(s)) for (let d = d0 + 13; d < d0 + STAGE_LEN; d += 27) { if (!offClear(d)) continue; const sd = R() < 0.5 ? 1 : -1, n = 2 + Math.floor(R() * 2); for (let i = 0; i < n; i++) put(g, makeJizo(), d + i * 0.55, sd * (T.cw + 0.5), { y: 0 }); }
+    if (s <= 10 && [1, 2, 6, 7].includes(s)) for (let i = 0; i < 7; i++) { const d = d0 + R() * STAGE_LEN; if (!offClear(d)) continue; const lat = (R() < 0.5 ? 1 : -1) * (T.cw + 1.5 + R() * 5); put(g, makeLog(2 + R() * 2.5), d, lat, { face: false, rot: R() * 6, sink: 0.08 }); }
     if (s !== 9) put(g, makeSign(), d0 + HUT_AT + 9, -(s === 4 ? 1.7 : T.cw + 0.4), { y: 0 });
     // 先に挑んだ者の刀：登るほど、道の脇に増えていく（言葉を使わずに、この山の厳しさを語る）
     { const n = [0, 1, 2, 3, 3, 5, 7, 9, 12, 16, 20][s]; const it = scatter(s, n, Math.min(T.cw + 0.5, 1.6), T.cw + 3, 500 + s, { clear: 8.5, s0: 0.9, s1: 1.1, maxH: 1.2, minH: -0.6 }); placeAt(g, PROP.swordKasa, PROP_STEEL, it.filter((_, i) => i % 2 === 0)); placeAt(g, PROP.sword, PROP_STEEL, it.filter((_, i) => i % 2 === 1)); }
@@ -4081,9 +4357,23 @@
     // 白峰の守り手：頂に至り、白狐に仕える者。白と銀の装い、白い襟巻
     mamori: { name: '白狐衆', weapons: null, hats: ['kasa', 'none'], mask: 'white', scarf: '#e8eaf0',
       pals: [{ kimono: '#c9cdd7', lapel: '#8c1a26', hakama: '#9aa1af', sash: '#dadde5', armor: '#b1b7c3', glove: '#c1c5cd', hood: '#d1d5dd' }] },
+    // 朱ノ宮の神狐衆：狐の社に仕える者。朱と白の装い、赤い狐の面
+    miko: { name: '神狐衆', weapons: ['naginata', 'katana', 'bow', 'staff', 'kodachi'], hats: ['none', 'tokin'], mask: 'red', scarf: '#f4efe4',
+      pals: [{ kimono: '#d8d2c4', lapel: '#b02a22', hakama: '#a8261f', sash: '#e8c860', armor: '#c9c1b0', glove: '#cfc7b6', hood: '#e0dacb' }, { kimono: '#b02a22', lapel: '#ece6d8', hakama: '#e0dacb', sash: '#2a2420', armor: '#8c2018', glove: '#d8d0c0', hood: '#d4cdbd' }] },
+    // 水月の湖衆：沈んだ宿場に住みつく、水辺の者。深い藍と青緑、濡れた色
+    kosan: { name: '湖衆', weapons: ['kusarigama', 'spear', 'dual', 'kodachi', 'bow', 'kunai'], hats: ['kasa', 'none', 'kasa'], mask: 'grey', mino: 0.3,
+      pals: [{ kimono: '#1c3a4a', lapel: '#8ab0b8', hakama: '#16283a', sash: '#c8a860', armor: '#1a2e3a', glove: '#1a2630', hood: '#142030' }, { kimono: '#27484a', lapel: '#c8d4cc', hakama: '#1c2c34', sash: '#6a4a2a', armor: '#1c3438', glove: '#1e2c30', hood: '#17262a' }] },
+    // 夜桜の花守衆：廃城の花を守り続ける者。黒と桃色
+    hanamori: { name: '花守衆', weapons: ['naginata', 'katana', 'dual', 'ninjato', 'kodachi', 'tetsubo'], hats: ['none', 'kasa'], mask: 'white', scarf: '#f0b8c8',
+      pals: [{ kimono: '#22202a', lapel: '#e890aa', hakama: '#2c2834', sash: '#e890aa', armor: '#1a1820', glove: '#2a2630', hood: '#18161e' }, { kimono: '#e8c8d4', lapel: '#3a2a3a', hakama: '#3a3040', sash: '#9a4a6a', armor: '#c8a8b8', glove: '#d0b0c0', hood: '#d8b8c6' }] },
+    // 風紋の砂の民：月の砂に生きる者。砂と土、藍染めの布
+    sunabito: { name: '砂の民', weapons: ['katana', 'otachi', 'spear', 'kusarigama', 'kunai', 'staff'], hats: ['kasa', 'none'], mask: 'iron', scarf: '#c8b890',
+      pals: [{ kimono: '#a89468', lapel: '#3a4a6a', hakama: '#6a5a40', sash: '#2a3a5a', armor: '#8a7a54', glove: '#5a4c36', hood: '#bcaa80' }, { kimono: '#6a5a40', lapel: '#c8b890', hakama: '#3a4a6a', sash: '#a8442a', armor: '#54482e', glove: '#4a3e2a', hood: '#8a7a54' }] },
   };
   // 合目ごとに出会う勢力（地形と合わせる：麓は野伏り、関は番所、霧と滝は修験、樹氷は忍び、尾根は天狗党、頂の手前は守り手）
   const STAGE_FACTIONS = { 10: ['mamori'], 1: ['nobushi'], 2: ['nobushi', 'bansho'], 3: ['shinobi', 'shugen'], 4: ['bansho'], 5: ['kenkaku', 'nobushi'], 6: ['shugen', 'kenkaku'], 7: ['shinobi', 'kenkaku'], 8: ['tengu'], 9: ['mamori', 'kenkaku'] };
+  Object.assign(STAGE_FACTIONS, { 11: ['miko'], 12: ['miko', 'kenkaku'], 13: ['miko', 'shinobi'], 14: ['miko'], 15: ['miko', 'mamori'], 16: ['kosan'], 17: ['kosan', 'shinobi'], 18: ['kosan', 'kenkaku'], 19: ['kosan'], 20: ['kosan', 'shugen'],
+    21: ['hanamori'], 22: ['hanamori', 'bansho'], 23: ['hanamori', 'shinobi'], 24: ['hanamori'], 25: ['hanamori', 'mamori'], 26: ['sunabito'], 27: ['sunabito'], 28: ['sunabito', 'shinobi'], 29: ['sunabito', 'tengu'], 30: ['sunabito', 'mamori'], 31: ['mamori', 'kenkaku', 'tengu', 'hanamori', 'sunabito'] });
   // 勢力ごとの動きの癖（docs/43）：間合い（pref）、回り込みの幅（lat）、止まる長さ（pause）、戦術の好み（tac）。動きを見れば、どこの者か分かる
   const FSTYLE = {
     nobushi: { pref: 2.9, lat: [0.5, 0.9], pause: [160, 260], tac: { press: 1.6, rush: 1.6, wait: 0.4, iai: 0.5, disengage: 0.5 } },   // 間合いを詰めて、休まず押す
@@ -4093,6 +4383,10 @@
     kenkaku: { pref: 3.4, lat: [0.7, 1.2], pause: [300, 460], tac: { iai: 1.8, press: 1.2 } },   // 居合の間合い
     tengu:   { pref: 3.8, lat: [1.0, 1.6], pause: [200, 320], tac: { aerial: 2.6, whirl: 1.8, rush: 1.3 } },   // 大きく跳び、旋風
     mamori:  { pref: 3.4, lat: [0.8, 1.3], pause: [260, 400], tac: {} },
+    miko:    { pref: 3.2, lat: [0.4, 0.8], pause: [200, 340], tac: { rush: 1.8, iai: 1.8, press: 1.2 } },
+    kosan:   { pref: 3.5, lat: [0.9, 1.5], pause: [260, 420], tac: { disengage: 1.6, wait: 1.3, press: 1.1 } },
+    hanamori: { pref: 3.3, lat: [0.8, 1.4], pause: [220, 360], tac: { whirl: 2.4, aerial: 1.4, press: 1.2 } },
+    sunabito: { pref: 3.4, lat: [0.6, 1.1], pause: [300, 480], tac: { jodan: 1.5, iai: 1.3, wait: 1.3 } },
   };
   const curStyle = () => (S.etype && FSTYLE[S.etype.faction]) || null;
   // 戦いの転（docs/45 規則2）：手練以上は、崩しが半分を越えると一度だけ奥の手に切り替わる。読みの三要素（手がかり・拍子・応え）のうち一つだけを変える
@@ -4104,6 +4398,10 @@
     kenkaku: { delay: 0.5 },   // 拍子：溜め遅らせが増える
     tengu:   { tac: { aerial: 3.5 } },   // 手がかり：上から来る
     mamori:  { counter: 0.35 },   // 応え：弾き返しが鋭い
+    miko:    { tac: { iai: 3, rush: 2 }, pause: 0.5 },   // 拍子：鋭い踏み込みと居合
+    kosan:   { peril: 0.3, feint: 0.2 },   // 応え：弾けない足払いと突きが増える
+    hanamori: { tac: { whirl: 3.5 }, pause: 0.6 },   // 手がかり：回って斬る（旋風）
+    sunabito: { delay: 0.4, counter: 0.2 },   // 拍子：溜め遅らせと、弾き返し
   };
   const defaultFaction = (t) => (t.weapon === 'ninjato' || t.weapon === 'kunai' ? 'shinobi' : t.weapon === 'naginata' ? 'shugen' : t.rank === 'zako' ? 'nobushi' : t.rank === 'ashigaru' ? 'bansho' : 'kenkaku');
   const hashStr = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
@@ -4286,6 +4584,41 @@
     // 十合目：風を継いだ三人との三連戦（強い者だけ）。大将は、のちに置く
     { name: '十合目', road: ['KOCHI', 'NOWAKI', 'OROSHI'] },
   ];
+  // ── 白峰のほかの世界の合目（docs/46）：主は、その世界ごとの二つ名。最後の主が、技を使う ──
+  const LORDS_NEW = {
+    ho1: LORD('staff:kashira', '灯守の翁', { brk: 0.8 }),
+    ho2: LORD('dual:kashira', '鳥居番の双刀', { brk: 0.75 }),
+    ho3: LORD('kunai:kashira', '狐火遣い', { brk: 0.75, vanish: true }),
+    ho4: LORD('naginata:kashira', '紅葉巫女', { brk: 0.75 }),
+    ho5: LORD('katana:kashira', '千里使い', { brk: 0.7, time: 0.84, read: 0.9, tacBias: { rush: 4, iai: 2.5, disengage: 1.6, press: 0.8 }, signature: 'shippu' }),
+    su1: LORD('spear:kashira', '渡し守', { brk: 0.7 }),
+    su2: LORD('kodachi:kashira', '宿の女将・鶴', { brk: 0.7, ward: 1 }),
+    su3: LORD('bow:kashira', '月見弓', { brk: 0.7, ward: 1 }),
+    su4: LORD('kusarigama:kashira', '霧船頭', { brk: 0.65, vanish: true, ward: 1 }),
+    su5: LORD('katana:kashira', '面打ち・無貌', { brk: 0.6, time: 0.86, ward: 1, read: 0.9, signature: 'oni', oni: true, tacBias: { press: 1.6, jodan: 1.3 } }),
+    ha1: LORD('naginata:kashira', '門番の大薙刀', { brk: 0.65, ward: 1 }),
+    ha2: LORD('tetsubo:kashira', '石垣崩し', { brk: 0.6, ward: 1 }),
+    ha3: LORD('ninjato:kashira', '花嵐の斥候', { brk: 0.6, ward: 1 }),
+    ha4: LORD('bow:kashira', '月見櫓の射手', { brk: 0.6, ward: 1 }),
+    ha5: LORD('dual:kashira', '花守・朧', { brk: 0.55, time: 0.84, ward: 2, read: 0.9, signature: 'rinka', tacBias: { whirl: 4, aerial: 1.6, press: 1.2 } }),
+    sa1: LORD('kunai:kashira', '砂浜の渡り鳥', { brk: 0.55, ward: 1 }),
+    sa2: LORD('otachi:kashira', '沈み船の船長', { brk: 0.55, ward: 2 }),
+    sa3: LORD('kusarigama:kashira', '風紋の迷い人', { brk: 0.5, vanish: true, ward: 2 }),
+    sa4: LORD('staff:kashira', '骨の祭司', { brk: 0.5, ward: 2 }),
+    sa5: LORD('katana:kashira', '月読', { brk: 0.5, time: 0.82, ward: 2, read: 1, counter: 0.4, signature: 'tsuki', tacBias: { wait: 4, iai: 2, press: 0.8 } }),
+  };
+  const L5 = (id) => id;
+  [['朱ノ宮・壱', ['a', ['a', 'z'], 't', ['a', 'a', 'z'], 'ho1']], ['朱ノ宮・弐', ['t', ['t', 'a'], 'r', ['a', 'a', 'a'], 'ho2']], ['朱ノ宮・参', [['t', 'a'], 'r', ['t', 't', 'a'], 'k', 'ho3']], ['朱ノ宮・肆', ['r', ['t', 't'], 'k', ['r', 'a', 'a'], 'ho4']], ['朱ノ宮・伍', ['k', ['r', 'r'], ['t', 't', 'r'], 'k', 'ho5']],
+    ['水月・壱', ['t', ['t', 'a'], 'r', ['t', 'a', 'a'], 'su1']], ['水月・弐', ['r', ['r', 't'], 'k', ['t', 't', 'a'], 'su2']], ['水月・参', [['r', 't'], 'r', ['t', 't', 'r'], 'k', 'su3']], ['水月・肆', ['k', ['r', 't', 't'], 'r', ['k', 't'], 'su4']], ['水月・伍', ['r', ['k', 'r'], ['t', 't', 'r'], 'k', 'su5']],
+    ['夜桜・壱', ['r', ['r', 't'], 'k', ['t', 't', 'r'], 'ha1']], ['夜桜・弐', ['k', ['r', 'r'], 'r', ['k', 't', 't'], 'ha2']], ['夜桜・参', [['k', 'r'], 'r', ['r', 'r', 't'], 'k', 'ha3']], ['夜桜・肆', ['k', ['k', 'r'], 'r', ['k', 'r', 'r'], 'ha4']], ['夜桜・伍', ['k', ['k', 'k'], ['r', 'r', 'k'], 'k', 'ha5']],
+    ['風紋・壱', ['k', ['r', 'r'], 'k', ['r', 'r', 'k'], 'sa1']], ['風紋・弐', [['k', 'r'], 'k', ['r', 'k', 'r'], 'k', 'sa2']], ['風紋・参', ['k', ['k', 'k'], 'k', ['k', 'r', 'r'], 'sa3']], ['風紋・肆', [['k', 'k'], 'k', ['k', 'r', 'k'], 'k', 'sa4']], ['風紋・伍', ['k', ['k', 'k'], ['k', 'k', 'r'], ['k', 'k'], 'sa5']],
+  ].forEach(([name, road], i) => { STAGES[11 + i] = { name, road: road.map((e) => (typeof e === 'string' && LORDS_NEW[e] ? LORDS_NEW[e] : e)) }; });
+  // 雲上の回廊（エンドレス）：層ごとに、五戦（一人→二人→三人→一人→主）。層が上がるほど格が上がる
+  STAGES[31] = { name: '雲上の回廊', get road() {
+    const f = S.endless ? S.endless.floor : 1, low = f < 3 ? 'a' : 't', mid = f < 3 ? 't' : f < 6 ? 'r' : 'k', hi = f < 2 ? 'r' : 'k';
+    const lordKeys = Object.keys(LORDS_NEW), lord = LORDS_NEW[lordKeys[(f * 7 + 3) % lordKeys.length]];
+    return [low, [low, mid], [mid, mid, low], hi, Object.assign({}, lord, { id: lord.id + '@e', ward: 2, brk: lord.brk * 0.9 })];
+  } };
   const RANK_OF = { z: 'zako', a: 'ashigaru', t: 'tedare', r: 'ryuha', k: 'kashira' };
   function makeRoad(stage) {
     const used = new Set();
@@ -4303,15 +4636,22 @@
       const t = pick(pool); used.add(t.id);
       return Object.assign({}, t, { look: factionLook(fk, t, salt), faction: fk });
     };
-    return STAGES[stage].road.map((e) => (Array.isArray(e) ? e.map(one) : one(e)));
+    // 世界が進むほど、雑兵も硬い（雑兵は月影で一撃、強い者は鬼面や輪華がないと崩れない。docs/46）
+    const w = worldOf(stage), mul = [1, 0.85, 0.65, 0.5, 0.4, 0.32][w - 1];
+    const wardFor = (rank) => (w <= 2 ? 0 : w === 3 ? (rank === 'kashira' ? 1 : 0) : w === 4 ? (rank === 'ryuha' || rank === 'kashira' ? 1 : 0) : w === 5 ? (['tedare', 'ryuha', 'kashira'].includes(rank) ? 1 : 0) : rank === 'kashira' ? 2 : rank === 'ryuha' || rank === 'tedare' ? 1 : 0);
+    const fin = (t) => (w === 1 || t.boss ? t : Object.assign({}, t, { brk: t.brk * (t.lord ? 1 : mul), ward: t.ward !== undefined ? t.ward : wardFor(t.rank) }));
+    return STAGES[stage].road.map((e) => (Array.isArray(e) ? e.map((q) => fin(one(q))) : fin(one(e))));
   }
   const saveStage = (n) => { try { localStorage.setItem('kaze.stage', String(n)); } catch (e) { /* 保存できなくても遊べる */ } };
   const loadStage = () => { try { return clamp(parseInt(localStorage.getItem('kaze.stage') || '1', 10) || 1, 1, STAGES.length - 1); } catch (e) { return 1; } };
   // 合目を越えた：題を静かに浮かべ、次の合目の山小屋から
   function advanceStage() {
     if (S.memory) { memEnd(); return; }
+    if (S.etype && S.etype.mumei) { mumeiDefeated(); return; }
     // 十合目の三人を越えた：風の社まで駆け上がり、雲海の上に日が昇るのを見て終わる
-    if (S.stage >= STAGES.length - 1) { startTravel(clearD(S.stage, 3) - 1, null, { final: true, speed: 3.4 }); return; }
+    if (S.stage === 31) { endlessNext(); return; }
+    if (S.stage === 10) { startTravel(clearD(S.stage, 3) - 1, null, { final: true, speed: 3.4 }); return; }
+    if (isWorldEnd(S.stage)) { S.mode = 'victory'; clearTimeout(S.endTimer); S.endTimer = setTimeout(() => finishWorld(), 700); return; }
     // 山小屋を通り過ぎた所で、合目の名が静かに浮かぶ（画面を切り替えず、歩いたまま次の合目へ入る）
     const next = S.stage + 1;
     S.road = makeRoad(next); S.roadIdx = 0;
@@ -4319,7 +4659,7 @@
   }
   function showStageCard(n) {
     const card = document.getElementById('stageCard');
-    card.textContent = STAGES[n].name + '　' + THEMES[n].name; card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+    card.textContent = n === 31 ? '雲上の回廊　第' + (S.endless ? S.endless.floor : 1) + '層' : STAGES[n].name + '　' + THEMES[n].name; card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
   }
   function kamae(kind, dur, then) { S.kamae = { kind, then }; setMode('kamae', dur); }
   function flip(then) {
@@ -4337,7 +4677,7 @@
     const names = Object.keys(TACTICS);
     const tw = S.etype && !S.etype.boss ? WEAPONS[S.etype.weapon].tactics : null;   // 雑兵は、武器に合った戦術だけを使う
     const fs = curStyle();
-    const ws = names.map((n) => (tw ? (tw[n] || 0) : 1) * Math.max(0.01, TACTICS[n].w(d)) / (1 + (S.tacticUse[n] || 0) * 1.5) * (S.etype && S.etype.learner ? learnerWeight(n) : 1) * (fs && fs.tac[n] !== undefined ? fs.tac[n] : 1) * (S.oku && S.oku.tac && S.oku.tac[n] !== undefined ? S.oku.tac[n] : 1));
+    const ws = names.map((n) => (tw ? (tw[n] || 0) : 1) * Math.max(0.01, TACTICS[n].w(d)) / (1 + (S.tacticUse[n] || 0) * 1.5) * (S.etype && S.etype.learner ? learnerWeight(n) : 1) * (fs && fs.tac[n] !== undefined ? fs.tac[n] : 1) * (S.oku && S.oku.tac && S.oku.tac[n] !== undefined ? S.oku.tac[n] : 1) * (S.etype && S.etype.tacBias && S.etype.tacBias[n] !== undefined ? S.etype.tacBias[n] : 1));
     let r = S.r() * ws.reduce((x, y) => x + y, 0), choice = names[0];
     for (let i = 0; i < names.length; i++) { r -= ws[i]; if (r <= 0) { choice = names[i]; break; } }
     Object.keys(S.tacticUse).forEach((k) => { S.tacticUse[k] *= 0.6; });
@@ -5153,7 +5493,7 @@
   }
   function setOrigin(d) { S.originD = d; const P = pathP(d); worldG.position.set(-P.x, -pathH(d, 1), -P.z); worldG.updateMatrixWorld(true); updateWorldVis(d); }
   // 描く合目は、いる合目と次の合目だけ（前の合目は、境のすぐ先にいる間だけ。カメラは前を向いている）
-  function updateWorldVis(d) { const s = stageOfD(d), back = d - stageStart(s) < 30, fwd = stageStart(s + 1) - d < 70; for (let k = 1; k <= 10; k++) STAGE_G[k].visible = k === s || (fwd && k === s + 1) || (back && k === s - 1); }
+  function updateWorldVis(d) { const s = stageOfD(d), back = d - stageStart(s) < 30, fwd = stageStart(s + 1) - d < 70; for (let k = 1; k <= LAST_STAGE; k++) { const on = k === s || (fwd && k === s + 1) || (back && k === s - 1); if (on && !STAGE_G[k]) buildStage(k); if (STAGE_G[k]) STAGE_G[k].visible = on; } }
   function worldShift(newD) {
     const O0 = pathP(S.originD), O1 = pathP(newD), dx = O1.x - O0.x, dz = O1.z - O0.z, dy = pathH(newD, 1) - pathH(S.originD, 1);
     setOrigin(newD); S.p.y = 0;
@@ -5320,13 +5660,14 @@
     // 月の光と照り返し
     moon.color.lerp(_fc3.set(T.moon[0]).convertSRGBToLinear(), k); moon.intensity = lerp(moon.intensity, T.moon[1], k);
     hemi.color.lerp(_fc3.set(T.hemi[0]).convertSRGBToLinear(), k); hemi.groundColor.lerp(_fc4.set(T.hemi[1]).convertSRGBToLinear(), k); hemi.intensity = lerp(hemi.intensity, T.hemi[2], k);
-    const tgt = { stars: T.stars, moonA: T.moonA, drop: T.drop, cloud: T.cloud === null ? -30 : T.cloud, cloudA: T.cloud === null ? 0 : 0.85, dawn: T.dawn, mist: T.mist, leaves: T.amb === 'leaves' ? 1 : 0, dust: T.amb === 'dust' ? 1 : 0, peakA: T === THEMES[10] ? 0 : clamp((T.fog[2] - 15) / 40, 0.12, 1) };
+    const tgt = { stars: T.stars, moonA: T.moonA, drop: T.drop, cloud: T.cloud === null ? -30 : T.cloud, cloudA: T.cloud === null ? 0 : 0.85, dawn: T.dawn, mist: T.mist, leaves: T.amb === 'leaves' ? 1 : 0, dust: T.amb === 'dust' ? 1 : 0, peakA: T === THEMES[10] || T.noPeak ? 0 : clamp((T.fog[2] - 15) / 40, 0.12, 1) };
     Object.keys(tgt).forEach((q) => { ATM[q] = lerp(ATM[q], tgt[q], k); });
     if (!STARS) { STARS = FIX_KIND('stars'); MOONS = FIX_KIND('moon'); MOONS.forEach((m) => { m.material.transparent = true; m.userData.op = m.material.opacity; }); }
     STARS.forEach((m) => { m.material.opacity = ATM.stars; m.visible = ATM.stars > 0.02; });
     MOONS.forEach((m) => { m.material.opacity = m.userData.op * ATM.moonA; });
     if (!RINGS) { RINGS = FIX_KIND('ring'); RINGS.forEach((m) => { m.material.transparent = true; }); }
-    RINGS.forEach((m) => { m.material.opacity = clamp(ATM.peakA * 1.15, 0, 1); m.visible = ATM.peakA > 0.15; });
+    RINGS.forEach((m) => { m.material.opacity = clamp((T.noPeak ? 0.95 : ATM.peakA * 1.15), 0, 1); m.visible = T.noPeak ? true : ATM.peakA > 0.15; m.material.color.lerp(_fc3.set(T.ring || 0xffffff), k * 0.5); if (!T.ring) m.material.color.lerp(_fc3.set(0xffffff), k * 0.5); });
+    AMB.leaves.material.color.lerp(_fc3.set(T.leaf || 0x5a7038).convertSRGBToLinear(), k); AMB.dust.material.color.lerp(_fc3.set(T.dustC || 0xffffff), k);
     PANO.drop = ATM.drop;
     if (S.memory) { ATM.peakA = 0; RINGS.forEach((m) => { m.visible = false; }); }
     // 稲光：闇の中のすべてを一瞬照らす
@@ -5495,6 +5836,7 @@
   function nextEnemy() {
     if (S.memory) { memNext(); return; }
     S.roadIdx++;
+    maybeIntrude();
     S.P = Math.max(0, S.P - 35);   // 一息つく
     startTravel(clearD(S.stage, Math.min(4, S.roadIdx)), S.road[S.roadIdx]);
   }
@@ -5727,6 +6069,7 @@
       if (u >= 1) { p.m.visible = false; PK.splice(i, 1); if (inFight() || S.mode === 'staggered') kunaiHit(); }
     }
     if (S.arm && gt - S.arm.t > 1100) S.arm = null;
+    { const kn = document.getElementById('kn'), want = hasSkill('hien'); if (kn.hidden === want) kn.hidden = !want; if (want) [...kn.children].forEach((e, i) => { const off = S.kunaiCool[i] > gt; if (e.classList.contains('off') !== off) e.classList.toggle('off', off); }); }
     if (S.iai && (!S.pa || S.pa.kind !== 'iai')) S.iai = false;
     // 輪華の進行
     if (S.rinka) {
@@ -6485,6 +6828,31 @@
     btn.onclick = () => { sgEl.classList.remove('on'); setTimeout(() => { sgEl.hidden = true; S.uiBlock = null; if (then) then(); }, 700); btn.onclick = null; };
     markTut([key]);
   }
+
+  // ── エンドレス「雲上の回廊」：層ごとに五戦。倒れたら第一層から。強者「無銘」が、ときに乱入する ──
+  const MUMEI = Object.assign({}, KITSUNE, { id: 'mumei', name: '無銘', mumei: true, learner: true, brk: 0.5, time: 0.8, read: 1, counter: 0.5, ward: 2, noFlinch: true,
+    look: { pal: { kimono: '#101014', lapel: '#f0f0f4', hakama: '#1a1a20', sash: '#f0f0f4', armor: '#1c1c22', glove: '#18181e', hood: '#0e0e12' }, hat: 'none', mask: 'white', plates: false, backBow: false, scale: 1.16, acc: {} } });
+  const bestFloor = () => { try { return +localStorage.getItem('kaze.best') || 0; } catch (e) { return 0; } };
+  const mumeiCount = () => { try { return +localStorage.getItem('kaze.mumei') || 0; } catch (e) { return 0; } };
+  function endlessNext() {
+    const E = S.endless; E.floor++; E.mumeiDone = false;
+    try { if (E.floor - 1 > bestFloor()) localStorage.setItem('kaze.best', String(E.floor - 1)); } catch (e) { /* なくてよい */ }
+    fadeOutIn(() => { S.newRoad = true; begin(1); }, 350);
+  }
+  // 乱入：層に一度まで、主の前のどこかで。層が深いほど起きやすい（鐘が鳴り、空気が張る）
+  function maybeIntrude() {
+    const E = S.endless;
+    if (!E || E.mumeiDone || S.roadIdx < 1 || S.roadIdx > S.road.length - 2) return;
+    if (S.r() > Math.min(0.45, 0.1 + 0.035 * E.floor) && !(S.dev && S.dev.intrude)) return;
+    E.mumeiDone = true; S.road.splice(S.roadIdx, 0, Object.assign({}, MUMEI, { id: 'mumei@' + E.floor }));
+    Sound.peril(); fxFlash(0.14, 0.0, 0.02); S.shake = Math.max(S.shake, 0.05);
+    noteNovel('乱入', '無銘');
+  }
+  function mumeiDefeated() {
+    try { localStorage.setItem('kaze.mumei', String(mumeiCount() + 1)); } catch (e) { /* なくてよい */ }
+    S.gotMumei = true;
+    if (S.roadIdx < S.road.length - 1) nextEnemy(); else endlessNext();
+  }
   // 世界を越えたとき：その世界の最終戦の相手から、技を一つ受け継ぐ
   const WORLD_REWARD = { 1: 'hien', 2: 'shippu', 3: 'kimen', 4: 'rinka', 5: 'tsuki' };
   function finishWorld() {
@@ -6502,12 +6870,14 @@
     { id: 3, name: '水月の里', sub: '鏡の湖と沈んだ宿', from: 16, to: 20, reward: 'kimen' },
     { id: 4, name: '夜桜の城跡', sub: '花嵐の廃城', from: 21, to: 25, reward: 'rinka' },
     { id: 5, name: '風紋の海', sub: '月の砂の海', from: 26, to: 30, reward: 'tsuki' },
+    { id: 6, name: '雲上の回廊', sub: '果てのない回廊（本編）', from: 31, to: 31, reward: null },
   ];
   const worldOf = (n) => (WORLDS.find((w) => n >= w.from && n <= w.to) || WORLDS[0]).id;
+  const isWorldEnd = (n) => WORLDS.some((w) => w.to === n && w.id < 6);
   const loadReach = () => { try { return JSON.parse(localStorage.getItem('kaze.reach') || '{}'); } catch (e) { return {}; } };
   function noteReach(n) { try { const r = loadReach(), w = worldOf(n); r[w] = Math.max(r[w] || 0, n); localStorage.setItem('kaze.reach', JSON.stringify(r)); } catch (e) { /* 保存できなくても遊べる */ } }
   const mapOwned = () => { try { return ALL_SKILLS || localStorage.getItem('kaze.map') === '1'; } catch (e) { return false; } };
-  const worldOpen = (w) => ALL_SKILLS || w.id === 1 || (STAGES[w.from] && S.skills.has(WORLDS[w.id - 2].reward));
+  const worldOpen = (w) => ALL_SKILLS || w.id === 1 || (w.id === 6 ? SKILL_ORDER.every((k) => S.skills.has(k)) : STAGES[w.from] && S.skills.has(WORLDS[w.id - 2].reward));
   const mapEl = document.getElementById('map');
   function openMap() {
     const reach = loadReach(), cur = S.stage || loadStage();
@@ -6517,9 +6887,9 @@
       const box = document.createElement('div'); box.className = 'mw' + (open && built ? '' : ' locked');
       box.innerHTML = `<h3>${w.name}</h3><div class="mw-s">${open && built ? w.sub : built ? '前の山を越えると、道が開く' : 'まだ、霧の中'}</div>`;
       if (open && built) for (let n = w.to; n >= w.from; n--) {
-        const ok = (reach[w.id] || (w.id === 1 ? loadStage() : 0)) >= n || n === w.from && w.id > 1;
+        const ok = (reach[w.id] || (w.id === 1 ? Math.min(10, loadStage()) : 0)) >= n || n === w.from && w.id > 1;
         const b = document.createElement('button'); b.type = 'button'; b.className = 'mn' + (ok ? ' on' : ' off') + (n === cur ? ' cur' : '');
-        b.innerHTML = `<i></i><b>${ok ? STAGES[n].name + '　' + (THEMES[n] ? THEMES[n].name : '') : '？？？'}</b><small>${ok ? '山小屋' : ''}</small>`;
+        b.innerHTML = `<i></i><b>${ok ? (n === 31 ? '雲上の回廊　第一層から' : STAGES[n].name + '　' + (THEMES[n] ? THEMES[n].name : '')) : '？？？'}</b><small>${ok ? (n === 31 ? '最高 第' + (+localStorage.getItem('kaze.best') || 0) + '層' : '山小屋') : ''}</small>`;
         if (ok) b.onclick = () => travelTo(n);
         box.appendChild(b);
       }
@@ -6531,7 +6901,7 @@
   function travelTo(n) {
     mapEl.hidden = true; S.uiBlock = null; document.getElementById('pause').hidden = true; S.paused = false;
     endEl.hidden = true; clearTimeout(S.endTimer);
-    S.stage = n; saveStage(n); S.devRoad = null; S.devStart = 0; S.dev = null; S.newRoad = true;
+    S.stage = n; if (n < 31) saveStage(n); S.devRoad = null; S.devStart = 0; S.dev = null; S.newRoad = true; S.endless = n === 31 ? { floor: 1 } : null;
     warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false;
     begin(1);
   }
@@ -6550,7 +6920,7 @@
   pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); doPause(); });
   document.getElementById('pzResume').addEventListener('click', doResume);
   document.getElementById('pzMap').addEventListener('click', () => { pauseEl.hidden = true; openMap(); });
-  document.getElementById('pzRetry').addEventListener('click', () => { pauseEl.hidden = true; S.paused = false; S.newRoad = true; resetSkillState(); begin(1); });   // 出直す＝倒れたときと同じ（その合目の山小屋から）
+  document.getElementById('pzRetry').addEventListener('click', () => { pauseEl.hidden = true; S.paused = false; if (S.endless) S.endless.floor = 1; S.newRoad = true; resetSkillState(); begin(1); });   // 出直す＝倒れたときと同じ（その合目の山小屋から）
   window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' || ev.key === 'p') { if (S.paused) doResume(); else doPause(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.started && canPause()) doPause(); });
 
@@ -6566,7 +6936,7 @@
   }
   function begin(fromPhase) {
     // 道：新しく始めるときは道を組み直す。負けたときは、同じ相手からやり直す
-    S.stage = S.stage || loadStage();
+    S.stage = S.stage || loadStage(); S.world = worldOf(S.stage);
     if (!S.road || S.newRoad) { S.road = S.devRoad || makeRoad(S.stage); S.roadIdx = Math.min(S.devStart || 0, S.road.length - 1); S.newRoad = false; }
     const entry0 = S.road[S.roadIdx];
     if (!(Array.isArray(entry0) ? entry0[0] : entry0).boss) fromPhase = 1;
@@ -6633,7 +7003,7 @@
       if (mode === 'stage') S.devStart = +$('dvStart').value;
       else if (mode === 'enemy') S.devRoad = [findT($('dvEnemy').value)];
       else { const n = +$('dvCount').value, pool = ROSTER.filter((t) => t.rank === RANK_OF[$('dvRank').value]); S.devRoad = [Array.from({ length: n }, () => pick(pool))]; if (n === 1) S.devRoad = [S.devRoad[0][0]]; }
-      S.dev = { god: $('dvGod').checked, skills: $('dvSkills').checked };
+      S.dev = { god: $('dvGod').checked, skills: $('dvSkills').checked, intrude: false }; S.endless = S.stage === 31 ? { floor: 1 } : null;
       $('devPanel').hidden = true;
       warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true;
       begin(1);
@@ -6641,7 +7011,7 @@
     });
     const st0 = loadStage(); $('tStage').textContent = st0 > 1 ? STAGES[st0].name + 'から' : '';
   }
-  document.getElementById('startBtn').addEventListener('click', () => { Sound.init(); if (mapOwned()) { S.stage = S.stage || loadStage(); openMap(); return; } S.devRoad = null; S.devStart = 0; S.dev = null; warmUp(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true; begin(1); });
+  document.getElementById('startBtn').addEventListener('click', () => { Sound.init(); if (mapOwned()) { S.stage = S.stage || loadStage(); openMap(); return; } S.devRoad = null; S.devStart = 0; S.dev = null; S.endless = null; warmUp(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true; begin(1); });
   function showEnd(won) {
     const st = S.stats;
     const secs = Math.round((S.gt - st.start) / 1000);
@@ -6650,12 +7020,17 @@
       ? `${S.gotSkill ? '受け継いだ技：' + SKILLS[S.gotSkill].name + '。' : ''}${secs}秒。弾き ${st.parry}・見切り ${st.mikiri}・反撃 ${st.counter}・出鼻 ${st.debana}・踏み ${st.stomp}・斬り ${st.cut}・被弾 ${st.hits}・最高 ${S.bestChain}連`
       : `${STAGES[S.stage] ? STAGES[S.stage].name : ''}の山小屋から、すぐにやり直せます。`;
     document.getElementById('endSummary').textContent = teleSummary();
+    if (S.endless && !won) {
+      const fl = S.endless.floor; try { if (fl > bestFloor()) localStorage.setItem('kaze.best', String(fl)); } catch (e) { /* なくてよい */ }
+      document.getElementById('endTitle').textContent = '第' + fl + '層で倒れた';
+      document.getElementById('endText').textContent = `最高 第${bestFloor()}層。無銘を斬った数 ${mumeiCount()}。第一層から、また登ります。`;
+    }
     document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
     endEl.hidden = false;
     S.lastWon = won;
   }
   // 負けたら、この合目の山小屋（始め）から。勝ちきったら、もう一度山を
-  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.memory) { player.resetHat(); player.clearTears(); S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt }; memStart(S.memory.id); return; } if (S.lastWon && !S.devRoad && mapOwned()) { S.started = false; S.mode = 'idle'; openMap(); return; } S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
+  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.endless && !S.lastWon) S.endless.floor = 1; if (S.memory) { player.resetHat(); player.clearTears(); S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt }; memStart(S.memory.id); return; } if (S.lastWon && !S.devRoad && mapOwned()) { S.started = false; S.mode = 'idle'; openMap(); return; } S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
   // 試遊の記録：刃が届くたびの結果と、入力のずれ（刃が届く何ミリ秒前に入れたか）
   // 新しい模様の補充：一分あたりの数と、新しい模様が来なかった最も長い間（遊び始めからの記録）
   function novelSummary() {
@@ -6694,6 +7069,9 @@
     forceMode(m, dur) { if (S.travel) { S.travel.s = S.travel.len; arrive(); } S.action = null; S.queue = []; S.counterUntil = 0; S.P = 0; setMode(m, dur); },
     input(dir) { doInput(dir, S.gt); },
     skillCard(k) { showSkillGet(k, () => {}); }, tutShow(items) { showTut(items || [...BASE_TUT, SKILL_TUT('hien'), SKILL_TUT('rinka')], 60000); }, finishWorldTest() { S.skills.delete('hien'); S.world = 1; finishWorld(); },
+    endlessState() { return S.endless && { ...S.endless, best: bestFloor(), mumei: mumeiCount(), road: S.road.map((t) => Array.isArray(t) ? t.map((q) => q.name).join('＋') : t.name) }; },
+    setEndless(f) { S.endless = { floor: f }; },
+    intrudeNow() { S.endless = S.endless || { floor: 1 }; S.dev = Object.assign(S.dev || {}, { intrude: true }); },
     iaiEnter() { return enterIai(); }, iaiDir(dir) { doIai(dir, S.gt); }, kunai() { return throwKunai(); },
     giveSkills(list) { (list || SKILL_ORDER).forEach((k) => S.skills.add(k)); saveSkills(); },
     skillState() { return { iai: S.iai, arm: S.arm && S.arm.kind, oni: Math.max(0, Math.round(S.oniUntil - S.gt)), rinka: !!S.rinka, kunai: S.kunaiCool.map((t) => Math.max(0, Math.round(t - S.gt))), skills: [...S.skills], B: S.B, ward: S.etype && S.etype.ward || 0, mode: S.mode }; },
