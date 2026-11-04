@@ -357,6 +357,7 @@
     // 雑兵の武器の技：手裏剣のように投げるクナイ、鎖鎌の分銅、槍の連突き、薙刀の大回し、棒・金砕棒の打ち
     kunaiT:  { key: 'R', O: 160, W: 300, S: 0, F: 240, R: 420, w: 0.5, reach: 99, lunge: 0, ranged: { kind: 'kunai', speed: 21 }, name: 'クナイ投げ' },
     kunaiTF: { key: 'L', O: 40, W: 160, S: 0, F: 220, R: 420, w: 0.5, reach: 99, lunge: 0, ranged: { kind: 'kunai', speed: 22 }, fixed: true, name: '二投目' },
+    hien:    { key: 'R', O: 200, W: 420, S: 0, F: 260, R: 460, w: 0.8, reach: 99, lunge: 0, ranged: { kind: 'hien', speed: 25 }, peril: 'hien', name: '緋燕' },   // 赤く光る防御できない投げ。避けるしかない
     chainT:  { key: 'T', O: 260, W: 560, S: 0, F: 420, R: 640, w: 0.9, reach: 99, lunge: 0, ranged: { kind: 'chain', speed: 11 }, name: '分銅打ち' },
     chainTF: { key: 'S', O: 60, W: 300, S: 0, F: 420, R: 640, w: 1.0, reach: 99, lunge: 0, ranged: { kind: 'chain', speed: 12 }, fixed: true, name: '返しの分銅' },
     spearT3: { key: 'T', O: 40, W: 110, S: 120, F: 300, R: 560, w: 0.7, reach: 3.9, lunge: 0.6, fixed: true, name: '連突き' },
@@ -532,6 +533,27 @@
     issen:   { dur: 2400, keys: [[120, 'issen', easeOut], [1700, 'issen', smooth], [2400, 'guard', smooth]] },   // 残心を保ち、最後にゆっくり構えへ戻す（一気に戻すと刀が跳ねる）
     down:    { dur: 1e9, keys: [[500, 'kneel', easeOut], [1e9, 'kneel', smooth]] },
   };
+  // ── 風の技（docs/46）：居合の構え（鯉口を切って低く待つ）と、そこから出す技、緋燕の投げ ──
+  Object.assign(PL, {
+    iai:     PS({ hand: V(0.34, 0.98, 0.3), sword: N(0.3, -0.12, -0.94), crouch: 0.58, pitch: 0.2, yaw: 0.95, hipX: 0.08, hipZ: -0.06 }),   // 居合の構え：腰を深く落とし、柄に手を添え、刀は鞘のまま背へ引く
+    iaiDraw: PS({ hand: V(-0.62, 1.1, 0.78), sword: N(-0.98, 0.04, 0.2), crouch: 0.4, pitch: 0.16, yaw: -1.5, hipZ: 0.28, hipX: -0.1 }),   // 抜きつけ：横一文字に抜き払う
+    iaiThru: PS({ hand: V(-0.7, 1.0, 0.2), sword: N(-0.8, -0.1, -0.58), crouch: 0.4, pitch: 0.22, yaw: -1.9, hipZ: 0.24 }),
+    throwW:  PS({ hand: V(0.45, 1.75, -0.1), sword: N(0.3, 0.5, -0.8), crouch: 0.3, yaw: 0.9, pitch: -0.1 }),
+    throwH:  PS({ hand: V(0.3, 1.5, 0.95), sword: N(0.2, 0.08, 0.98), crouch: 0.32, yaw: 0.3, pitch: 0.12, hipZ: 0.22 }),
+    kimenA:  PS({ hand: V(0.1, 2.3, 0.1), sword: N(0.05, 0.6, -0.8), crouch: 0.1, pitch: -0.55, lift: 0.2 }),   // 面を裏返す：刀を高く掲げ、天を仰ぐ
+    kimenB:  PS({ hand: V(0.3, 1.1, 0.5), sword: N(0.5, 0.2, 0.84), crouch: 0.62, pitch: 0.3, yaw: 0.6 }),   // 鬼の構え：深く低く
+  });
+  Object.assign(PA, {
+    iai:     { dur: 1e9, keys: [[70, 'iai', easeOut], [1e9, 'iai', smooth]] },
+    armed:   { dur: 520, keys: [[50, 'iaiDraw', easeOut], [440, 'iaiDraw', smooth], [520, 'guard', smooth]] },
+    iaiOut:  { dur: 300, keys: [[300, 'guard', smooth]] },
+    shippu:  { dur: 520, hitAt: 120, keys: [[30, 'iai', easeOut], [125, 'iaiDraw', easeIn], [200, 'iaiThru', easeOut], [260, 'iaiThru', smooth], [520, 'guard', smooth]] },
+    tsuki:   { dur: 560, keys: [[30, 'deflect', easeOut], [380, 'deflect', smooth], [560, 'guard', smooth]] },
+    kimen:   { dur: 700, keys: [[160, 'kimenA', easeOut], [300, 'kimenA', smooth], [700, 'kimenB', smooth]] },
+    kimenEnd: { dur: 420, keys: [[420, 'guard', smooth]] },
+    rinka:   { dur: 1300, keys: [[110, 'iaiDraw', easeIn], [200, 'iaiThru', easeOut], [1050, 'iaiThru', smooth], [1300, 'guard', smooth]] },
+    kunai:   { dur: 300, keys: [[70, 'throwW', easeOut], [120, 'throwH', easeIn], [200, 'throwH', smooth], [300, 'guard', smooth]] },
+  });
 
   // 手と刀は、直線ではなく肩の前の支点を中心に弧を描いて動く
   const PIVOT = V(0, 1.36, 0.05);
@@ -3704,6 +3726,14 @@
       whiff() {}, dodge() {}, crunch() {}, step() {}, swing() {}, breath() {}, grunt() {}, gasp() {},
       // 見切り（突きを踏む）：雪に押しつけられた刀の、こもった「ゴィン」
       mikiri() { play(B.stompMetal, 0.75, 0.25); },
+      // 居合の構え「カチン」：鯉口を切る、硬く短い金属音
+      chin() { play(B.glint, 0.5, 0.2, 0, 2.1); play(B.stompMetal, 0.4, 0.05, 0, 2.4); },
+      // 鬼面：面を裏返す低い響きと、細い刃鳴り
+      oni() { play(B.clashLow, 0.85, 0.55, 0, 0.45); play(B.glint, 0.35, 0.5, 0.06, 0.65); },
+      // 輪華の一太刀ごと（高くなっていく）と、納刀の「カチン」
+      rinka(n) { play(B.parry, 0.55, 0.35, 0, 1 + n * 0.16); },
+      nou() { play(B.parryHard, 0.7, 0.6, 0, 1.25); play(B.stompMetal, 0.5, 0.05, 0.02, 2.0); },
+      kunai() { play(B.glint, 0.4, 0.35, 0, 1.6); },
       // 鎧の板が落ちる
       plate() { play(B.stompMetal, 0.25, 0.1, 0, 1.6); },
       // 雷鳴（刀の記憶「雷雨の河原」だけで鳴らす。稲光の後いつ来るかを数える手がかりなので、刀の音だけに絞る方針の例外とする）
@@ -4019,7 +4049,7 @@
       look: { pal: { kimono: '#1f5050', lapel: '#e8e4da', hakama: '#c9cdd7', sash: '#e8e4da', armor: '#1f4646', glove: '#d8dce4', hood: '#e0e4ec' }, hat: 'none', mask: 'white', plates: false, scale: 1.18, acc: { scarf: '#f0f2f8' } } }),
     NOWAKI: Object.assign({}, ROSTER.find((t) => t.id === 'otachi:kashira'), { id: 'wind:nowaki', name: '野分', lord: true, keepLook: true, brk: 0.6, time: 0.88, w: 1.3, read: 0.8, law: 'heavy',
       look: { pal: { kimono: '#22222a', lapel: '#c8a040', hakama: '#2c2c34', sash: '#c8a040', armor: '#16161c', glove: '#24242a', hood: '#1a1a20' }, hat: 'kabuto', mask: 'white', plates: true, scale: 1.3, acc: { crest: true, mino: 'dark' } } }),
-    OROSHI: Object.assign({}, BOSS, { id: 'wind:oroshi', name: '颪', lord: true, keepLook: true, brk: 0.7, time: 0.86, read: 0.7,
+    OROSHI: Object.assign({}, BOSS, { id: 'wind:oroshi', name: '颪', lord: true, keepLook: true, hien: 0.3, signature: 'hien', brk: 0.7, time: 0.86, read: 0.7,
       look: { pal: { kimono: '#18181e', lapel: '#b8bcc8', hakama: '#30323a', sash: '#b8bcc8', armor: '#9aa0ae', glove: '#30323a', hood: '#141418' }, hat: 'kasa', mask: 'white', plates: true, scale: 1.22, acc: { scarf: '#9aa0ae' } } }),
   };
   // ───────── 武器ごとの構えと技の形：同じ体でも、持つ物で立ち方が変わる ─────────
@@ -4232,6 +4262,8 @@
     let key = token.replace('*', '');
     // 奥の手（関守）：連撃の一手が、弾けない危険な技に置き換わる
     if (S.oku && S.oku.peril && !feint && MOVES[key] && !MOVES[key].fixed && !MOVES[key].peril && S.r() < S.oku.peril) key = S.r() < 0.5 ? 'sweep' : 'pierce';
+    // 緋燕（颪）：連撃の始めに、赤く光る投げを混ぜる。弾けない。避けるしかない
+    if (S.etype && S.etype.hien && !feint && MOVES[key] && !MOVES[key].fixed && !MOVES[key].ranged && key !== 'hien' && dist() > 1.6 && S.r() < S.etype.hien) key = 'hien';
     // 様式を変える：同じ斬り方でも、回る・跳ぶ・沈む・速める…のどれで来るかは毎回違う
     const et = S.etype || BOSS;
     const varRate = et.boss ? (S.phase === 1 ? 0.5 : 0.7) : ({ zako: 0, ashigaru: 0.15, tedare: 0.35, ryuha: 0.45, kashira: 0.55 }[et.rank] || 0);
@@ -4284,6 +4316,7 @@
     // 下と左右は、斬りの振り終わりからなら割り込める
     if (attacking && t < 110) return;
     if (dir === 'D') {
+      S.tsukiUntil = 0;
       const spam = tDown - S.lastGuard < CFG.spamGap;
       S.guardPerfect = (spam ? CFG.spamGuard : CFG.perfectGuard) * (S.ryugi && RYUGI[S.ryugi] ? RYUGI[S.ryugi].guard : 1);   // 流儀「稲妻」：弾きの間が狭い
       S.lastGuard = S.guardStart = tDown;
@@ -4360,6 +4393,7 @@
 
   // ───────────────────────── こちらの斬り ─────────────────────────
   function resolvePlayerHit(pa) {
+    if (pa.kind === 'shippu') { shippuHit(); return; }
     if (S.evade && S.gt < S.evade.until) {
       // かわされた：空を切り、相手が斬り返す。時間がゆっくりになり、画面の色が抜ける（見切られたとわかる）
       S.evade = null;
@@ -4449,6 +4483,7 @@
 
   function landHit(amount, label, cls, big) {
     amount *= S.etype ? S.etype.brk : 1;   // 雑兵ほど崩れやすい
+    amount *= wardMul(label === '輪華' ? 'rinka' : 'cut') * (S.gt < S.oniUntil ? 1.6 : 1);   // 守り／鬼面
     S.B = clamp(S.B + amount, 0, 100); S.lastPressure = S.gt;
     S.W = Math.min(90, (S.W || 0) + amount * 0.6);
     // 斬られた側へ体がひねられ、頭がのけぞる。体が一瞬白く光り、うめく。
@@ -4528,9 +4563,10 @@
     // 指は置かれたが、向きがまだ決まっていない：少しだけ待つ
     if (S.touch && !S.touch.resolved && a.T - S.touch.tDown < 200 && gt < a.T + 140) return null;
     const g = a.T - S.guardStart, v = a.T - S.dodgeStart, st = a.T - S.stompStart;
+    if (S.arm && a.T - S.arm.t >= -CFG.lateGrace && a.T - S.arm.t <= CFG.dodgeWin) return S.arm.kind;   // 居合の構えからの、鬼面・輪華
     if (a.peril === 'pierce' && st >= -CFG.lateGrace && st <= CFG.stompWin) return 'stomp';
     if (v >= -CFG.lateGrace && v <= CFG.dodgeWin && !(S.dodgeCramped && HORIZ.has(a.move.key) && !a.move.ranged)) return v <= CFG.perfectDodge ? 'mikiri' : 'dodge';
-    if (g >= -CFG.lateGrace && g <= CFG.guardWin) return a.peril ? 'guardBreak' : (g <= S.guardPerfect ? 'parry' : 'block');
+    if (g >= -CFG.lateGrace && g <= CFG.guardWin) return a.peril ? 'guardBreak' : (g <= S.guardPerfect ? 'parry' : (S.tsukiUntil > a.T ? 'hit' : 'block'));   // 月影は、狭い窓を外すと受けにもならない
     if (gt < a.T + CFG.lateGrace) return null;
     return dist() > a.move.reach + 0.15 ? 'miss' : 'hit';
   }
@@ -4545,6 +4581,8 @@
     else if (res === 'mikiri') { if (readingDodge()) punishDodge(a); else mikiri(a); }
     else if (res === 'dodge') { missPlayer(a, true); if (readingDodge()) punishDodge(a); }
     else if (res === 'stomp') stomp(a);
+    else if (res === 'oni') kimenOn(a);
+    else if (res === 'rinka') rinkaStart(a);
     else if (res === 'miss') missPlayer(a, false);
     else hitPlayer(a, res === 'guardBreak');
   }
@@ -4552,7 +4590,8 @@
   function parry(a) {
     a.resolved = true; a.parried = true;
     S.stats.parry++; addChain();
-    const amt = CFG.brk.parry * a.move.w * (S.etype ? S.etype.brk : 1);
+    const tsuki = S.gt <= S.tsukiUntil + 700 && S.tsukiUntil > 0; S.tsukiUntil = 0;
+    const amt = CFG.brk.parry * a.move.w * (S.etype ? S.etype.brk : 1) * wardMul('parry') * (S.gt < S.oniUntil ? 1.25 : 1) + (tsuki ? 26 * wardMul('tsuki') * (S.etype ? S.etype.brk : 1) : 0);
     S.B = clamp(S.B + amt, 0, 100); S.lastPressure = S.gt;
     // 弾き：時間が止まり、熱い火花が飛び、星形の光、衝撃波、高く長く響く金属音
     clashPoint(tA); Sound.at(tA); Sound.kin(S.chain);
@@ -4577,6 +4616,11 @@
     const f = dirPE();
     tween(S.e, S.e.x + f.x * 0.35, S.e.z + f.z * 0.35, 220);
     pushLog('弾き', `${Math.round(a.T - S.guardStart)}ms`, `崩し ${Math.round(amt)}　反撃の機会`);
+    // 月影：雑兵・足軽・手練は、一撃で斬り伏せる
+    if (tsuki) {
+      const E = S.etype; noteNovel('技', '月影');
+      if (E && !E.boss && !E.lord && !E.ward && ['zako', 'ashigaru', 'tedare'].includes(E.rank)) { S.B = 100; S.queue = []; S.action = null; pushLog('月影', '', '一撃で斬り伏せた'); Sound.nou(); issen(); return; }
+    }
     // 連撃の最後か重い技を弾くと、相手は大きくよろめく
     if (!S.queue.length || a.move.w >= 1.4) { S.queue = []; S.action = null; setMode('staggered', 700); }
     if (S.B >= 100) breakEnemy();
@@ -4905,6 +4949,10 @@
       } else if (kind === 'kunai') {
         const b = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.16, 4), headMat); b.rotation.x = Math.PI / 2; g.add(b);
         const r = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 4, 8), arrowMat); r.position.z = -0.1; g.add(r);
+      } else if (kind === 'hien') {
+        // 緋燕：赤く燃える刃と、赤い光の尾
+        const b = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.2, 4), new THREE.MeshBasicMaterial({ color: 0xff4a30 })); b.rotation.x = Math.PI / 2; g.add(b);
+        const gl = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.9, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xff2410, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); gl.rotation.x = -Math.PI / 2; gl.position.z = -0.5; g.add(gl);
       } else if (kind === 'chain') {
         const w2 = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), headMat); g.add(w2);
         const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(0, 0, 0), V(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0x8a909a })); line.frustumCulled = false; scene.add(line); g.userData.line = line;
@@ -4932,23 +4980,24 @@
       scene.add(g); return g;
     }
     // 使い回しの置き場：撃つたびに作ると、作るたびに止まる
-    const pool = { arrow: [], wave: [], kunai: [], chain: [] };
+    const pool = { arrow: [], wave: [], kunai: [], chain: [], hien: [] };
     for (let i = 0; i < 6; i++) { const m = make('arrow'); m.visible = false; pool.arrow.push(m); }
     for (let i = 0; i < 4; i++) { const m = make('wave'); m.visible = false; pool.wave.push(m); }
     for (let i = 0; i < 6; i++) { const m = make('kunai'); m.visible = false; pool.kunai.push(m); }
+    for (let i = 0; i < 5; i++) { const m = make('hien'); m.visible = false; pool.hien.push(m); }
     for (let i = 0; i < 2; i++) { const m = make('chain'); m.visible = false; m.userData.line.visible = false; pool.chain.push(m); }
     const take = (kind, flat) => { const m = pool[kind].find((q) => !q.visible) || pool[kind][0]; m.visible = true; m.scale.setScalar(1); m.rotation.set(0, 0, 0); if (m.userData.glow) { m.userData.ghosts.forEach((q, k) => { q.material.opacity = [1, 0.45, 0.2][k]; }); m.children[0].rotation.z = flat ? 0 : Math.PI / 2; } return m; };
     const drop = (m) => { m.visible = false; if (m.userData.line) m.userData.line.visible = false; };
     return {
       pool,
       fire(a) {
-        const from = a.move.ranged.kind === 'arrow' ? enemy.chestWorld.clone().add(V(0, 0.12, 0)) : (a.move.ranged.kind === 'kunai' || a.move.ranged.kind === 'chain') ? enemy.mid.clone() : enemy.chestWorld.clone();
+        const from = a.move.ranged.kind === 'arrow' ? enemy.chestWorld.clone().add(V(0, 0.12, 0)) : (a.move.ranged.kind === 'kunai' || a.move.ranged.kind === 'hien' || a.move.ranged.kind === 'chain') ? enemy.mid.clone() : enemy.chestWorld.clone();
         const to = player.chestWorld.clone();
         const m = take(a.move.ranged.kind, a.move.ranged.flat);
         m.position.copy(from); m.lookAt(to);
         list.push({ a, m, from, to, t0: S.gt, dur: Math.max(60, a.T - S.gt), state: 'fly', v: V(0, 0, 0), life: 1.2, kind: a.move.ranged.kind });
         if (m.userData.line) m.userData.line.visible = true;
-        if (a.move.ranged.kind === 'arrow' || a.move.ranged.kind === 'kunai' || a.move.ranged.kind === 'chain') { Sound.at(from); Sound.clank(); } else { Sound.at(from); Sound.swing(1.4); burst(from, 20, 1.6, 'cool'); }
+        if (a.move.ranged.kind === 'hien') { Sound.at(from); Sound.peril(); flare(from, 1.2, 260, 0xff3020); } else if (a.move.ranged.kind === 'arrow' || a.move.ranged.kind === 'kunai' || a.move.ranged.kind === 'chain') { Sound.at(from); Sound.clank(); } else { Sound.at(from); Sound.swing(1.4); burst(from, 20, 1.6, 'cool'); }
       },
       // 当たった結果に合わせて飛び方を変える：弾かれた矢は火花を散らして跳ね、避けた矢は後ろへ抜ける
       resolve(a, res) {
@@ -4966,6 +5015,7 @@
             p.m.position.lerpVectors(p.from, p.to, u);
             if (p.kind === 'arrow') p.m.position.y += Math.sin(Math.PI * Math.min(1, u)) * 0.08;
             else if (p.kind === 'kunai') p.m.rotateZ(dt * 30);
+            else if (p.kind === 'hien') { if (Math.random() < 0.7) glowAt(p.m.position, 0.32, 160, 0xff3a20); }
             else if (p.m.userData.ghosts && p.m.userData.ghosts.length) { p.m.scale.setScalar(1 + u * 0.35); p.m.userData.ghosts[0].material.opacity = 0.85 + 0.15 * Math.sin(S.gt * 0.06); }   // 鎖鎌の分銅には残像が無い（以前は、ここで止まり画面が固まった）
             if (u >= 1.05 && !p.a.resolved) p.state = 'pass';
           } else if (p.state === 'deflect' || p.state === 'pass') {
@@ -5370,6 +5420,245 @@
     setTimeout(() => showEnd(false), 2600);
   }
 
+
+  // ───────────────────────── 風の技（docs/46-skills-and-worlds.md） ─────────────────────────
+  // ステージを越えるたびに一つ、その最終戦の相手から技を受け継ぐ。緋燕（二度押し）と、居合の構え（長押し）から出す四つ。
+  const SKILLS = {
+    hien:   { name: '緋燕', yomi: 'ひえん', how: '素早く 二度 押す', desc: '赤い刃を投げる。防げない一撃で、相手の連撃を断ち切る', from: '颪', icon: 'tap2' },
+    shippu: { name: '疾風断ち', yomi: 'はやてだち', how: '長押し → 上へ', desc: 'どれだけ離れていても詰めて一太刀。雑兵は一度で崩れる', icon: 'up' },
+    kimen:  { name: '鬼面', yomi: 'きめん', how: '長押し → 右へ（相手の刃が届く直前に）', desc: '面を裏返し、鬼の面に。攻めが大きく上がる', icon: 'right' },
+    rinka:  { name: '輪華', yomi: 'りんか', how: '長押し → 左へ（鬼面の間、刃が届く直前に）', desc: '見切りの一閃から、相手を輪になって斬り巡る', icon: 'left' },
+    tsuki:  { name: '月影', yomi: 'つきかげ', how: '長押し → 下へ（刃が届く直前に）', desc: '刃に月を映して弾く。雑兵は一撃で斬り伏せる', icon: 'down' },
+  };
+  const SKILL_ORDER = ['hien', 'shippu', 'kimen', 'rinka', 'tsuki'];
+  const ALL_SKILLS = /[?&]skills=all/.test(location.search);
+  const loadSkills = () => { try { return JSON.parse(localStorage.getItem('kaze.skills') || '[]'); } catch (e) { return []; } };
+  const saveSkills = () => { try { localStorage.setItem('kaze.skills', JSON.stringify([...S.skills])); } catch (e) { /* 保存できなくても遊べる */ } };
+  S.skills = new Set(loadSkills());
+  const hasSkill = (k) => ALL_SKILLS || S.skills.has(k) || !!(S.dev && S.dev.skills);
+  const hasIai = () => ['shippu', 'kimen', 'rinka', 'tsuki'].some(hasSkill);
+  Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, kunaiCool: [0, 0, 0], shippuReady: 0, rinka: null, lastTapUp: -1e9 });
+  const PB0 = player.bladeMat.emissive.getHex();
+  // 守り：強い相手は、条件を満たさない攻撃では崩れにくい（体力の数字は増やさず、崩しが通らない）
+  function wardMul(src) {
+    const w = S.etype && S.etype.ward || 0;
+    if (!w) return 1;
+    const oni = S.gt < S.oniUntil;
+    if (w === 1) return oni ? 1 : 0.1;
+    return oni && src === 'rinka' ? 1 : 0.08;
+  }
+  const inFight = () => S.started && !['victory', 'defeat', 'falling', 'travel', 'memArrive', 'broken'].includes(S.mode) && !S.rinka;
+
+  // ── 居合の構え：長押しで、すぐに「カチン」と構える ──
+  function enterIai() {
+    if (!hasIai() || !inFight() || S.gt < S.playerLockUntil) return false;
+    S.iai = true; startPA('iai');
+    Sound.chin();
+    tA.copy(player.hipWorld); glowAt(tA, 0.55, 150, 0xffffff); flare(tA, 0.9, 160, 0xdfeaff);
+    kickSnow(player.hipWorld, 0.5); fxKick(0.002, 0.03, player.chestWorld);
+    try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* なくてよい */ }
+    noteNovel('技', '居合の構え');
+    return true;
+  }
+  function leaveIai() {
+    if (!S.iai) return;
+    S.iai = false;
+    if (S.pa && S.pa.kind === 'iai') startPA('iaiOut');
+  }
+  function doIai(dir, tDown) {
+    if (!S.iai || !inFight()) { S.iai = false; return; }
+    S.iai = false;
+    if (dir === 'U') { if (hasSkill('shippu')) shippuGo(); else startPA('iaiOut'); return; }
+    if (dir === 'D') {
+      if (!hasSkill('tsuki')) { startPA('iaiOut'); return; }
+      S.guardPerfect = 180; S.lastGuard = S.guardStart = tDown; S.tsukiUntil = tDown + 700;
+      S.playerLockUntil = S.gt + 120; startPA('tsuki'); noteNovel('技', '月影');
+      return;
+    }
+    if (dir === 'R' && hasSkill('kimen')) { S.arm = { kind: 'oni', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }
+    if (dir === 'L' && hasSkill('rinka') && S.gt < S.oniUntil) { S.arm = { kind: 'rinka', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }
+    startPA('iaiOut');   // 持っていない技、鬼面のないときの輪華：構えを解く
+  }
+
+  // ── 疾風断ち：どれだけ離れていても詰めて一太刀。相手は必ず弾く（雑兵は崩れ、主には効きが薄い） ──
+  function shippuGo() {
+    if (S.gt < S.shippuReady) { startPA('iaiOut'); return; }
+    S.shippuReady = S.gt + 1800;
+    const f = dirPE(), go = Math.max(0, f.d - 1.55);
+    tween(S.p, S.p.x + f.x * go, S.p.z + f.z * go, 100, easeOut);
+    startPA('shippu'); S.playerLockUntil = S.gt + 300;
+    snowBurst(S.p.x, S.p.z, 0.9); kickSnow(player.hipWorld, 1.0); fxKick(0.01, 0.08, enemy.chestWorld); S.fovKick = Math.max(S.fovKick, 6);
+    noteNovel('技', '疾風断ち');
+  }
+  function shippuHit() {
+    const E = S.etype, rk = !E || E.boss || E.lord ? 0.18 : ({ zako: 1, ashigaru: 0.85, tedare: 0.65, ryuha: 0.42, kashira: 0.3 }[E.rank] || 0.4);
+    const oni = S.gt < S.oniUntil;
+    S.queue = []; S.action = null;
+    tA.copy(enemy.chestWorld).lerp(player.tip, 0.45);
+    clashPoint(tA); Sound.at(tA); Sound.clashLow(); Sound.kin(1);
+    burst(tA, 56, 3.2, 'cool'); glowAt(tA, 1.0, 130, 0xffffff); glowAt(tA, 1.0, 240, 0x8fb8ff, true); flare(tA, 1.8, 220, 0xdfeaff); lightAt(tA, 5, 0xc0d8ff);
+    fxShock(tA, 0.9); fxKick(0.012, 0.1, tA); camKick(tA, 0.9, 0.2); S.shake = Math.max(S.shake, 0.05);
+    S.freezeUntil = performance.now() + 110;
+    const amt = 60 * rk * (oni ? 1.4 : 1) * wardMul('shippu') * (E ? E.brk : 1);
+    S.B = clamp(S.B + amt, 0, 100); S.lastPressure = S.gt;
+    { const f = dirPE(); tween(S.e, S.e.x + f.x * 1.1, S.e.z + f.z * 1.1, 260, easeOut); }
+    S.stagger.vp -= 1.0; S.stats.cut++; addChain();
+    pushLog('疾風断ち', '', `崩し ${Math.round(amt)}`);
+    if (S.B >= 100) breakEnemy(); else setMode('staggered', 700);
+  }
+
+  // ── 鬼面：相手の刃が届く直前に右へ。面を裏返し、赤い気をまとう（約9秒） ──
+  function kimenOn(a) {
+    a.resolved = true; a.missed = true; S.queue = []; S.arm = null;
+    S.oniUntil = S.gt + 9000;
+    S.stats.mikiri++; addChain();
+    startPA('kimen'); S.playerLockUntil = S.gt + 260;
+    Sound.at(player.headWorld); Sound.oni(); Sound.mikiri();
+    S.freezeUntil = performance.now() + 140; S.slowUntil = performance.now() + 140 + 700; S.slowScale = 0.3;
+    tA.copy(player.headWorld); flare(tA, 2.6, 520, 0xff2a18); glowAt(tA, 1.6, 420, 0xff4a30, true); lightAt(tA, 8, 0xff3a20);
+    tB.copy(player.chestWorld); burst(tB, 90, 3.6, 'crimson'); ring(S.p.x, S.p.z, 4.2, 0xff3a20); fxShock(tB, 1.1); fxKick(0.014, 0.12, tB); fxFlash(0.3, 0.02, 0.0); camKick(tB, 0.8, 0.3);
+    S.fovKick = Math.max(S.fovKick, 7);
+    S.counterUntil = S.gt + 1100; S.counterKind = 'mikiri';
+    noteNovel('技', '鬼面');
+    pushLog('鬼面', '', '面を裏返した');
+  }
+
+  // ── 輪華（鬼神解放・見切り切り）：見切りの一閃から、相手のまわりを輪になって斬り巡り、最後に納刀 ──
+  function rinkaStart(a) {
+    a.resolved = true; a.missed = true; S.queue = []; S.action = null; S.arm = null;
+    S.oniUntil = Math.max(S.oniUntil, S.gt + 5500);
+    S.stats.mikiri++; addChain();
+    S.rinka = { t0: S.gt, n: 0, a0: Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z), done: false };
+    S.playerLockUntil = S.gt + 1600;
+    setMode('staggered', 1700);
+    Sound.at(player.chestWorld); Sound.mikiri(); Sound.oni();
+    S.freezeUntil = performance.now() + 130; S.slowUntil = performance.now() + 130 + 260; S.slowScale = 0.45;
+    fxKick(0.012, 0.14, enemy.chestWorld); fxFlash(0.2, 0.04, 0.03);
+    startPA('rinka'); noteNovel('技', '輪華');
+  }
+  function rinkaHit(k) {
+    const R = S.rinka, last = k === 6;
+    const ang = R.a0 + k * (Math.PI * 2 / 6);
+    const ex = S.e.x, ez = S.e.z;
+    if (k > 0) { const r = 1.75; tween(S.p, ex + Math.sin(ang) * r, ez + Math.cos(ang) * r, 90, easeOut); startPA(k % 2 ? 'slash2' : 'slash1'); S.playerLockUntil = S.gt + 1500; }
+    tA.copy(enemy.chestWorld).lerp(enemy.hipWorld, 0.2);
+    const amt = k === 0 ? 18 : last ? 20 : 7;
+    landHit(amt, '輪華', 'cut', k === 0 || last);
+    S.e.tw = null; S.e.x = ex; S.e.z = ez;   // 中心の相手は動かさない（まわりを斬り巡る）
+    // 斬り筋：相手を囲む輪の一部（一太刀ごとに傾きが変わり、輪が花のように開く）
+    const tilt = (k % 2 ? 1 : -1) * (0.35 + 0.08 * k), pts = [], c = tA;
+    for (let i = 0; i <= 10; i++) { const u = ang + Math.PI + (i / 10 - 0.5) * 1.5; pts.push(V(c.x + Math.sin(u) * 1.15, c.y + Math.sin(u * 2 + k) * 0.18 + tilt * (i / 10 - 0.5) * 1.2, c.z + Math.cos(u) * 1.15)); }
+    slashArc(pts, c, true, [1.5, 0.4, 0.35], 'slit');
+    Sound.rinka(k); burst(tA, 24, 2.2, 'crimson'); glowAt(tA, 0.8, 120, 0xffffff);
+    if (!last) S.freezeUntil = performance.now() + 28;
+    S.shake = Math.max(S.shake, 0.03);
+  }
+  function rinkaEnd() {
+    const R = S.rinka; R.done = true;
+    const f = dirPE();
+    tween(S.p, S.e.x - f.x * 2.5, S.e.z - f.z * 2.5, 220, easeOut);
+    Sound.at(player.chestWorld); Sound.nou();
+    S.freezeUntil = performance.now() + 180; S.slowUntil = performance.now() + 180 + 500; S.slowScale = 0.35;
+    tA.copy(enemy.chestWorld); fxFlash(0.34, 0.34, 0.38); fxShock(tA, 1.4); ring(S.e.x, S.e.z, 6.0, 0xffffff); glowAt(tA, 2.0, 300, 0xffffff); flare(tA, 3.0, 420, 0xfff0e8); lightAt(tA, 9, 0xffffff);
+    burst(tA, 120, 4.4, 'hot'); smoke(tA, 5, 0.5); camKick(tA, 1.2, 0.5); fxKick(0.016, 0.16, tA); S.fovKick = Math.max(S.fovKick, 8);
+    kickSnow(enemy.hipWorld, 1.4); snowBurst(S.e.x, S.e.z, 1.8);
+    S.playerLockUntil = S.gt + 300;
+    if (S.mode !== 'broken') setMode('staggered', 900);
+  }
+
+  // ── 緋燕：素早く二度押し。赤い刃を投げる。防げず、相手の技を断ち切る。三本まで（一本は4秒で戻る）、投げる間は返せない ──
+  const PK = [];
+  const PKMESH = [0, 1, 2].map(() => {
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.2, 4), new THREE.MeshBasicMaterial({ color: 0xff4a30 })); b.rotation.x = Math.PI / 2; g.add(b);
+    const gl = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.9, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xff2410, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); gl.rotation.x = -Math.PI / 2; gl.position.z = -0.5; g.add(gl);
+    g.traverse((o) => { o.frustumCulled = false; }); g.visible = false; scene.add(g); return g;
+  });
+  function throwKunai() {
+    if (!hasSkill('hien') || !inFight() || S.gt < S.playerLockUntil) return false;
+    const i = S.kunaiCool.findIndex((t) => t <= S.gt);
+    if (i < 0) { Sound.clank(); return false; }
+    S.kunaiCool[i] = S.gt + 4000;
+    S.guardStart = -1e9; S.tsukiUntil = 0;   // 投げる間は返せない
+    startPA('kunai'); S.playerLockUntil = S.gt + 260;
+    const from = player.chestWorld.clone().add(V(0, 0.1, 0)), to = enemy.chestWorld.clone();
+    const m = PKMESH.find((q) => !q.visible) || PKMESH[0]; m.visible = true; m.position.copy(from); m.lookAt(to);
+    PK.push({ m, from, t0: S.gt, dur: Math.max(90, from.distanceTo(to) / 26 * 1000) });
+    Sound.at(from); Sound.kunai(); flare(from, 0.9, 160, 0xff3020);
+    noteNovel('技', '緋燕');
+    return true;
+  }
+  function kunaiHit() {
+    const a = S.action, E = S.etype, oni = S.gt < S.oniUntil;
+    tA.copy(enemy.chestWorld);
+    burst(tA, 56, 3.6, 'crimson'); glowAt(tA, 0.9, 120, 0xff7a60); glowAt(tA, 1.2, 260, 0xff2a18, true); flare(tA, 2.0, 280, 0xff3020); lightAt(tA, 5, 0xff5a40);
+    Sound.at(tA); Sound.kin(2); fxKick(0.008, 0.05, tA); camKick(tA, 0.6, 0.1); fxShock(tA, 0.6);
+    S.freezeUntil = performance.now() + 70;
+    const gain = (k) => k * (E ? E.brk : 1) * (oni ? 1.4 : 1) * wardMul('hien');
+    if (a && !a.resolved && !a.feint) {
+      // 技を断ち切る：赤い刃が相手の刃を弾き、連撃が途切れる
+      a.resolved = true; a.parried = true;
+      if (a.move.ranged && a.fired) Proj.resolve(a, 'parry');
+      S.action = null; S.queue = [];
+      S.B = clamp(S.B + gain(8), 0, 100); S.lastPressure = S.gt;
+      S.counterUntil = S.gt + 800; S.counterKind = 'parry';
+      S.stagger.vx += (S.r() < 0.5 ? -1 : 1) * 1.1; S.stagger.vp -= 0.8;
+      if (S.B >= 100) breakEnemy(); else setMode('staggered', 650);
+      pushLog('緋燕', '', '相手の技を断ち切った');
+    } else {
+      S.B = clamp(S.B + gain(3.5), 0, 100); S.lastPressure = S.gt;
+      S.flinch = { t0: S.gt, amt: 0.7, side: S.r() < 0.5 ? -1 : 1 };
+      if (['stalk', 'approach', 'retreat'].includes(S.mode)) setMode('staggered', 380);
+      if (S.B >= 100) breakEnemy();
+    }
+  }
+
+  // ── 毎コマの更新：緋燕の飛行、居合の構えの保ち、鬼面の気、輪華の進行 ──
+  const ONI_AURA = (() => {
+    const g = new THREE.CylinderGeometry(0.62, 0.34, 2.1, 20, 1, true);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff2a14, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.frustumCulled = false; m.visible = false; scene.add(m); return m;
+  })();
+  function updateSkills(dtGame) {
+    if (!S.started) return;
+    const gt = S.gt;
+    // 緋燕の飛行
+    for (let i = PK.length - 1; i >= 0; i--) {
+      const p = PK[i], u = Math.min(1, (gt - p.t0) / p.dur);
+      p.m.position.lerpVectors(p.from, enemy.chestWorld, u); p.m.lookAt(enemy.chestWorld);
+      if (Math.random() < 0.8) glowAt(p.m.position, 0.3, 150, 0xff3a20);
+      if (u >= 1) { p.m.visible = false; PK.splice(i, 1); if (inFight() || S.mode === 'staggered') kunaiHit(); }
+    }
+    if (S.arm && gt - S.arm.t > 1100) S.arm = null;
+    if (S.iai && (!S.pa || S.pa.kind !== 'iai')) S.iai = false;
+    // 輪華の進行
+    if (S.rinka) {
+      const R = S.rinka, t = gt - R.t0;
+      while (R.n < 7 && t >= 140 + R.n * 105) { rinkaHit(R.n); R.n++; }
+      if (R.n >= 7 && !R.done && t >= 140 + 7 * 105 + 120) rinkaEnd();
+      if (R.done && t >= 140 + 7 * 105 + 700) S.rinka = null;
+    }
+    // 鬼面の気
+    const on = gt < S.oniUntil && !['defeat', 'travel'].includes(S.mode);
+    if (on) {
+      const left = (S.oniUntil - gt) / 9000, pul = 0.5 + 0.5 * Math.sin(gt * 0.012);
+      ONI_AURA.visible = true; ONI_AURA.position.copy(player.hipWorld); ONI_AURA.position.y += 0.2;
+      ONI_AURA.scale.set(1 + pul * 0.08, 1 + pul * 0.1, 1 + pul * 0.08); ONI_AURA.material.opacity = (0.1 + 0.08 * pul) * Math.min(1, left * 6);
+      player.bladeMat.emissive.setRGB(0.5 + 0.2 * pul, 0.07, 0.03);
+      if (Math.random() < dtGame / 90) { tC.copy(player.hipWorld); tC.x += (Math.random() - 0.5) * 0.7; tC.z += (Math.random() - 0.5) * 0.7; tC.y = 0.1; burst(tC, 3, 0.9, 'crimson'); }
+      S.oniWas = true;
+    } else if (S.oniWas) {
+      S.oniWas = false; ONI_AURA.visible = false; player.bladeMat.emissive.setHex(PB0);
+      if (S.started && S.mode !== 'defeat') { burst(player.chestWorld, 30, 1.6, 'crimson'); Sound.at(player.chestWorld); Sound.glint && Sound.glint(); }
+    }
+    // 緋燕の補充を、足もとのかすかな赤い点で（文字や数字は出さない）
+  }
+  function resetSkillState() {
+    Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, rinka: null, kunaiCool: [0, 0, 0], shippuReady: 0 });
+    PK.forEach((p) => { p.m.visible = false; }); PK.length = 0;
+    ONI_AURA.visible = false; player.bladeMat.emissive.setHex(PB0); S.oniWas = false;
+  }
+
   // ───────────────────────── 画面上の表現 ─────────────────────────
   const glyphs = document.getElementById('glyphs');
   const projV = V(0, 0, 0);
@@ -5407,30 +5696,56 @@
     const n = performance.now(), t = ev.timeStamp;
     return (t > 0 && Math.abs(n - t) < 1000) ? t : n;
   }
+  // 押す→すぐ離す＝タップ。二度続けて素早く押す＝緋燕。押し続ける（約110ms）＝居合の構え（「カチン」）。そこから上下左右へはじく＝居合の技。
+  // それ以外は、はじいた向きで、斬る・弾く・避ける
+  const HOLD_MS = 110, DTAP_MS = 320;
   stage.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     Sound.init();
-    const touch = { x: ev.clientX, y: ev.clientY, tDown: toGameTime(eventTime(ev)), resolved: false };
+    if (S.uiBlock && S.uiBlock()) return;
+    const tNow = performance.now();
+    const touch = { x: ev.clientX, y: ev.clientY, tDown: toGameTime(eventTime(ev)), resolved: false, iai: false, moved: false, real: tNow };
+    // 二度押し：緋燕（二度目の押し始めで、すぐ投げる）
+    if (S.started && hasSkill('hien') && tNow - S.lastTapUp < DTAP_MS) {
+      S.lastTapUp = -1e9; touch.resolved = true; touch.dtap = true; S.touch = touch;
+      throwKunai();
+      return;
+    }
     S.touch = touch;
-    setTimeout(() => { if (!touch.resolved) touch.resolved = true; }, 240);
+    // 長押し：居合の構え。持っている間、向きは決めずに待つ
+    if (S.started && hasIai()) touch.holdTimer = setTimeout(() => { if (!touch.resolved && !touch.moved && enterIai()) touch.iai = true; }, HOLD_MS);
+    touch.timer = setTimeout(() => { if (!touch.iai) touch.resolved = true; }, 240);
   });
   stage.addEventListener('pointermove', (ev) => {
     const tc = S.touch;
     if (!tc || tc.resolved) return;
     const dx = ev.clientX - tc.x, dy = ev.clientY - tc.y;
     if (dx * dx + dy * dy < FLICK_PX * FLICK_PX) return;
-    tc.resolved = true;
-    doInput(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'), tc.tDown);
+    tc.moved = true;
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U');
+    clearTimeout(tc.holdTimer); tc.resolved = true;
+    if (tc.iai) { doIai(dir, toGameTime(eventTime(ev))); return; }
+    doInput(dir, tc.tDown);
   });
-  const release = () => { if (S.touch) S.touch.resolved = true; };
+  const release = () => {
+    const tc = S.touch;
+    if (!tc) return;
+    clearTimeout(tc.holdTimer);
+    if (tc.iai && !tc.resolved) leaveIai();   // 構えたまま、はじかずに離した
+    else if (!tc.moved && !tc.dtap && !tc.iai && performance.now() - tc.real < 220) S.lastTapUp = performance.now();
+    tc.resolved = true;
+  };
   stage.addEventListener('pointerup', release);
   stage.addEventListener('pointercancel', release);
   window.addEventListener('keydown', (ev) => {
     if (ev.repeat || !S.started) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); Sound.init(); throwKunai(); return; }
+    if (ev.key === 'x' || ev.key === 'Shift') { ev.preventDefault(); Sound.init(); if (S.iai) leaveIai(); else enterIai(); return; }
     const map = { ArrowRight: 'R', ArrowLeft: 'L', ArrowUp: 'U', ArrowDown: 'D' };
     if (!(ev.key in map)) return;
     ev.preventDefault();
     Sound.init();
+    if (S.iai) { doIai(map[ev.key], toGameTime(eventTime(ev))); return; }
     doInput(map[ev.key], toGameTime(eventTime(ev)));
   });
 
@@ -5792,7 +6107,7 @@
       if (hide !== !!S.vanished) { S.vanished = hide; enemy.present(!hide); if (!hide) { snowBurst(S.e.x, S.e.z, 1.2); kickSnow(V(S.e.x, 1.0, S.e.z), 1.2); Sound.at(V(S.e.x, 1, S.e.z)); Sound.step(1); } }
       if (hide && S.e.tw && Math.random() < dtGame / 90) { kickSnow(V(S.e.x, 0.05, S.e.z), 0.35); Sound.at(V(S.e.x, 0.2, S.e.z)); Sound.step(0.6); }
     } else if (S.vanished) { S.vanished = false; enemy.present(true); }
-    const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge'].includes(pa.kind) && S.gt - pa.t0 < 480;
+    const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge', 'shippu', 'kunai', 'kimen', 'tsuki', 'iai', 'armed', 'rinka'].includes(pa.kind) && S.gt - pa.t0 < 480;
     enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
     enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z), walk: S.mode === 'memArrive' });
     updateWaiting(dtGame);
@@ -5872,7 +6187,7 @@
     enemyTrail.update(a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F, enemy, now);
     const pa = S.pa;
     // 軌跡は振り下ろしの間だけ（振りかぶりで刀を引く動きを拾うと、帯が「く」の字に折れる）
-    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen'].includes(pa.kind) && S.gt - pa.t0 >= (pa.def.keys[0][0] || 0) * 0.85 && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
+    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen', 'shippu'].includes(pa.kind) && S.gt - pa.t0 >= (pa.def.keys[0][0] || 0) * 0.85 && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
     if (a && !a.feint && !a.peril && !a.resolved && !a.glinted && S.mode === 'attack' && S.gt >= a.T - 175) { a.glinted = true; tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.5, 170, 0xdfe9ff); }
     if (enemy.tip.y < 0.14 && S.B > 70 && now - (S.lastDrag || 0) > 70 && S.mode !== 'falling' && S.mode !== 'victory') { S.lastDrag = now; footprint(enemy.tip.x, enemy.tip.z, S.e.yaw + 1.2); }
     // 危険な技の赤い光：起こりから振り始めまで
@@ -6002,6 +6317,7 @@
       S.frameGt = S.gt; S.frameReal = now; S.frameScale = scale;
       autoPlay();
       updatePlayerAction();
+      updateSkills(dtGame);
       updateTravel();
       updateRules();
       updateAI();
@@ -6057,7 +6373,7 @@
     enemy2.resetHat(); enemy3.resetHat(); setupEncounter(S.road[S.roadIdx]);
     if (!atHut) { S.rule = THEMES[S.stage].rule; placeGroup(cd); S.waiters.forEach((w) => { w.st.nextBurst = S.gt + 2400; }); }
     if (S.rule === 'wind') S.wind = { dir: 1, next: S.gt + 3000 };
-    Proj.clear(); S.kamae = null; S.evade = null; S.pendingCut = 0;
+    Proj.clear(); S.kamae = null; S.evade = null; S.pendingCut = 0; resetSkillState();
     Shatter.clear(); player.resetHat(); S.readDodgeUntil = 0; S.dodgeLog = [];
     if (fromPhase === 1) { Shatter.clear(); clearTimeout(S.endTimer); enemy.resetHat(); enemy.clearTears(); player.clearTears(); }
     else if (enemy.hatOn()) enemy.dropHat();
@@ -6162,6 +6478,10 @@
     setPhase(n) { S.phase = n; },
     forceMode(m, dur) { if (S.travel) { S.travel.s = S.travel.len; arrive(); } S.action = null; S.queue = []; S.counterUntil = 0; S.P = 0; setMode(m, dur); },
     input(dir) { doInput(dir, S.gt); },
+    iaiEnter() { return enterIai(); }, iaiDir(dir) { doIai(dir, S.gt); }, kunai() { return throwKunai(); },
+    giveSkills(list) { (list || SKILL_ORDER).forEach((k) => S.skills.add(k)); saveSkills(); },
+    skillState() { return { iai: S.iai, arm: S.arm && S.arm.kind, oni: Math.max(0, Math.round(S.oniUntil - S.gt)), rinka: !!S.rinka, kunai: S.kunaiCool.map((t) => Math.max(0, Math.round(t - S.gt))), skills: [...S.skills], B: S.B, ward: S.etype && S.etype.ward || 0, mode: S.mode }; },
+    setEnemy(o) { Object.assign(S.etype, o); },
     setB(v) { S.B = v; S.lastPressure = S.gt + 1e6; },
     addTearTest() { enemy.addTear(); },
     flashTest() { enemy.flashHit(1); },
