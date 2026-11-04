@@ -159,6 +159,83 @@
     #slash.on { animation-duration: 1ms; }
   }
 
+
+  /* 操作の説明の箱：読まれない前提で、動く指の絵を主にする */
+  #tut { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); z-index: 12; display: flex; gap: 14px; padding: 12px 16px 10px; background: rgba(6, 9, 18, 0.62); border: 1px solid rgba(214, 220, 232, 0.18); border-radius: 16px; pointer-events: none; opacity: 0; transition: opacity 0.6s ease; max-width: calc(100vw - 24px); }
+  #tut.on { opacity: 1; }
+  .tt { display: grid; justify-items: center; gap: 5px; font-family: var(--display); font-size: 12px; letter-spacing: 0.08em; color: #dfe5f0; text-align: center; min-width: 4.4em; }
+  .tt small { font-size: 10px; color: rgba(214, 220, 232, 0.55); letter-spacing: 0.04em; }
+  .gz { position: relative; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(214, 220, 232, 0.28); display: block; background: radial-gradient(circle, rgba(214,220,232,0.08), transparent 70%); }
+  .gz .fg { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px 3px rgba(255, 255, 255, 0.7); animation: fgMove 2.2s ease-in-out infinite; }
+  .gz .rg { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.0); }
+  .gz.up { --dx: 0px; --dy: -22px; } .gz.down { --dx: 0px; --dy: 22px; } .gz.left { --dx: -22px; --dy: 0px; } .gz.right { --dx: 22px; --dy: 0px; }
+  .gz.lr .fg { animation-name: fgLR; }
+  .gz.hold .fg { animation-name: fgHold; animation-duration: 2.6s; }
+  .gz.hold .rg { animation: rgHold 2.6s ease-out infinite; }
+  .gz.tap2 .fg { animation: fgTap2 1.8s ease-in-out infinite; }
+  .gz.red .fg { background: #ffd9cf; box-shadow: 0 0 14px 4px rgba(255, 60, 40, 0.8); }
+  .gz.hold::after, .gz.up::after, .gz.down::after, .gz.left::after, .gz.right::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 26px; margin: -13px 0 0 -1.5px; background: linear-gradient(rgba(255,255,255,0.0), rgba(255,255,255,0.3)); transform-origin: 50% 50%; opacity: 0.0; }
+  @keyframes fgMove { 0%, 12% { transform: translate(0, 0) scale(1); opacity: 0.0; } 18% { opacity: 1; } 60% { transform: translate(var(--dx), var(--dy)) scale(0.9); opacity: 1; } 75%, 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+  @keyframes fgLR { 0%, 8% { transform: translate(0, 0); opacity: 0; } 14% { opacity: 1; } 30% { transform: translate(-22px, 0); } 50% { transform: translate(22px, 0); } 56%, 100% { opacity: 0; transform: translate(22px, 0); } }
+  @keyframes fgHold { 0%, 5% { transform: translate(0, 0) scale(1); opacity: 0; } 10% { opacity: 1; } 12%, 50% { transform: translate(0, 0) scale(1.35); } 70% { transform: translate(var(--dx), var(--dy)) scale(0.9); opacity: 1; } 85%, 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+  @keyframes rgHold { 0%, 10% { opacity: 0; transform: scale(1); } 14% { opacity: 1; border-color: rgba(255,255,255,0.9); transform: scale(1.4); } 48% { opacity: 0.9; transform: scale(2.4); border-color: rgba(255,255,255,0.0); } 100% { opacity: 0; } }
+  @keyframes fgTap2 { 0%, 5% { transform: scale(0.6); opacity: 0; } 10% { transform: scale(1.5); opacity: 1; } 20% { transform: scale(0.8); opacity: 0.4; } 32% { transform: scale(1.5); opacity: 1; } 44% { transform: scale(0.8); opacity: 0.2; } 100% { opacity: 0; } }
+
+
+  /* 風纏（地図）と休止 */
+  #map { position: fixed; inset: 0; z-index: 24; background: radial-gradient(120% 90% at 50% 20%, #1a1812, #0a0a0d 80%); overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 28px) 18px 40px; }
+  #map[hidden] { display: none !important; }
+  #map h2 { font-family: var(--display); font-weight: 500; letter-spacing: 0.6em; padding-left: 0.6em; text-align: center; font-size: 22px; margin: 0 0 4px; color: #efe6d2; }
+  #map .mp-sub { text-align: center; font-size: 11px; letter-spacing: 0.3em; color: rgba(230, 220, 195, 0.45); margin-bottom: 22px; }
+  .mw { max-width: 26em; margin: 0 auto 22px; padding: 16px 16px 14px; border: 1px solid rgba(230, 220, 195, 0.16); border-radius: 14px; background: rgba(240, 230, 205, 0.04); }
+  .mw.locked { opacity: 0.4; }
+  .mw h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.4em; font-size: 16px; margin: 0 0 2px; color: #f2e8d0; }
+  .mw .mw-s { font-size: 11px; letter-spacing: 0.15em; color: rgba(230, 220, 195, 0.5); margin-bottom: 10px; }
+  .mn { all: unset; display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 4px; width: 100%; box-sizing: border-box; cursor: pointer; border-top: 1px dashed rgba(230, 220, 195, 0.12); }
+  .mn:first-of-type { border-top: 0; }
+  .mn i { width: 12px; height: 12px; border-radius: 50%; background: #3a3730; justify-self: center; }
+  .mn.on i { background: #ffb36b; box-shadow: 0 0 10px 2px rgba(255, 150, 70, 0.6); }
+  .mn.cur i { background: #fff; box-shadow: 0 0 12px 3px rgba(255, 255, 255, 0.7); }
+  .mn b { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.12em; color: #efe6d2; }
+  .mn small { font-size: 11px; color: rgba(230, 220, 195, 0.5); letter-spacing: 0.08em; }
+  .mn.off { cursor: default; opacity: 0.35; }
+  .mn:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
+  #mapClose { all: unset; display: block; margin: 8px auto 0; font-family: var(--display); font-size: 13px; letter-spacing: 0.3em; color: rgba(230, 220, 195, 0.6); padding: 10px 20px; cursor: pointer; }
+  #pauseBtn { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: calc(env(safe-area-inset-left, 0px) + 12px); z-index: 11; font-family: var(--body); font-size: 12px; letter-spacing: 0.08em; color: var(--mist); background: transparent; border: 1px solid rgba(154, 166, 186, 0.35); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  #pauseBtn[hidden] { display: none !important; }
+  #pause { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(3, 4, 8, 0.97); }
+  #pause[hidden] { display: none !important; }
+  #pause .pz { display: grid; gap: 14px; justify-items: center; }
+  #pause h3 { font-family: var(--display); font-weight: 500; letter-spacing: 0.7em; padding-left: 0.7em; font-size: 20px; margin: 0 0 8px; color: #dfe5f0; }
+  #pause button { all: unset; font-family: var(--display); font-size: 16px; letter-spacing: 0.3em; padding: 12px 26px 12px 30px; border: 1px solid rgba(214, 220, 232, 0.4); border-radius: 999px; color: #e8ecf3; cursor: pointer; min-width: 11em; text-align: center; }
+  #pause button.ghost { font-size: 13px; color: rgba(214, 220, 232, 0.6); border-color: rgba(214, 220, 232, 0.2); }
+  #pause p { margin: 0; font-size: 12px; color: rgba(214, 220, 232, 0.4); letter-spacing: 0.1em; text-align: center; max-width: 18em; line-height: 1.7; }
+
+  /* 技を受け継いだ場面 */
+  #skillGet { position: fixed; inset: 0; z-index: 26; display: grid; place-items: center; background: radial-gradient(90% 70% at 50% 48%, rgba(60, 8, 8, 0.55), rgba(3, 4, 9, 0.93)); padding: 20px; opacity: 0; transition: opacity 0.9s ease; overflow: hidden; }
+  #skillGet[hidden] { display: none !important; }
+  #skillGet.on { opacity: 1; }
+  #skillGet .sg { display: grid; justify-items: center; gap: 14px; text-align: center; max-width: 24em; position: relative; z-index: 2; }
+  #skillGet .sg-k { font-family: var(--display); font-size: 12px; letter-spacing: 0.6em; padding-left: 0.6em; color: rgba(255, 210, 200, 0.7); opacity: 0; }
+  #skillGet.on .sg-k { animation: tIn 1.2s 0.5s ease forwards; }
+  #skillGet .sg-n { font-family: var(--display); font-weight: 800; font-size: clamp(56px, 20vw, 104px); letter-spacing: 0.12em; padding-left: 0.12em; color: #fff3ea; text-shadow: 0 0 34px rgba(255, 70, 40, 0.85), 0 0 80px rgba(255, 40, 20, 0.5); opacity: 0; }
+  #skillGet.on .sg-n { animation: sgStamp 1.1s 1.1s cubic-bezier(.2, .9, .2, 1) forwards; }
+  #skillGet .sg-y { font-family: var(--display); font-size: 14px; letter-spacing: 0.5em; padding-left: 0.5em; color: rgba(255, 220, 210, 0.75); opacity: 0; }
+  #skillGet.on .sg-y { animation: tIn 1.2s 2.0s ease forwards; }
+  #skillGet .sg-g { display: grid; justify-items: center; gap: 8px; opacity: 0; margin-top: 8px; }
+  #skillGet.on .sg-g { animation: tIn 1.2s 2.6s ease forwards; }
+  #skillGet .sg-g .gz { width: 92px; height: 92px; }
+  #skillGet .sg-h { font-family: var(--display); font-size: 15px; letter-spacing: 0.1em; color: #fff; }
+  #skillGet .sg-d { font-size: 13px; color: rgba(255, 220, 210, 0.7); line-height: 1.7; }
+  #skillGet button { all: unset; margin-top: 12px; font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.3em; padding: 10px 26px 10px 30px; border: 1px solid rgba(255, 210, 200, 0.5); border-radius: 999px; color: #ffe9e2; cursor: pointer; opacity: 0; }
+  #skillGet.on button { animation: tIn 1s 3.6s ease forwards; }
+  #skillGet button:focus-visible { outline: 2px solid var(--lantern); outline-offset: 3px; }
+  #skillGet .sg-ring { position: absolute; left: 50%; top: 40%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 2px solid rgba(255, 90, 60, 0.9); opacity: 0; z-index: 1; }
+  #skillGet.on .sg-ring { animation: sgRing 2.2s 1.0s ease-out forwards; }
+  #skillGet.on .sg-ring.r2 { animation-delay: 1.35s; }
+  @keyframes sgStamp { 0% { opacity: 0; transform: scale(1.9); filter: blur(14px); } 40% { opacity: 1; filter: blur(0); } 55% { transform: scale(0.94); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes sgRing { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(34); } }
+
   /* 始めの画面：余白と一行の題だけ。夜の雪原が透けて見える */
   #start { position: fixed; inset: 0; z-index: 20; background: radial-gradient(120% 90% at 50% 45%, rgba(8, 11, 20, 0.55), rgba(4, 6, 12, 0.92)); }
   #start[hidden] { display: none !important; }
@@ -225,6 +302,7 @@
     <label>群れの人数 <select id="dvCount"><option>1</option><option selected>2</option><option>3</option></select></label>
     <label>群れの格 <select id="dvRank"><option value="z">雑兵</option><option value="a">足軽</option><option value="t">手練</option><option value="r">流派の者</option><option value="k">頭</option></select></label>
     <label><input type="checkbox" id="dvGod"> 倒れない（崩しが溜まらない）</label>
+    <label><input type="checkbox" id="dvSkills"> 全部の技を持つ</label>
     <label><input type="checkbox" id="dvAuto"> 自動で遊ぶ（弾き中心）</label>
     <label>時間の速さ <select id="dvSpeed"><option value="0.5">0.5倍</option><option value="1" selected>1倍</option><option value="1.5">1.5倍</option><option value="2">2倍</option></select></label>
     <label><input type="checkbox" id="dvSave"> 進み具合を一合目に戻す</label>
@@ -234,6 +312,24 @@
 
 <div id="hint" hidden><span><b>上</b>斬る</span><span><b>下</b>弾く</span><span><b>左右</b>避ける</span></div>
 
+<div id="map" hidden><h2>風纏</h2><div class="mp-sub">行ったことのある山小屋へ、風に乗って渡る</div><div id="mapBody"></div><button id="mapClose" type="button">戻る</button></div>
+<button id="pauseBtn" type="button" hidden>休止</button>
+<div id="pause" hidden><div class="pz"><h3>休止</h3>
+  <button id="pzResume" type="button">続ける</button>
+  <button id="pzMap" type="button" class="ghost" hidden>地図を開く</button>
+  <button id="pzRetry" type="button" class="ghost">この山小屋から出直す</button>
+  <p>戦いの中では、地図には戻れません。出直すと、倒れたときと同じ山小屋からになります。</p></div></div>
+<div id="tut" aria-live="polite"></div>
+<div id="skillGet" hidden>
+  <span class="sg-ring"></span><span class="sg-ring r2"></span>
+  <div class="sg">
+    <span class="sg-k">技を受け継いだ</span>
+    <span class="sg-n" id="sgName"></span>
+    <span class="sg-y" id="sgYomi"></span>
+    <div class="sg-g"><span id="sgGz"></span><span class="sg-h" id="sgHow"></span><span class="sg-d" id="sgDesc"></span></div>
+    <button id="sgBtn" type="button">つづける</button>
+  </div>
+</div>
 <div id="stageCard" aria-live="polite"></div>
 <div id="end" class="veil" hidden>
   <div class="card end">
@@ -4219,7 +4315,7 @@
     // 山小屋を通り過ぎた所で、合目の名が静かに浮かぶ（画面を切り替えず、歩いたまま次の合目へ入る）
     const next = S.stage + 1;
     S.road = makeRoad(next); S.roadIdx = 0;
-    startTravel(clearD(next, 0), S.road[0], { speed: 5.2, cross: { d: stageStart(next) + HUT_AT, fn: () => { S.stage = next; saveStage(next); showStageCard(next); } } });
+    startTravel(clearD(next, 0), S.road[0], { speed: 5.2, cross: { d: stageStart(next) + HUT_AT, fn: () => { S.stage = next; saveStage(next); noteReach(next); showStageCard(next); if (next === 5 && !mapOwned()) { try { localStorage.setItem('kaze.map', '1'); } catch (e) { /* なくてよい */ } setTimeout(() => showSkillGet('map', null), 1800); } } } });
   }
   function showStageCard(n) {
     const card = document.getElementById('stageCard');
@@ -4300,6 +4396,7 @@
 
   function doInput(dir, tDown) {
     if (!S.started || !dir) return;
+    if (tutEl.classList.contains('on') && S.mode !== 'travel') hideTut();
     if (S.mode === 'victory' && dir === 'U') { chopFollow(); clearTimeout(S.endTimer); S.endTimer = setTimeout(() => (S.devRoad ? showEnd(true) : advanceStage()), 2600); return; }
     if (S.mode === 'travel' && S.memCall && S.gt < S.memCall.until) { memStart(S.memCall.id); return; }   // 鳴った刀に触れる：記憶へ
     if (['victory', 'defeat', 'falling', 'travel', 'memArrive'].includes(S.mode)) return;
@@ -5129,7 +5226,7 @@
   function arrive() {
     const T = S.travel; S.travel = null;
     worldShift(T.targetD);
-    if (T.final) { S.mode = 'victory'; S.modeStart = S.gt; S.p.yaw = Math.PI; clearTimeout(S.endTimer); S.endTimer = setTimeout(() => showEnd(true), 3200); return; }
+    if (T.final) { S.mode = 'victory'; S.modeStart = S.gt; S.p.yaw = Math.PI; clearTimeout(S.endTimer); S.endTimer = setTimeout(() => finishWorld(), 3200); return; }
     S.rule = THEMES[stageOfD(T.targetD)].rule; noteNovel('法則', S.rule);
     if (S.rule === 'wind') S.wind = { dir: S.r() < 0.5 ? 1 : -1, next: S.gt + 3000 + S.r() * 2500 };
     const entry = S.road[S.roadIdx], t = Array.isArray(entry) ? entry[0] : entry;
@@ -6302,6 +6399,7 @@
     try { step(now); } catch (e) { if (!S.loopErr) { S.loopErr = true; console.error(e); } }
   }
   function step(now) {
+    if (S.paused) { last = now; return; }
     const dtReal = Math.min(64, now - last);
     last = now;
     // 時間の流れ：止めきらず（完全に止めると引っかかって見える）、ゆっくりから滑らかに戻す
@@ -6338,6 +6436,123 @@
     if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
   }
   requestAnimationFrame(frame);
+
+
+  // ───────────────────────── 操作の説明の箱と、技を受け継ぐ場面（docs/46） ─────────────────────────
+  const tutEl = document.getElementById('tut');
+  const seenTut = () => { try { return JSON.parse(localStorage.getItem('kaze.tut') || '[]'); } catch (e) { return []; } };
+  const markTut = (ids) => { try { const a = new Set(seenTut()); ids.forEach((i) => a.add(i)); localStorage.setItem('kaze.tut', JSON.stringify([...a])); } catch (e) { /* 保存できなくても遊べる */ } };
+  const gzHTML = (cls) => `<span class="gz ${cls}"><i class="fg"></i><i class="rg"></i></span>`;
+  const BASE_TUT = [{ g: 'up', t: '斬る', s: '上へはじく' }, { g: 'down', t: '弾く', s: '刃が届く直前' }, { g: 'lr left', t: '避ける', s: '左右へはじく' }];
+  const SKILL_TUT = (k) => {
+    const d = SKILLS[k];
+    const g = { hien: 'tap2 red', shippu: 'hold up', kimen: 'hold right', rinka: 'hold left', tsuki: 'hold down' }[k];
+    return { g, t: d.name, s: k === 'hien' ? '素早く二度押し' : '長押し→' + { shippu: '上', kimen: '右', rinka: '左', tsuki: '下' }[k] };
+  };
+  const GETS = { map: { name: '風纏', yomi: 'かぜまとい', kicker: '風を纏う巻物を手に入れた', how: 'タイトルの次に開く', desc: '行ったことのある山小屋へ、風に乗って渡る。戦いの中では開けない', g: 'tap2' } };
+  let tutTimer = 0;
+  function showTut(items, ms, ids) {
+    tutEl.innerHTML = items.map((i) => `<span class="tt">${gzHTML(i.g)}<span>${i.t}</span><small>${i.s}</small></span>`).join('');
+    tutEl.classList.add('on'); clearTimeout(tutTimer);
+    tutTimer = setTimeout(hideTut, ms || 12000);
+    if (ids) markTut(ids);
+  }
+  function hideTut() { tutEl.classList.remove('on'); clearTimeout(tutTimer); }
+  // 始めに出す説明：最初の一度だけ基本の三つ。技を受け継いだあとは、まだ見せていない技を
+  function maybeShowTutorial() {
+    if (S.devRoad) return;
+    const seen = seenTut(), items = [], ids = [];
+    if (!seen.includes('base') && (S.stage || 1) === 1) { items.push(...BASE_TUT); ids.push('base'); }
+    SKILL_ORDER.forEach((k) => { if (S.skills.has(k) && !seen.includes(k)) { items.push(SKILL_TUT(k)); ids.push(k); } });
+    if (items.length) showTut(items, 14000, ids);
+  }
+  const sgEl = document.getElementById('skillGet');
+  function showSkillGet(key, then) {
+    const d = SKILLS[key] || GETS[key], t = d === GETS[key] ? { g: GETS[key].g } : SKILL_TUT(key);
+    document.querySelector('#skillGet .sg-k').textContent = d.kicker || '技を受け継いだ';
+    hideTut();
+    document.getElementById('sgName').textContent = d.name;
+    document.getElementById('sgYomi').textContent = d.yomi;
+    document.getElementById('sgGz').innerHTML = gzHTML(t.g);
+    document.getElementById('sgHow').textContent = d.how;
+    document.getElementById('sgDesc').textContent = d.desc;
+    sgEl.hidden = false; void sgEl.offsetWidth; sgEl.classList.add('on');
+    S.uiBlock = () => true;
+    // 画面の光と音：名が刻まれる瞬間に、白い閃光と納刀の澄んだ音
+    setTimeout(() => { Sound.nou(); Sound.kin(8); fxFlash(0.35, 0.18, 0.12); S.shake = Math.max(S.shake, 0.05); }, 1150);
+    setTimeout(() => { Sound.kin(5); }, 1900);
+    const btn = document.getElementById('sgBtn');
+    btn.onclick = () => { sgEl.classList.remove('on'); setTimeout(() => { sgEl.hidden = true; S.uiBlock = null; if (then) then(); }, 700); btn.onclick = null; };
+    markTut([key]);
+  }
+  // 世界を越えたとき：その世界の最終戦の相手から、技を一つ受け継ぐ
+  const WORLD_REWARD = { 1: 'hien', 2: 'shippu', 3: 'kimen', 4: 'rinka', 5: 'tsuki' };
+  function finishWorld() {
+    const k = WORLD_REWARD[S.world || 1];
+    if (k && !S.skills.has(k)) { S.skills.add(k); saveSkills(); showSkillGet(k, () => showEnd(true)); S.gotSkill = k; }
+    else showEnd(true);
+  }
+
+
+  // ───────────────────────── 世界と地図「風纏」（docs/46） ─────────────────────────
+  // 合目の通し番号：白峰は 1〜10。ほかの世界は、その続き（世界ごとに 5 つの景色）
+  const WORLDS = [
+    { id: 1, name: '白峰', sub: '雪の山　十合', from: 1, to: 10, reward: 'hien' },
+    { id: 2, name: '朱ノ宮', sub: '千本鳥居の谷', from: 11, to: 15, reward: 'shippu' },
+    { id: 3, name: '水月の里', sub: '鏡の湖と沈んだ宿', from: 16, to: 20, reward: 'kimen' },
+    { id: 4, name: '夜桜の城跡', sub: '花嵐の廃城', from: 21, to: 25, reward: 'rinka' },
+    { id: 5, name: '風紋の海', sub: '月の砂の海', from: 26, to: 30, reward: 'tsuki' },
+  ];
+  const worldOf = (n) => (WORLDS.find((w) => n >= w.from && n <= w.to) || WORLDS[0]).id;
+  const loadReach = () => { try { return JSON.parse(localStorage.getItem('kaze.reach') || '{}'); } catch (e) { return {}; } };
+  function noteReach(n) { try { const r = loadReach(), w = worldOf(n); r[w] = Math.max(r[w] || 0, n); localStorage.setItem('kaze.reach', JSON.stringify(r)); } catch (e) { /* 保存できなくても遊べる */ } }
+  const mapOwned = () => { try { return ALL_SKILLS || localStorage.getItem('kaze.map') === '1'; } catch (e) { return false; } };
+  const worldOpen = (w) => ALL_SKILLS || w.id === 1 || (STAGES[w.from] && S.skills.has(WORLDS[w.id - 2].reward));
+  const mapEl = document.getElementById('map');
+  function openMap() {
+    const reach = loadReach(), cur = S.stage || loadStage();
+    const body = document.getElementById('mapBody'); body.innerHTML = '';
+    WORLDS.forEach((w) => {
+      const open = worldOpen(w), built = !!STAGES[w.from];
+      const box = document.createElement('div'); box.className = 'mw' + (open && built ? '' : ' locked');
+      box.innerHTML = `<h3>${w.name}</h3><div class="mw-s">${open && built ? w.sub : built ? '前の山を越えると、道が開く' : 'まだ、霧の中'}</div>`;
+      if (open && built) for (let n = w.to; n >= w.from; n--) {
+        const ok = (reach[w.id] || (w.id === 1 ? loadStage() : 0)) >= n || n === w.from && w.id > 1;
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'mn' + (ok ? ' on' : ' off') + (n === cur ? ' cur' : '');
+        b.innerHTML = `<i></i><b>${ok ? STAGES[n].name + '　' + (THEMES[n] ? THEMES[n].name : '') : '？？？'}</b><small>${ok ? '山小屋' : ''}</small>`;
+        if (ok) b.onclick = () => travelTo(n);
+        box.appendChild(b);
+      }
+      body.appendChild(box);
+    });
+    mapEl.hidden = false; startEl.hidden = true; S.uiBlock = () => true;
+  }
+  function closeMap() { mapEl.hidden = true; S.uiBlock = null; if (!S.started) startEl.hidden = false; }
+  function travelTo(n) {
+    mapEl.hidden = true; S.uiBlock = null; document.getElementById('pause').hidden = true; S.paused = false;
+    endEl.hidden = true; clearTimeout(S.endTimer);
+    S.stage = n; saveStage(n); S.devRoad = null; S.devStart = 0; S.dev = null; S.newRoad = true;
+    warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false;
+    begin(1);
+  }
+  document.getElementById('mapClose').addEventListener('click', () => { if (S.started) { mapEl.hidden = true; S.uiBlock = null; document.getElementById('pause').hidden = false; } else closeMap(); });
+
+  // ── 休止：戦いの中は、地図に戻れない。画面は暗くして、相手の構えを見て備えることもできない ──
+  const pauseBtn = document.getElementById('pauseBtn'), pauseEl = document.getElementById('pause');
+  const canPause = () => S.started && !['defeat', 'victory', 'falling'].includes(S.mode) && !S.rinka && !S.paused && !S.uiBlock;
+  function doPause() {
+    if (!canPause()) return;
+    S.paused = true; S.touch = null; leaveIai();
+    document.getElementById('pzMap').hidden = !(mapOwned() && S.mode === 'travel');   // 歩いて移動している間だけ、地図を開ける
+    pauseEl.hidden = false; hideTut();
+  }
+  function doResume() { pauseEl.hidden = true; S.paused = false; }
+  pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); doPause(); });
+  document.getElementById('pzResume').addEventListener('click', doResume);
+  document.getElementById('pzMap').addEventListener('click', () => { pauseEl.hidden = true; openMap(); });
+  document.getElementById('pzRetry').addEventListener('click', () => { pauseEl.hidden = true; S.paused = false; S.newRoad = true; resetSkillState(); begin(1); });   // 出直す＝倒れたときと同じ（その合目の山小屋から）
+  window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' || ev.key === 'p') { if (S.paused) doResume(); else doPause(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.started && canPause()) doPause(); });
 
   // ───────────────────────── 開始と終了 ─────────────────────────
   const startEl = document.getElementById('start');
@@ -6379,11 +6594,11 @@
     else if (enemy.hatOn()) enemy.dropHat();
     enemy.bladeMat.emissive.set(fromPhase === 2 ? 0x3a0c10 : 0x1a2230);
     S.r = rng((Date.now() ^ (fromPhase * 7919)) >>> 0);
-    if (atHut) { startTravel(cd, S.road[S.roadIdx], { fresh: true }); showStageCard(S.stage); }
+    if (atHut) { startTravel(cd, S.road[S.roadIdx], { fresh: true }); showStageCard(S.stage); setTimeout(maybeShowTutorial, 1800); }
     else if (fromPhase === 1) setMode('intro', 2400); else setMode('stalk', 1400);
     S.tele = S.tele && fromPhase !== 1 ? S.tele : [];
     S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt };
-    S.bestChain = 0;
+    S.bestChain = 0; S.gotSkill = null;
     S.log = []; renderLog();
     showHint();
   }
@@ -6418,21 +6633,21 @@
       if (mode === 'stage') S.devStart = +$('dvStart').value;
       else if (mode === 'enemy') S.devRoad = [findT($('dvEnemy').value)];
       else { const n = +$('dvCount').value, pool = ROSTER.filter((t) => t.rank === RANK_OF[$('dvRank').value]); S.devRoad = [Array.from({ length: n }, () => pick(pool))]; if (n === 1) S.devRoad = [S.devRoad[0][0]]; }
-      S.dev = { god: $('dvGod').checked };
+      S.dev = { god: $('dvGod').checked, skills: $('dvSkills').checked };
       $('devPanel').hidden = true;
-      warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; S.newRoad = true;
+      warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true;
       begin(1);
       S.speed = +$('dvSpeed').value; S.auto = $('dvAuto').checked ? 'sen' : false;
     });
     const st0 = loadStage(); $('tStage').textContent = st0 > 1 ? STAGES[st0].name + 'から' : '';
   }
-  document.getElementById('startBtn').addEventListener('click', () => { S.devRoad = null; S.devStart = 0; S.dev = null; warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; S.newRoad = true; begin(1); });
+  document.getElementById('startBtn').addEventListener('click', () => { Sound.init(); if (mapOwned()) { S.stage = S.stage || loadStage(); openMap(); return; } S.devRoad = null; S.devStart = 0; S.dev = null; warmUp(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true; begin(1); });
   function showEnd(won) {
     const st = S.stats;
     const secs = Math.round((S.gt - st.start) / 1000);
     document.getElementById('endTitle').textContent = won ? (S.devRoad ? '勝負あり' : S.stage >= 10 ? '暁の頂に立った' : (STAGES[S.stage] ? STAGES[S.stage].name : '') + 'を越えた') : '倒れた';
     document.getElementById('endText').textContent = won
-      ? `${secs}秒。弾き ${st.parry}・見切り ${st.mikiri}・反撃 ${st.counter}・出鼻 ${st.debana}・踏み ${st.stomp}・斬り ${st.cut}・被弾 ${st.hits}・最高 ${S.bestChain}連`
+      ? `${S.gotSkill ? '受け継いだ技：' + SKILLS[S.gotSkill].name + '。' : ''}${secs}秒。弾き ${st.parry}・見切り ${st.mikiri}・反撃 ${st.counter}・出鼻 ${st.debana}・踏み ${st.stomp}・斬り ${st.cut}・被弾 ${st.hits}・最高 ${S.bestChain}連`
       : `${STAGES[S.stage] ? STAGES[S.stage].name : ''}の山小屋から、すぐにやり直せます。`;
     document.getElementById('endSummary').textContent = teleSummary();
     document.getElementById('againBtn').textContent = won ? 'もう一度' : 'やり直す';
@@ -6440,7 +6655,7 @@
     S.lastWon = won;
   }
   // 負けたら、この合目の山小屋（始め）から。勝ちきったら、もう一度山を
-  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.memory) { player.resetHat(); player.clearTears(); S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt }; memStart(S.memory.id); return; } S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
+  document.getElementById('againBtn').addEventListener('click', () => { endEl.hidden = true; if (S.memory) { player.resetHat(); player.clearTears(); S.stats = { parry: 0, block: 0, mikiri: 0, counter: 0, debana: 0, stomp: 0, cut: 0, hits: 0, dodges: 0, start: S.gt }; memStart(S.memory.id); return; } if (S.lastWon && !S.devRoad && mapOwned()) { S.started = false; S.mode = 'idle'; openMap(); return; } S.newRoad = true; if (S.lastWon && !S.devRoad) { S.stage = 1; saveStage(1); } begin(1); });
   // 試遊の記録：刃が届くたびの結果と、入力のずれ（刃が届く何ミリ秒前に入れたか）
   // 新しい模様の補充：一分あたりの数と、新しい模様が来なかった最も長い間（遊び始めからの記録）
   function novelSummary() {
@@ -6478,6 +6693,7 @@
     setPhase(n) { S.phase = n; },
     forceMode(m, dur) { if (S.travel) { S.travel.s = S.travel.len; arrive(); } S.action = null; S.queue = []; S.counterUntil = 0; S.P = 0; setMode(m, dur); },
     input(dir) { doInput(dir, S.gt); },
+    skillCard(k) { showSkillGet(k, () => {}); }, tutShow(items) { showTut(items || [...BASE_TUT, SKILL_TUT('hien'), SKILL_TUT('rinka')], 60000); }, finishWorldTest() { S.skills.delete('hien'); S.world = 1; finishWorld(); },
     iaiEnter() { return enterIai(); }, iaiDir(dir) { doIai(dir, S.gt); }, kunai() { return throwKunai(); },
     giveSkills(list) { (list || SKILL_ORDER).forEach((k) => S.skills.add(k)); saveSkills(); },
     skillState() { return { iai: S.iai, arm: S.arm && S.arm.kind, oni: Math.max(0, Math.round(S.oniUntil - S.gt)), rinka: !!S.rinka, kunai: S.kunaiCool.map((t) => Math.max(0, Math.round(t - S.gt))), skills: [...S.skills], B: S.B, ward: S.etype && S.etype.ward || 0, mode: S.mode }; },
