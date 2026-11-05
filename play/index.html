@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 6.4 · 11/05 13:54 · c235f5b</span></span>
+  <span class="t-ver"><span id="ver">試作 6.5 · 11/05 14:28 · d2039a8</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 6.4</span></div></div>
+  <span class="mv">試作 6.5</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -375,7 +375,7 @@
     <label>群れの格 <select id="dvRank"><option value="z">雑兵</option><option value="a">足軽</option><option value="t">手練</option><option value="r">流派の者</option><option value="k">頭</option></select></label>
     <label><input type="checkbox" id="dvGod"> 倒れない（崩しが溜まらない）</label>
     <div class="dvk"><b>持っている技</b>
-      <label><input type="checkbox" id="dvK_hien"> 苦無</label><label><input type="checkbox" id="dvK_shippu"> 居合切り</label><label><input type="checkbox" id="dvK_kimen"> 神纏</label><label><input type="checkbox" id="dvK_rinka"> 神纏切り</label><label><input type="checkbox" id="dvK_tsuki"> 居合</label>
+      <label><input type="checkbox" id="dvK_hien"> クナイ</label><label><input type="checkbox" id="dvK_shippu"> 居合切り</label><label><input type="checkbox" id="dvK_kimen"> 神纏</label><label><input type="checkbox" id="dvK_rinka"> 神纏切り</label><label><input type="checkbox" id="dvK_tsuki"> 居合</label>
       <label><input type="checkbox" id="dvSkills"> 全部</label>
       <small>合目を選ぶと、その手前の世界で得る技にそろいます。あとで外せます</small></div>
     <div class="dvk"><b>地図（保存されます）</b>
@@ -539,7 +539,7 @@
     // 雑兵の武器の技：手裏剣のように投げるクナイ、鎖鎌の分銅、槍の連突き、薙刀の大回し、棒・金砕棒の打ち
     kunaiT:  { key: 'R', O: 160, W: 300, S: 0, F: 240, R: 420, w: 0.5, reach: 99, lunge: 0, ranged: { kind: 'kunai', speed: 21 }, name: 'クナイ投げ' },
     kunaiTF: { key: 'L', O: 40, W: 160, S: 0, F: 220, R: 420, w: 0.5, reach: 99, lunge: 0, ranged: { kind: 'kunai', speed: 22 }, fixed: true, name: '二投目' },
-    hien:    { key: 'R', O: 200, W: 420, S: 0, F: 260, R: 460, w: 0.8, reach: 99, lunge: 0, ranged: { kind: 'hien', speed: 25 }, peril: 'hien', name: '苦無' },   // 赤く光る防御できない投げ。避けるしかない
+    hien:    { key: 'R', O: 200, W: 420, S: 0, F: 260, R: 460, w: 0.8, reach: 99, lunge: 0, ranged: { kind: 'hien', speed: 25 }, peril: 'hien', name: 'クナイ' },   // 赤く光る防御できない投げ。避けるしかない
     chainT:  { key: 'T', O: 260, W: 560, S: 0, F: 420, R: 640, w: 0.9, reach: 99, lunge: 0, ranged: { kind: 'chain', speed: 11 }, name: '分銅打ち' },
     chainTF: { key: 'S', O: 60, W: 300, S: 0, F: 420, R: 640, w: 1.0, reach: 99, lunge: 0, ranged: { kind: 'chain', speed: 12 }, fixed: true, name: '返しの分銅' },
     spearT3: { key: 'T', O: 40, W: 110, S: 120, F: 300, R: 560, w: 0.7, reach: 3.9, lunge: 0.6, fixed: true, name: '連突き' },
@@ -584,8 +584,8 @@
   });
 
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.05, pitch: 0, yaw: 0, roll: 0, lift: 0 }, o);
-  const mirrorX = (p) => pose({ hand: V(-p.hand.x, p.hand.y, p.hand.z), sword: V(-p.sword.x, p.sword.y, p.sword.z), hipX: -p.hipX, hipZ: p.hipZ, crouch: p.crouch, pitch: p.pitch, yaw: -p.yaw, roll: -p.roll, lift: p.lift });
+  const pose = (o) => Object.assign({ hipX: 0, hipZ: 0, crouch: 0.05, pitch: 0, yaw: 0, roll: 0, lift: 0, freeW: 0, free: V(0, 1.2, 0.3) }, o);
+  const mirrorX = (p) => pose({ hand: V(-p.hand.x, p.hand.y, p.hand.z), sword: V(-p.sword.x, p.sword.y, p.sword.z), hipX: -p.hipX, hipZ: p.hipZ, crouch: p.crouch, pitch: p.pitch, yaw: -p.yaw, roll: -p.roll, lift: p.lift, freeW: p.freeW || 0, free: V(-(p.free ? p.free.x : 0), p.free ? p.free.y : 1.2, p.free ? p.free.z : 0.3) });
   const N = (x, y, z) => V(x, y, z).normalize();
 
   // 相手の姿勢（ローカル：前＝+z。相手はこちらを向いているので x は画面の右）。実際より大きく、激しく。
@@ -715,14 +715,16 @@
     issen:   { dur: 2400, keys: [[120, 'issen', easeOut], [1700, 'issen', smooth], [2400, 'guard', smooth]] },   // 残心を保ち、最後にゆっくり構えへ戻す（一気に戻すと刀が跳ねる）
     down:    { dur: 1e9, keys: [[500, 'kneel', easeOut], [1e9, 'kneel', smooth]] },
   };
-  // ── 風の技（docs/46）：居合の構え（鯉口を切って低く待つ）と、そこから出す技、苦無の投げ ──
+  // ── 風の技（docs/46）：居合の構え（鯉口を切って低く待つ）と、そこから出す技、クナイの投げ ──
   Object.assign(PL, {
     iai:     PS({ hand: V(0.38, 0.84, 0.24), sword: N(0.3, -0.22, -0.92), crouch: 0.92, pitch: 0.36, yaw: 1.15, hipX: 0.12, hipZ: -0.14, roll: 0.06 }),   // 居合の構え：腰を深く落とし、柄に手を添え、刀は鞘のまま背へ引く
     iaiDraw: PS({ hand: V(-0.62, 1.1, 0.78), sword: N(-0.98, 0.04, 0.2), crouch: 0.4, pitch: 0.16, yaw: -1.5, hipZ: 0.28, hipX: -0.1 }),   // 抜きつけ：横一文字に抜き払う
     iaiThru: PS({ hand: V(-0.7, 1.0, 0.2), sword: N(-0.8, -0.1, -0.58), crouch: 0.4, pitch: 0.22, yaw: -1.9, hipZ: 0.24 }),
-    throwW:  PS({ hand: V(0.78, 1.98, -0.55), sword: N(0.5, 0.6, -0.62), crouch: 0.34, yaw: 1.65, pitch: -0.28, hipZ: -0.34, hipX: 0.16, roll: -0.12, lift: 0.1 }),   // 苦無・振りかぶり：体を大きくひねり、腕を背の後ろへ引く
-    throwH:  PS({ hand: V(0.15, 1.42, 1.15), sword: N(0.1, 0.05, 1), crouch: 0.52, yaw: -1.0, pitch: 0.34, hipZ: 0.46, hipX: -0.16, roll: 0.1 }),   // 離す瞬間：踏み込み、腕を一気に振り抜く
-    throwF:  PS({ hand: V(-0.15, 0.95, 0.95), sword: N(-0.2, -0.3, 0.9), crouch: 0.6, yaw: -1.5, pitch: 0.42, hipZ: 0.5, hipX: -0.22, roll: 0.14 }),   // 投げ終わり：体が前へ流れる
+    kuDraw:  PS({ hand: V(0.3, 0.95, 0.1), sword: N(0.42, -0.1, -0.9), crouch: 0.34, pitch: 0.12, yaw: 0.2, hipZ: -0.04, freeW: 1, free: V(-0.02, 1.3, 0.24) }),
+    throwW:  PS({ hand: V(0.32, 0.92, 0.06), sword: N(0.4, -0.12, -0.9), crouch: 0.44, pitch: -0.2, yaw: -1.4, hipZ: -0.32, hipX: -0.14, roll: 0.12, freeW: 1, free: V(-0.82, 1.96, -0.55) }),
+    throwH:  PS({ hand: V(0.32, 0.92, 0.06), sword: N(0.4, -0.12, -0.9), crouch: 0.6, pitch: 0.36, yaw: 0.95, hipZ: 0.46, hipX: 0.16, roll: -0.1, freeW: 1, free: V(0.1, 1.4, 1.22) }),
+    throwF:  PS({ hand: V(0.3, 0.95, 0.1), sword: N(0.42, -0.1, -0.9), crouch: 0.64, pitch: 0.46, yaw: 1.4, hipZ: 0.5, hipX: 0.2, roll: -0.14, freeW: 1, free: V(0.58, 0.95, 0.95) }),
+    spinSw:  PS({ hand: V(0.85, 1.22, 0.28), sword: N(1, 0.04, 0.1), crouch: 0.5, pitch: 0.12, yaw: 0, hipX: 0.12, hipZ: 0.05, roll: 0.25 }),
     iaiDip:  PS({ hand: V(0.4, 0.74, 0.18), sword: N(0.3, -0.3, -0.9), crouch: 1.1, pitch: 0.5, yaw: 1.25, hipX: 0.14, hipZ: -0.2, roll: 0.1 }),   // 居合・沈み込み：一気に低く
     kimenC:  PS({ hand: V(0.1, 0.8, 0.5), sword: N(0.3, -0.5, 0.8), crouch: 0.9, pitch: 0.4, yaw: 0.5 }),
     kimenA:  PS({ hand: V(0.1, 2.3, 0.1), sword: N(0.05, 0.6, -0.8), crouch: 0.1, pitch: -0.55, lift: 0.2 }),   // 面を裏返す：刀を高く掲げ、天を仰ぐ
@@ -736,8 +738,8 @@
     tsuki:   { dur: 560, keys: [[30, 'deflect', easeOut], [380, 'deflect', smooth], [560, 'guard', smooth]] },
     kimen:   { dur: 700, keys: [[160, 'kimenA', easeOut], [300, 'kimenA', smooth], [700, 'kimenB', smooth]] },
     kimenEnd: { dur: 420, keys: [[420, 'guard', smooth]] },
-    rinka:   { dur: 1300, keys: [[110, 'iaiDraw', easeIn], [200, 'iaiThru', easeOut], [1050, 'iaiThru', smooth], [1300, 'guard', smooth]] },
-    kunai:   { dur: 460, keys: [[100, 'throwW', easeOut], [150, 'throwH', easeIn], [250, 'throwF', easeOut], [330, 'throwF', smooth], [460, 'guard', smooth]] },
+    rinka:   { dur: 1900, keys: [[110, 'iaiDraw', easeIn], [190, 'iaiThru', easeOut], [330, 'spinSw', easeOut], [1190, 'spinSw', smooth], [1260, 'windUp', easeOut], [1350, 'hitDown', easeIn], [1450, 'thruDown', easeOut], [1900, 'guard', smooth]] },
+    kunai:   { dur: 540, keys: [[85, 'kuDraw', easeOut], [200, 'throwW', easeOut], [250, 'throwH', easeIn], [340, 'throwF', easeOut], [420, 'throwF', smooth], [540, 'guard', smooth]] },
   });
 
   // 手と刀は、直線ではなく肩の前の支点を中心に弧を描いて動く
@@ -763,6 +765,7 @@
     const hipX = lerp(a.hipX, b.hipX, tBody), hipZ = lerp(a.hipZ, b.hipZ, tBody), crouch = lerp(a.crouch, b.crouch, tBody);
     const pitch = lerp(a.pitch, b.pitch, tBody), yaw = lerp(a.yaw, b.yaw, tBody), roll = lerp(a.roll, b.roll, tBody), lift = lerp(a.lift, b.lift, tBody);
     blendArms(a, b, tArm, out);
+    out.freeW = lerp(a.freeW || 0, b.freeW || 0, tArm); if (!out.free) out.free = V(0, 1.2, 0.3); out.free.lerpVectors(a.free || out.free, b.free || out.free, tArm);
     out.hipX = hipX; out.hipZ = hipZ; out.crouch = crouch; out.pitch = pitch; out.yaw = yaw; out.roll = roll; out.lift = lift;
     return out;
   }
@@ -3216,6 +3219,7 @@
         sh.add(tC);
         if (dual && i === 1) { const hh = dLag ? dLag.h : p.hand; hand.set(-hh.x * 0.85 + 0.06, hh.y - 0.1, hh.z * 0.9); }   // 二刀：左手は自分の刀を持ち、右を遅れて映す
         else hand.copy(p.hand).addScaledVector(p.sword, i === 0 ? -0.04 : -TK * 0.72);
+        if (i === 1 && !dual && p.freeW > 0.001) hand.lerp(p.free, p.freeW);   // 空いた手：刀から離れ、懐へ入れ、振り抜く
         tB.copy(hand).sub(sh).normalize();
         wrist.copy(hand).addScaledVector(tB, -BODY.grip);
         bendL.set(sgn * 0.8, -0.5, -0.35);
@@ -4898,7 +4902,7 @@
     let key = token.replace('*', '');
     // 奥の手（関守）：連撃の一手が、弾けない危険な技に置き換わる
     if (S.oku && S.oku.peril && !feint && MOVES[key] && !MOVES[key].fixed && !MOVES[key].peril && S.r() < S.oku.peril) key = S.r() < 0.5 ? 'sweep' : 'pierce';
-    // 苦無（颪）：連撃の始めに、赤く光る投げを混ぜる。弾けない。避けるしかない
+    // クナイ（颪）：連撃の始めに、赤く光る投げを混ぜる。弾けない。避けるしかない
     if (S.etype && S.etype.hien && !feint && MOVES[key] && !MOVES[key].fixed && !MOVES[key].ranged && key !== 'hien' && dist() > 1.6 && S.r() < S.etype.hien) key = 'hien';
     // 様式を変える：同じ斬り方でも、回る・跳ぶ・沈む・速める…のどれで来るかは毎回違う
     const et = S.etype || BOSS;
@@ -6059,7 +6063,7 @@
 
 
 
-  // ── 苦無の刃：木の葉形の鋼の刃、輪のついた柄、赤い刃の縁（防げない印）、後ろに細い尾 ──
+  // ── クナイの刃：木の葉形の鋼の刃、輪のついた柄、赤い刃の縁（防げない印）、後ろに細い尾 ──
   var KUNAI_PARTS = null;
   function makeKunaiMesh() {
     if (!KUNAI_PARTS) {
@@ -6085,9 +6089,9 @@
     return g;
   }
   // ───────────────────────── 風の技（docs/46-skills-and-worlds.md） ─────────────────────────
-  // ステージを越えるたびに一つ、その最終戦の相手から技を受け継ぐ。苦無（二度押し）と、居合の構え（長押し）から出す四つ。
+  // ステージを越えるたびに一つ、その最終戦の相手から技を受け継ぐ。クナイ（二度押し）と、居合の構え（長押し）から出す四つ。
   const SKILLS = {
-    hien:   { name: '苦無', yomi: 'くない', how: '素早く 二度 押す', desc: '赤く光る刃を投げる。防げない一撃で、相手の連撃を断ち切る', from: '颪', icon: 'tap2' },
+    hien:   { name: 'クナイ', yomi: 'くない', how: '素早く 二度 押す', desc: '赤く光る刃を投げる。防げない一撃で、相手の連撃を断ち切る', from: '颪', icon: 'tap2' },
     shippu: { name: '居合切り', yomi: 'いあいぎり', how: '長押し → 上へ', desc: 'どれだけ離れていても詰めて一太刀。雑兵は一度で崩れる', icon: 'up' },
     kimen:  { name: '神纏', yomi: 'かみまとい', how: '長押し → 右へ（相手の刃が届く直前に）', desc: '神を身に纏い、燃える気で攻めが大きく上がる', icon: 'right' },
     rinka:  { name: '神纏切り', yomi: 'かみまといぎり', how: '長押し → 左へ（神纏の間、刃が届く直前に）', desc: '見切りの一閃から、無数の斬撃で相手を貫く', icon: 'left' },
@@ -6171,7 +6175,7 @@
     { const f = dirPE(); tween(S.e, S.e.x + f.x * 1.1, S.e.z + f.z * 1.1, 260, easeOut); }
     S.stagger.vp -= 1.0; S.stats.cut++; addChain();
     pushLog('居合切り', '', `崩し ${Math.round(amt)}`);
-    if (S.B >= 100) breakEnemy(); else setMode('staggered', 700);
+    if (S.B >= 100) breakEnemy(); else softStagger(700);
   }
 
   // ── 神纏：相手の刃が届く直前に右へ。面を裏返し、赤い気をまとう（約9秒） ──
@@ -6191,48 +6195,44 @@
   }
 
   // ── 神纏切り（鬼神解放・見切り切り）：見切りの一閃から、相手のまわりを輪になって斬り巡り、最後に納刀 ──
+  // 見切りの一閃（居合で抜きつける）→ 体ごと三回転して、刀で相手を薙ぎ払う → 縦に一太刀 → 納刀。光は刃の軌跡と当たりの火花だけに絞る
+  const SPIN_T0 = 330, SPIN_DUR = 860, FINISH_T = 1350, RINKA_END = 1900;
   function rinkaStart(a) {
     a.resolved = true; a.missed = true; S.queue = []; S.action = null; S.arm = null;
     S.oniUntil = Math.max(S.oniUntil, S.gt + 5500);
     S.stats.mikiri++; addChain();
-    S.rinka = { t0: S.gt, n: 0, a0: Math.atan2(S.p.x - S.e.x, S.p.z - S.e.z), done: false };
-    S.playerLockUntil = S.gt + 1600;
-    setMode('staggered', 1700);
+    S.rinka = { t0: S.gt, hit0: false, spinHits: 0, finished: false, done: false };
+    S.playerLockUntil = S.gt + RINKA_END + 60;
+    softStagger(RINKA_END + 100);
+    { const f = dirPE(), go = f.d - 1.75; tween(S.p, S.p.x + f.x * go, S.p.z + f.z * go, 130, easeOut); }
     Sound.at(player.chestWorld); Sound.mikiri(); Sound.oni();
-    S.freezeUntil = performance.now() + 130; S.slowUntil = performance.now() + 130 + 260; S.slowScale = 0.45;
-    fxKick(0.012, 0.14, enemy.chestWorld); fxFlash(0.2, 0.04, 0.03);
+    S.freezeUntil = performance.now() + 90; S.slowUntil = performance.now() + 90 + 220; S.slowScale = 0.45;
+    FX.desat = Math.max(FX.desat, 0.35);
     startPA('rinka'); noteNovel('技', '神纏切り');
+    playerTrail.tint(1.3, 0.3, 0.25);
   }
-  function rinkaHit(k) {
-    const R = S.rinka, last = k === 6;
-    const ang = R.a0 + k * (Math.PI * 2 / 6);
+  function rinkaHit(k, big) {
     const ex = S.e.x, ez = S.e.z;
-    if (k > 0) { const r = 1.75; tween(S.p, ex + Math.sin(ang) * r, ez + Math.cos(ang) * r, 90, easeOut); startPA(k % 2 ? 'slash2' : 'slash1'); S.playerLockUntil = S.gt + 1500; }
     tA.copy(enemy.chestWorld).lerp(enemy.hipWorld, 0.2);
-    const amt = k === 0 ? 18 : last ? 20 : 7;
-    landHit(amt, '神纏切り', 'cut', k === 0 || last);
-    S.e.tw = null; S.e.x = ex; S.e.z = ez;   // 中心の相手は動かさない（まわりを斬り巡る）
-    // 貫く斬撃：画面いっぱいに、長い光の刃が相手を貫いて走る（一太刀ごとに数を増やし、最後は大きく）
-    slashThrough(tA, k === 0 ? 7 : last ? 12 : 5, last ? 6.5 : k === 0 ? 5.4 : 4.6, last ? 2.0 : 1.4, 0);
-    if (last) { slashThrough(tA, 4, 9, 3.2, 90); fxFlash(0.22, 0.1, 0.08); }
-    Sound.rinka(k); burst(tA, 24, 2.2, 'crimson'); glowAt(tA, 0.8, 120, 0xffffff);
-    if (!last) S.freezeUntil = performance.now() + 28;
-    S.shake = Math.max(S.shake, 0.03);
+    landHit(k === 0 ? 14 : big ? 24 : 12, '神纏切り', 'cut', !!big);
+    S.e.tw = null; S.e.x = ex; S.e.z = ez;
+    Sound.rinka(k); burst(tA, big ? 46 : 22, big ? 3.2 : 2.4, 'crimson');
+    if (big) slashThrough(tA, 3, 4.2, 0.55, 0);
+    if (!big) S.freezeUntil = performance.now() + 36;
+    S.shake = Math.max(S.shake, big ? 0.05 : 0.03);
   }
   function rinkaEnd() {
     const R = S.rinka; R.done = true;
-    const f = dirPE();
-    tween(S.p, S.e.x - f.x * 2.5, S.e.z - f.z * 2.5, 220, easeOut);
     Sound.at(player.chestWorld); Sound.nou();
-    S.freezeUntil = performance.now() + 180; S.slowUntil = performance.now() + 180 + 500; S.slowScale = 0.35;
-    tA.copy(enemy.chestWorld); fxFlash(0.34, 0.34, 0.38); fxShock(tA, 1.4); ring(S.e.x, S.e.z, 6.0, 0xffffff); glowAt(tA, 2.0, 300, 0xffffff); flare(tA, 3.0, 420, 0xfff0e8); lightAt(tA, 9, 0xffffff);
-    burst(tA, 120, 4.4, 'hot'); smoke(tA, 5, 0.5); camKick(tA, 1.2, 0.5); fxKick(0.016, 0.16, tA); S.fovKick = Math.max(S.fovKick, 8);
-    kickSnow(enemy.hipWorld, 1.4); snowBurst(S.e.x, S.e.z, 1.8);
-    S.playerLockUntil = S.gt + 300;
-    if (S.mode !== 'broken') setMode('staggered', 900);
+    tA.copy(enemy.chestWorld); fxShock(tA, 0.9); ring(S.p.x, S.p.z, 4.2, 0xdfe6f4); snowBurst(S.p.x, S.p.z, 1.0); kickSnow(player.hipWorld, 1.0);
+    S.freezeUntil = performance.now() + 110; S.slowUntil = performance.now() + 110 + 380; S.slowScale = 0.4;
+    camKick(tA, 0.7, 0.25); fxKick(0.008, 0.08, tA); S.fovKick = Math.max(S.fovKick, 5);
+    S.pSpin = 0; S.playerLockUntil = S.gt + 120;
+    if (S.mode === 'broken') issen(); else softStagger(900);
   }
+  function softStagger(ms) { if (!['broken', 'falling', 'victory', 'defeat'].includes(S.mode)) setMode('staggered', ms); }
 
-  // ── 苦無：素早く二度押し。赤い刃を投げる。防げず、相手の技を断ち切る。三本まで（一本は4秒で戻る）、投げる間は返せない ──
+  // ── クナイ：素早く二度押し。赤い刃を投げる。防げず、相手の技を断ち切る。三本まで（一本は4秒で戻る）、投げる間は返せない ──
   const PK = [];
   const PKMESH = [0, 1, 2, 3].map(() => { const g = new THREE.Group(); g.add(makeKunaiMesh()); g.traverse((o) => { o.frustumCulled = false; }); g.visible = false; scene.add(g); return g; });
   function throwKunai() {
@@ -6241,11 +6241,11 @@
     if (i < 0) { Sound.clank(); return false; }
     S.kunaiCool[i] = S.gt + 4000;
     S.guardStart = -1e9; S.tsukiUntil = 0;   // 投げる間は返せない
-    startPA('kunai'); S.playerLockUntil = S.gt + 300;
-    S.kunaiRel = { at: S.gt + 125 };   // 腕が振り抜かれる瞬間に、刃が離れる
+    startPA('kunai'); S.playerLockUntil = S.gt + 420;
+    S.kunaiRel = { at: S.gt + 245 }; S.kunaiDraw = { at: S.gt + 95 };   // 懐から抜き、腕が振り抜かれる瞬間に、刃が離れる
     const f = dirPE(); tween(S.p, S.p.x + f.x * Math.min(0.5, Math.max(0, f.d - 1.9)), S.p.z + f.z * Math.min(0.5, Math.max(0, f.d - 1.9)), 150, easeOut);
     Sound.kunai(); snowBurst(S.p.x, S.p.z, 0.5); kickSnow(player.hipWorld, 0.6); S.fovKick = Math.max(S.fovKick, 3);
-    noteNovel('技', '苦無');
+    noteNovel('技', 'クナイ');
     return true;
   }
   function kunaiHit() {
@@ -6263,8 +6263,8 @@
       S.B = clamp(S.B + gain(8), 0, 100); S.lastPressure = S.gt;
       S.counterUntil = S.gt + 800; S.counterKind = 'parry';
       S.stagger.vx += (S.r() < 0.5 ? -1 : 1) * 1.1; S.stagger.vp -= 0.8;
-      if (S.B >= 100) breakEnemy(); else setMode('staggered', 650);
-      pushLog('苦無', '', '相手の技を断ち切った');
+      if (S.B >= 100) breakEnemy(); else softStagger(650);
+      pushLog('クナイ', '', '相手の技を断ち切った');
     } else {
       S.B = clamp(S.B + gain(3.5), 0, 100); S.lastPressure = S.gt;
       S.flinch = { t0: S.gt, amt: 0.7, side: S.r() < 0.5 ? -1 : 1 };
@@ -6273,44 +6273,42 @@
     }
   }
 
-  // ── 毎コマの更新：苦無の飛行、居合の構えの保ち、神纏の気、神纏切りの進行 ──
+  // ── 毎コマの更新：クナイの飛行、居合の構えの保ち、神纏の気、神纏切りの進行 ──
 
   // ───────── 神纏のオーラ：燃え上がる炎の舌と、細かな雷、足もとの輪、赤く光る眼 ─────────
   const AURA2 = (() => {
     const flameTex = canvasTex(64, 128, (x, w, h) => {
-      for (let L = 0; L < 7; L++) { const k = 1 - L * 0.12, a = 0.16 + L * 0.07; const g = x.createLinearGradient(0, h, 0, 0); g.addColorStop(0, `rgba(255,170,60,${a})`); g.addColorStop(0.45, `rgba(255,60,20,${a * 0.9})`); g.addColorStop(1, 'rgba(120,0,0,0)'); x.fillStyle = g; x.beginPath(); x.moveTo(w / 2, 4 + L * 6); x.bezierCurveTo(w * (0.5 + 0.55 * k), h * 0.45, w * (0.5 + 0.42 * k), h * 0.9, w / 2, h - 4); x.bezierCurveTo(w * (0.5 - 0.42 * k), h * 0.9, w * (0.5 - 0.55 * k), h * 0.45, w / 2, 4 + L * 6); x.fill(); }
+      for (let L = 0; L < 6; L++) { const k = 1 - L * 0.13, a = 0.12 + L * 0.06; const g = x.createLinearGradient(0, h, 0, 0); g.addColorStop(0, `rgba(255,150,50,${a})`); g.addColorStop(0.5, `rgba(235,50,20,${a * 0.9})`); g.addColorStop(1, 'rgba(120,0,0,0)'); x.fillStyle = g; x.beginPath(); x.moveTo(w * 0.56, 6 + L * 8); x.bezierCurveTo(w * (0.5 + 0.5 * k), h * 0.4, w * (0.5 + 0.38 * k), h * 0.9, w / 2, h - 4); x.bezierCurveTo(w * (0.5 - 0.4 * k), h * 0.9, w * (0.5 - 0.5 * k), h * 0.4, w * 0.56, 6 + L * 8); x.fill(); }
     });
-    const flames = Array.from({ length: 20 }, (_, i) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, color: new THREE.Color(1, 0.45 + (i % 4) * 0.12, 0.25) })); sp.visible = false; sp.frustumCulled = false; sp.userData = { ph: i / 20 + Math.random() * 0.05, a0: Math.random() * 6.28, r: 0.28 + Math.random() * 0.22, sp: 0.55 + Math.random() * 0.5 }; scene.add(sp); return sp; });
-    const ARCS = 11, SEG = 6, lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARCS * SEG * 6), 3));
-    const bolts = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0xffc8b0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); bolts.frustumCulled = false; bolts.visible = false; scene.add(bolts);
-    const ringM = new THREE.Mesh(new THREE.RingGeometry(0.35, 1.05, 40), new THREE.MeshBasicMaterial({ color: 0xff3a1a, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); ringM.rotation.x = -Math.PI / 2; ringM.visible = false; scene.add(ringM);
+    const flames = Array.from({ length: 9 }, (_, i) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, color: new THREE.Color(1, 0.4 + (i % 3) * 0.1, 0.22) })); sp.visible = false; sp.frustumCulled = false; sp.userData = { ph: i / 9, a0: Math.random() * 6.28, r: 0.3 + Math.random() * 0.15, sp: 0.5 + Math.random() * 0.35, lean: (Math.random() - 0.5) * 0.5 }; scene.add(sp); return sp; });
+    const base = glowSprite('rgba(255,70,30,0.9)', 0.0, 3); base.visible = false; scene.add(base);
+    const NS = 90, sg = new THREE.BufferGeometry(), sPos = new Float32Array(NS * 3), sLife = new Float32Array(NS); sg.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+    const sparks = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffc89a, size: 0.05, map: softTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); sparks.frustumCulled = false; sparks.visible = false; scene.add(sparks);
+    for (let i = 0; i < NS; i++) sLife[i] = Math.random();
+    const ringM = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.95, 40), new THREE.MeshBasicMaterial({ color: 0xff3a1a, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); ringM.rotation.x = -Math.PI / 2; ringM.visible = false; scene.add(ringM);
     const eyes = [-1, 1].map(() => { const e = glowSprite('rgba(255,60,40,0.95)', 0.0, 0.5); e.visible = false; scene.add(e); return e; });
-    let nextArc = 0; const P0 = V(0, 0, 0), _e = V(0, 0, 0);
+    let lastT = 0; const P0 = V(0, 0, 0), _e = V(0, 0, 0);
     return {
       update(on, t, left) {
-        const vis = on; flames.forEach((f) => { f.visible = vis; }); bolts.visible = vis; ringM.visible = vis; eyes.forEach((e) => { e.visible = vis; });
-        if (!vis) return;
+        flames.forEach((f) => { f.visible = on; }); base.visible = on; sparks.visible = on; ringM.visible = on; eyes.forEach((e) => { e.visible = on; });
+        if (!on) return;
+        const dt = Math.min(0.05, Math.max(0, (t - lastT) * 0.001)); lastT = t;
         P0.copy(player.hipWorld); const foot = P0.y - 0.95, fade = Math.min(1, left * 5);
         flames.forEach((f, i) => {
-          const d = f.userData, ph = (t * 0.001 * d.sp + d.ph) % 1, a = d.a0 + t * 0.0009 * (i % 2 ? 1 : -1), r = d.r * (1 - ph * 0.45);
-          const h = 1.5 * (1 - ph * 0.35), w = 0.75 * (1 - ph * 0.5) + 0.12 * Math.sin(t * 0.02 + i);
-          f.position.set(P0.x + Math.cos(a) * r + Math.sin(t * 0.004 + i) * 0.05, foot + ph * 1.6 + h * 0.5, P0.z + Math.sin(a) * r); f.scale.set(w, h, 1);
-          f.material.opacity = Math.pow(1 - ph, 0.7) * Math.min(1, ph * 9) * 0.95 * fade;
+          const d = f.userData, ph = (t * 0.001 * d.sp + d.ph) % 1, a = d.a0 + t * 0.0007 * (i % 2 ? 1 : -1), r = d.r * (1 - ph * 0.4);
+          const h = 1.25 * (1 - ph * 0.35), w = 0.42 * (1 - ph * 0.45);
+          f.position.set(P0.x + Math.cos(a) * r, foot + 0.1 + ph * 1.35 + h * 0.5, P0.z + Math.sin(a) * r); f.scale.set(w, h, 1); f.material.rotation = d.lean * (1 - ph) + Math.sin(t * 0.006 + i) * 0.08;
+          f.material.opacity = Math.pow(1 - ph, 0.8) * Math.min(1, ph * 10) * 0.5 * fade;
         });
-        // 雷：体から外へ、細かく折れながら走る（約16コマに1回、新しく走り直す）
-        const pos = lg.attributes.position.array;
-        if (t >= nextArc) {
-          nextArc = t + 55 + Math.random() * 40;
-          for (let k = 0; k < ARCS; k++) {
-            const a = Math.random() * 6.28, hh = -0.7 + Math.random() * 1.7; let x = P0.x + Math.cos(a) * 0.3, y = P0.y + hh, z = P0.z + Math.sin(a) * 0.3, dx = Math.cos(a) * 0.55 + (Math.random() - 0.5) * 0.6, dy = 0.25 + Math.random() * 0.7, dz = Math.sin(a) * 0.55 + (Math.random() - 0.5) * 0.6;
-            const dl = Math.hypot(dx, dy, dz); dx /= dl; dy /= dl; dz /= dl;
-            for (let sg = 0; sg < SEG; sg++) { const o = (k * SEG + sg) * 6, st = 0.13 + Math.random() * 0.1; pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; x += dx * st + (Math.random() - 0.5) * 0.16; y += dy * st + (Math.random() - 0.5) * 0.16; z += dz * st + (Math.random() - 0.5) * 0.16; pos[o + 3] = x; pos[o + 4] = y; pos[o + 5] = z; }
-          }
-          lg.attributes.position.needsUpdate = true;
+        base.position.set(P0.x, P0.y - 0.1, P0.z); base.scale.set(2.2, 2.6, 1); base.material.opacity = (0.16 + 0.05 * Math.sin(t * 0.01)) * fade;
+        for (let i = 0; i < NS; i++) {
+          sLife[i] += dt * (0.5 + (i % 5) * 0.12);
+          if (sLife[i] >= 1) { sLife[i] = 0; const a = Math.random() * 6.28, r = 0.18 + Math.random() * 0.3; sPos[i * 3] = P0.x + Math.cos(a) * r; sPos[i * 3 + 1] = foot + Math.random() * 1.5; sPos[i * 3 + 2] = P0.z + Math.sin(a) * r; }
+          sPos[i * 3] += Math.sin(t * 0.008 + i * 1.7) * 0.004; sPos[i * 3 + 1] += dt * (0.7 + (i % 4) * 0.25); sPos[i * 3 + 2] += Math.cos(t * 0.007 + i * 1.3) * 0.004;
         }
-        bolts.material.opacity = (0.55 + 0.45 * Math.random()) * fade;
-        ringM.position.set(P0.x, foot + 0.04, P0.z); const pu = 0.5 + 0.5 * Math.sin(t * 0.012); ringM.scale.setScalar(1 + pu * 0.25); ringM.material.opacity = (0.28 + 0.2 * pu) * fade;
-        [-1, 1].forEach((sd, i) => { player.eyeWorld(sd, _e); eyes[i].position.copy(_e); eyes[i].material.opacity = 0.95 * fade; eyes[i].scale.set(0.34, 0.34, 1); });
+        sg.attributes.position.needsUpdate = true; sparks.material.opacity = 0.9 * fade;
+        ringM.position.set(P0.x, foot + 0.04, P0.z); const pu = 0.5 + 0.5 * Math.sin(t * 0.01); ringM.scale.setScalar(1 + pu * 0.2); ringM.material.opacity = (0.16 + 0.1 * pu) * fade;
+        [-1, 1].forEach((sd, i) => { player.eyeWorld(sd, _e); eyes[i].position.copy(_e); eyes[i].material.opacity = 0.9 * fade; eyes[i].scale.set(0.3, 0.3, 1); });
       },
     };
   })();
@@ -6359,18 +6357,19 @@
   function updateSkills(dtGame) {
     if (!S.started) return;
     const gt = S.gt;
-    // 苦無：腕が振り抜かれた瞬間に、手元が赤くキランと光り、刃が離れる
+    if (S.kunaiDraw && gt >= S.kunaiDraw.at) { S.kunaiDraw = null; const dpe = dirPE(); tC.copy(player.chestWorld).add(V(dpe.x * 0.3, 0, dpe.z * 0.3)); glowAt(tC, 0.28, 110, 0xffffff); }   // 懐から刃が覗く
+    // クナイ：腕が振り抜かれた瞬間に、手元が赤くキランと光り、刃が離れる
     if (S.kunaiRel && gt >= S.kunaiRel.at) {
       S.kunaiRel = null;
       if (inFight() || S.mode === 'staggered') {
-        const from = player.mid.clone(), to = enemy.chestWorld.clone();
+        const dpe = dirPE(), from = player.chestWorld.clone().add(V(dpe.x * 0.5, -0.02, dpe.z * 0.5)), to = enemy.chestWorld.clone();   // 懐から
         const m = PKMESH.find((q) => !q.visible) || PKMESH[0]; m.visible = true; m.position.copy(from); m.lookAt(to);
         PK.push({ m, from, t0: gt, dur: Math.max(90, from.distanceTo(to) / 28 * 1000) });
         Sound.at(from); Sound.peril();
-        glowAt(from, 0.8, 150, 0xff3020, true); flare(from, 1.5, 230, 0xff4030); lightAt(from, 4, 0xff4a30); fxKick(0.006, 0.05, from); camKick(from, 0.5, 0.15);
+        glowAt(from, 0.5, 130, 0xff3020, true); flare(from, 0.9, 170, 0xff4030); fxKick(0.004, 0.04, from); camKick(from, 0.4, 0.1);
       }
     }
-    // 苦無の飛行
+    // クナイの飛行
     for (let i = PK.length - 1; i >= 0; i--) {
       const p = PK[i], u = Math.min(1, (gt - p.t0) / p.dur);
       p.m.position.lerpVectors(p.from, enemy.chestWorld, u); p.m.lookAt(enemy.chestWorld);
@@ -6381,12 +6380,18 @@
     { const kn = document.getElementById('kn'), want = hasSkill('hien'); if (kn.hidden === want) kn.hidden = !want; if (want) [...kn.children].forEach((e, i) => { const off = S.kunaiCool[i] > gt; if (e.classList.contains('off') !== off) e.classList.toggle('off', off); }); }
     if (S.iai && (!S.pa || S.pa.kind !== 'iai')) S.iai = false;
     if (S.iai) { FX.vig = Math.max(FX.vig, 0.32); if (Math.random() < dtGame / 140) { tC.copy(player.mid); glowAt(tC, 0.35, 160, 0xdfeaff); } }   // 構えている間：視界が締まり、刃が冷たく光る
-    // 神纏切りの進行
+    // 神纏切りの進行（体の回転、当たり、締め）
     if (S.rinka) {
       const R = S.rinka, t = gt - R.t0;
-      while (R.n < 7 && t >= 140 + R.n * 105) { rinkaHit(R.n); R.n++; }
-      if (R.n >= 7 && !R.done && t >= 140 + 7 * 105 + 120) rinkaEnd();
-      if (R.done && t >= 140 + 7 * 105 + 700) S.rinka = null;
+      if (!R.hit0 && t >= 135) { R.hit0 = true; rinkaHit(0, false); }
+      if (t >= SPIN_T0 && t < SPIN_T0 + SPIN_DUR) { const u = clamp((t - SPIN_T0) / SPIN_DUR, 0, 1); S.pSpin = 6 * Math.PI * (u * u * (3 - 2 * u)); }
+      else if (t >= SPIN_T0 + SPIN_DUR && S.pSpin) S.pSpin = 0;   // 三回転で元の向き（見た目は変わらない）
+      // 刃が相手の方を向く瞬間（三回転で三度）に、当たる
+      const th = S.pSpin ? S.pSpin : (t >= SPIN_T0 + SPIN_DUR ? 6 * Math.PI : 0);
+      while (R.spinHits < 3 && (t >= SPIN_T0 + SPIN_DUR * (0.12 + R.spinHits * 0.3) )) { R.spinHits++; rinkaHit(R.spinHits, false); }
+      if (!R.finished && t >= FINISH_T) { R.finished = true; rinkaHit(4, true); }
+      if (!R.done && t >= RINKA_END - 150) rinkaEnd();
+      if (R.done && t >= RINKA_END + 100) S.rinka = null;
     }
     // 神纏の気：炎と雷をまとう
     const on = gt < S.oniUntil && !['defeat', 'travel'].includes(S.mode);
@@ -6402,10 +6407,10 @@
       S.oniWas = false; player.bladeMat.emissive.setHex(PB0);
       if (S.started && S.mode !== 'defeat') { burst(player.chestWorld, 40, 2.0, 'crimson'); Sound.at(player.chestWorld); Sound.glint && Sound.glint(); }
     }
-    // 苦無の補充を、足もとのかすかな赤い点で（文字や数字は出さない）
+    // クナイの補充を、足もとのかすかな赤い点で（文字や数字は出さない）
   }
   function resetSkillState() {
-    Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, rinka: null, kunaiCool: [0, 0, 0], shippuReady: 0, kunaiRel: null }); STREAKS.forEach((q) => { q.on = false; q.g.visible = false; });
+    Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, rinka: null, kunaiCool: [0, 0, 0], shippuReady: 0, kunaiRel: null, kunaiDraw: null, pSpin: 0 }); STREAKS.forEach((q) => { q.on = false; q.g.visible = false; });
     PK.forEach((p) => { p.m.visible = false; }); PK.length = 0;
     ONI_AURA.visible = false; AURA2.update(false, 0, 0); player.bladeMat.emissive.setHex(PB0); S.oniWas = false;
   }
@@ -6447,7 +6452,7 @@
     const n = performance.now(), t = ev.timeStamp;
     return (t > 0 && Math.abs(n - t) < 1000) ? t : n;
   }
-  // 押す→すぐ離す＝タップ。二度続けて素早く押す＝苦無。押し続ける（約110ms）＝居合の構え（「カチン」）。そこから上下左右へはじく＝居合の技。
+  // 押す→すぐ離す＝タップ。二度続けて素早く押す＝クナイ。押し続ける（約110ms）＝居合の構え（「カチン」）。そこから上下左右へはじく＝居合の技。
   // それ以外は、はじいた向きで、斬る・弾く・避ける
   const HOLD_MS = 110, DTAP_MS = 320;
   stage.addEventListener('pointerdown', (ev) => {
@@ -6456,7 +6461,7 @@
     if (S.uiBlock && S.uiBlock()) return;
     const tNow = performance.now();
     const touch = { x: ev.clientX, y: ev.clientY, tDown: toGameTime(eventTime(ev)), resolved: false, iai: false, moved: false, real: tNow };
-    // 二度押し：苦無（二度目の押し始めで、すぐ投げる）
+    // 二度押し：クナイ（二度目の押し始めで、すぐ投げる）
     if (S.started && hasSkill('hien') && tNow - S.lastTapUp < DTAP_MS) {
       S.lastTapUp = -1e9; touch.resolved = true; touch.dtap = true; S.touch = touch;
       throwKunai();
@@ -6806,6 +6811,15 @@
     return out;
   }
 
+  // ぬるぬる動かす：姿勢の目標を、時間の窓（τ）でならす。キーの切り替わりでカクつかず、速い所だけ素早く追う
+  const PSM_P = { init: false }, PSM_E = { init: false };
+  function smoothPose(sm, tg, dtMs, tau) {
+    if (!sm.init || dtMs > 200) { sm.init = true; sm.hand = tg.hand.clone(); sm.sword = tg.sword.clone(); sm.free = (tg.free || V(0, 1.2, 0.3)).clone(); ['hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift', 'freeW'].forEach((f) => { sm[f] = tg[f] || 0; }); return sm; }
+    const k = 1 - Math.exp(-Math.max(0, dtMs) / tau);
+    ['hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift', 'freeW'].forEach((f) => { sm[f] += ((tg[f] || 0) - sm[f]) * k; });
+    sm.hand.lerp(tg.hand, k); sm.free.lerp(tg.free || sm.free, k); sm.sword.lerp(tg.sword, k).normalize();
+    return sm;
+  }
   function playerPoseNow() {
     const out = S.playerPose, pa = S.pa;
     // 相手が近いほど、構えが低く締まる
@@ -6860,9 +6874,9 @@
     } else if (S.vanished) { S.vanished = false; enemy.present(true); }
     const pFast = pa && ['slash1', 'slash2', 'slash3', 'counter', 'deflect', 'stomp', 'hit', 'issen', 'dodge', 'shippu', 'kunai', 'kimen', 'tsuki', 'iai', 'armed', 'rinka'].includes(pa.kind) && S.gt - pa.t0 < 480;
     enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
-    enemy.apply(enemyPoseNow(), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z), walk: S.mode === 'memArrive' });
+    enemy.apply(smoothPose(PSM_E, enemyPoseNow(), dtGame, eFast ? 22 : 38), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z), walk: S.mode === 'memArrive' });
     updateWaiting(dtGame);
-    player.apply(playerPoseNow(), S.p.x, S.p.z, S.p.yaw, dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: S.mode === 'travel' ? null : enemy.headWorld, walk: S.mode === 'travel', gy: gyFeet, rootY: S.p.y || 0 });
+    player.apply(smoothPose(PSM_P, playerPoseNow(), dtGame, pFast ? 20 : 34), S.p.x, S.p.z, S.p.yaw + (S.pSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: S.mode === 'travel' || S.pSpin ? null : enemy.headWorld, walk: S.mode === 'travel', gy: gyFeet, rootY: S.p.y || 0 });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
     const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
     const eb = Math.floor(S.gt / ep), pb = Math.floor(S.gt / pp);
@@ -6938,7 +6952,7 @@
     enemyTrail.update(a && !a.feint && S.mode === 'attack' && S.gt >= a.T - a.S - 30 && S.gt <= a.T + a.F, enemy, now);
     const pa = S.pa;
     // 軌跡は振り下ろしの間だけ（振りかぶりで刀を引く動きを拾うと、帯が「く」の字に折れる）
-    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen', 'shippu'].includes(pa.kind) && S.gt - pa.t0 >= (pa.def.keys[0][0] || 0) * 0.85 && S.gt - pa.t0 < (pa.def.hitAt || 120) + 160, player, now);
+    playerTrail.update(pa && ['slash1', 'slash2', 'slash3', 'counter', 'stomp', 'issen', 'shippu', 'rinka'].includes(pa.kind) && S.gt - pa.t0 >= (pa.def.keys[0][0] || 0) * 0.85 && S.gt - pa.t0 < (pa.kind === 'rinka' ? 1600 : (pa.def.hitAt || 120) + 160), player, now);
     if (a && !a.feint && !a.peril && !a.resolved && !a.glinted && S.mode === 'attack' && S.gt >= a.T - 175) { a.glinted = true; tA.copy(enemy.tip).lerp(enemy.mid, 0.3); flare(tA, 0.5, 170, 0xdfe9ff); }
     if (enemy.tip.y < 0.14 && S.B > 70 && now - (S.lastDrag || 0) > 70 && S.mode !== 'falling' && S.mode !== 'victory') { S.lastDrag = now; footprint(enemy.tip.x, enemy.tip.z, S.e.yaw + 1.2); }
     // 危険な技の赤い光：起こりから振り始めまで
@@ -7316,7 +7330,7 @@
     const reached = (n) => { const w = worldOf(n), r = reach[w] || (w === 1 ? Math.min(10, loadStage()) : 0); return devAll || r >= n || (n === WORLDS[w - 1].from && w > 1 && worldOpen(WORLDS[w - 1])); };
     WORLDS.forEach((w) => { const pp = MAP_PTS[w.id]; for (let i = 0; i < pp.length - 1; i++) P.push(edge(pp[i], pp[i + 1], reached(w.from + i + 1))); if (w.id < 6) P.push(edge(pp[pp.length - 1], MAP_PTS[w.id + 1][0], reached(w.to + 1) && worldOpen(WORLDS[w.id]))); });
     // ─ 世界の名と、朱印
-    const SEAL = { 1: '苦無', 2: '居切', 3: '神纏', 4: '神切', 5: '居合' };
+    const SEAL = { 1: 'クナ', 2: '居切', 3: '神纏', 4: '神切', 5: '居合' };
     [['白峰', 296, 1690, 1], ['紅蓮寺', 160, 1112, 2], ['城', 226, 1062, 3], ['水月の里', 196, 724, 4], ['風紋の海', 196, 440, 5], ['雲上の回廊', 196, 126, 6]].forEach(([t, x, y, id]) => {
       const op = WORLDS[id - 1] && worldOpen(WORLDS[id - 1]) && STAGES[WORLDS[id - 1].from];
       P.push(`<text x="${x}" y="${y}" font-size="${t.length > 3 ? 19 : 25}" font-weight="700" fill="${K}" opacity="${op ? 0.86 : 0.45}" letter-spacing="0.2em" text-anchor="middle" style="font-family:var(--display)" paint-order="stroke" stroke="#ecdcae" stroke-width="3">${op ? t : '？？？'}</text>`);
