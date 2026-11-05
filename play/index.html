@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 7.0 · 11/05 16:26 · cd27240</span></span>
+  <span class="t-ver"><span id="ver">試作 7.1 · 11/05 16:45 · 91815d3</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 7.0</span></div></div>
+  <span class="mv">試作 7.1</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -457,6 +457,7 @@
     arena: 7.5,
   };
   const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
+  const WTIME = { value: 0 };   // 世界の時計（秒）：木のそよぎ、星のまたたき
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -957,10 +958,18 @@
     moonCore.position.copy(moonDir).multiplyScalar(69); moonCore.lookAt(0, 0, 0); moonCore.userData.fixed = true; moonCore.userData.kind = 'moon'; scene.add(moonCore);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('rgba(150,170,230,0.35)', 'rgba(150,170,230,0)', 128), fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending }));
     halo.position.copy(moonDir).multiplyScalar(68); halo.scale.set(26, 26, 1); halo.userData.fixed = true; halo.userData.kind = 'moon'; scene.add(halo);
+    // オーロラ：空の遠くに、ゆっくり波打つ光のカーテン
+    {
+      const aur = new THREE.Mesh(new THREE.PlaneGeometry(170, 40, 90, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, uniforms: { uT: { value: 0 }, uA: { value: 0 } },
+        vertexShader: 'varying vec2 vUv; uniform float uT; void main(){ vUv = uv; vec3 p = position; p.y += sin(p.x * 0.06 + uT * 0.25) * 4.0 + sin(p.x * 0.13 - uT * 0.4) * 1.6; p.z += sin(p.x * 0.05) * 9.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+        fragmentShader: 'uniform float uT, uA; varying vec2 vUv; float h(float x){ return fract(sin(x * 127.1) * 43758.5); } void main(){ float x = vUv.x * 14.0; float cu = pow(0.5 + 0.5 * sin(x * 2.1 + uT * 0.5 + sin(x * 0.7 + uT * 0.3) * 2.0), 1.6); float n = 0.6 + 0.4 * sin(vUv.x * 70.0 + uT * 0.8 + h(floor(vUv.x * 70.0)) * 6.0); float v = smoothstep(0.0, 0.12, vUv.y) * pow(1.0 - vUv.y, 1.4); float e = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x); vec3 c = mix(vec3(0.1, 1.0, 0.55), vec3(0.5, 0.25, 0.95), smoothstep(0.35, 1.0, vUv.y)); gl_FragColor = vec4(c * cu * n * v * e * uA * 0.8, 1.0); }' }));
+      aur.position.set(-14, 36, -68); aur.rotation.y = 0.18; aur.renderOrder = -6; aur.userData.fixed = true; aur.userData.kind = 'aurora'; aur.frustumCulled = false; scene.add(aur);
+    }
     // 星
     { const n = 700, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const u = R() * Math.PI * 2, v = 0.08 + Math.pow(R(), 0.7) * 0.9, r = 72; pos.set([Math.cos(u) * Math.cos(Math.asin(v)) * r, v * r, Math.sin(u) * Math.cos(Math.asin(v)) * r], i * 3); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 })); stars.userData.fixed = true; stars.userData.kind = 'stars'; scene.add(stars); }
+      const smat = new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 }); smat.onBeforeCompile = (sh) => { sh.uniforms.uWT = WTIME; sh.vertexShader = 'varying float vTw;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTw = fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);'); sh.fragmentShader = 'varying float vTw; uniform float uWT;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.a *= 0.5 + 0.5 * sin(uWT * (1.5 + vTw * 3.0) + vTw * 40.0);'); }; smat.customProgramCacheKey = () => 'starsTw';
+      const stars = new THREE.Points(g, smat); stars.userData.fixed = true; stars.userData.kind = 'stars'; scene.add(stars); }
     // 山並み：尾根の高さを、いくつもの波の重ね合わせで作る。遠い列ほど霞んで明るく青い。頂は雪で白い
     [[44, 7, 0.0, [0.13, 0.15, 0.24], [0.36, 0.4, 0.52]], [54, 11, 1.7, [0.15, 0.17, 0.27], [0.42, 0.46, 0.58]], [64, 16, 3.1, [0.17, 0.19, 0.3], [0.47, 0.51, 0.63]]].forEach(([rad, amp, ph, rock, snow]) => {
       const N = 220, pos = [], col = [], idx = [];
@@ -1119,8 +1128,12 @@
     if (!renderer.capabilities.isWebGL2) return mat;
     o = Object.assign({ scale: 1.1, bump: 0.5, albedo: 0.22, sparkle: 0 }, o || {});
     mat.onBeforeCompile = (sh) => {
-      sh.uniforms.uDS = { value: o.scale }; sh.uniforms.uDB = { value: o.bump }; sh.uniforms.uDA = { value: o.albedo }; sh.uniforms.uDSp = { value: o.sparkle };
-      sh.vertexShader = 'varying vec3 vDL;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vDL = transformed;');
+      sh.uniforms.uDS = { value: o.scale }; sh.uniforms.uDB = { value: o.bump }; sh.uniforms.uDA = { value: o.albedo }; sh.uniforms.uDSp = { value: o.sparkle }; sh.uniforms.uWT = WTIME; sh.uniforms.uSw = { value: o.sway || 0 };
+      sh.vertexShader = 'varying vec3 vDL; uniform float uWT, uSw;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  vDL = transformed;
+#ifdef USE_INSTANCING
+  if (uSw > 0.0) { vec3 ip = instanceMatrix[3].xyz; float sw = pow(max(transformed.y, 0.0), 1.5) * uSw; float ph = uWT * 1.4 + ip.x * 0.37 + ip.z * 0.29 + transformed.x * 0.5; transformed.x += sin(ph) * sw; transformed.z += cos(ph * 0.8 + 1.3) * sw * 0.6; }   // 木のそよぎ（枝先ほど大きく、一本ごとに位相をずらす）
+#endif`);
       sh.fragmentShader = `varying vec3 vDL; uniform float uDS, uDB, uDA, uDSp;
         float dh31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         float dn(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -1134,7 +1147,7 @@
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   if (uDSp > 0.0) { float gg = dh31(floor(vDL * 52.0)); float tw = step(0.9925, gg) * (0.45 + 0.55 * sin(dot(vViewPosition, vec3(6.0, 4.0, 2.5)) + gg * 60.0)); totalEmissiveRadiance += vec3(0.5, 0.68, 1.0) * max(tw, 0.0) * uDSp; }`);
     };
-    mat.customProgramCacheKey = () => 'wd' + o.scale + ':' + o.bump + ':' + o.albedo + ':' + o.sparkle;
+    mat.customProgramCacheKey = () => 'wd' + o.scale + ':' + o.bump + ':' + o.albedo + ':' + o.sparkle + ':' + (o.sway || 0);
     mat.needsUpdate = true; return mat;
   }
   const GROUND_MAT = toon(0xffffff, { vertexColors: true, map: sparkleTex, roughness: 0.92 });
@@ -1320,7 +1333,7 @@
       PROP.swordKasa = mergeColored([sw, kasaS]);
     }
   }
-  const PROP_MAT = toon(0xffffff, { vertexColors: true, roughness: 0.88 }); addWorldDetail(PROP_MAT, { scale: 2.4, bump: 0.7, albedo: 0.26 });
+  const PROP_MAT = toon(0xffffff, { vertexColors: true, roughness: 0.88 }); addWorldDetail(PROP_MAT, { scale: 2.4, bump: 0.7, albedo: 0.26, sway: 0.0045 });
   const PROP_ICE = toon(0xffffff, { vertexColors: true, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.88, envMapIntensity: 1.4 });
   const PROP_STEEL = toon(0xffffff, { vertexColors: true, roughness: 0.5, metalness: 0.2, envMapIntensity: 1.0 });
   const ICE_PLAIN = toon(0x8fb8e0, { roughness: 0.32, metalness: 0.05, transparent: true, opacity: 0.85, envMapIntensity: 1.3 });
@@ -1335,12 +1348,14 @@
   const mesh = (geo, mat, x, y, z, g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); if (g) g.add(m); return m; };
   const LANTERN_SPOTS = [];   // 灯りの場所（世界の座標）。近い四つに点の光を置く
   const ANIM = [];   // 動く物（風車、幟、焚き火…）。見えている合目の物だけ動かす
+  const POOL_MAT = new THREE.MeshBasicMaterial({ map: radialTexture('rgba(255,170,90,0.6)', 'rgba(255,170,90,0)', 128), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  const addPool = (g, size) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), POOL_MAT); m.rotation.x = -Math.PI / 2; m.position.y = 0.03; g.add(m); };
   function makeLantern(tall) {
     const g = new THREE.Group(); const add = (geo, mat, y) => mesh(geo, mat, 0, y, 0, g);
     add(new THREE.CylinderGeometry(0.24, 0.3, 0.12, 6), STONE, 0.06); add(new THREE.CylinderGeometry(0.08, 0.1, 0.62, 8), STONE, 0.43); add(new THREE.CylinderGeometry(0.2, 0.17, 0.08, 6), STONE, 0.77);
     add(new THREE.CylinderGeometry(0.15, 0.15, 0.22, 6), PAPER, 0.92); add(new THREE.CylinderGeometry(0.17, 0.17, 0.035, 6), STONE, 1.045);
     add(new THREE.ConeGeometry(0.36, 0.2, 6), STONE, 1.16); add(new THREE.ConeGeometry(0.28, 0.1, 6), SNOWM, 1.24); add(new THREE.SphereGeometry(0.06, 8, 6), STONE, 1.3);
-    const hl = glowSprite('rgba(255,179,107,0.9)', 0.55, 1.6); hl.position.y = 0.92; g.add(hl);
+    const hl = glowSprite('rgba(255,179,107,0.9)', 0.55, 1.6); hl.position.y = 0.92; g.add(hl); addPool(g, 3.8);
     if (tall) g.scale.setScalar(1.6);
     return g;
   }
@@ -1937,7 +1952,7 @@
     [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]].forEach(([x, z]) => mesh(new THREE.BoxGeometry(0.04, 0.9, 0.04), DARKWOOD, x, 0.45, z, g));
     mesh(new THREE.BoxGeometry(0.34, 0.5, 0.34), new THREE.MeshBasicMaterial({ color: 0xffc47a }), 0, 0.95, 0, g);
     mesh(new THREE.BoxGeometry(0.4, 0.06, 0.4), DARKWOOD, 0, 1.23, 0, g);
-    const gl = glowSprite('rgba(255,180,100,0.9)', 0.8, 2.2); gl.position.set(0, 0.95, 0); g.add(gl);
+    const gl = glowSprite('rgba(255,180,100,0.9)', 0.8, 2.2); gl.position.set(0, 0.95, 0); g.add(gl); addPool(g, 4.4);
     return g;
   }
   const GOLD = toon(0xc8a030, { roughness: 0.35, metalness: 0.7 }), ROOFT = toon(0x2a2a34, { roughness: 0.8 }), PLASTER = toon(0xb8aa90, { roughness: 0.95 }), REDL = toon(0x8c241a, { roughness: 0.5 }), NOREN = toon(0x2a3a5a, { roughness: 1, side: THREE.DoubleSide }), NIOM = toon(0xa83a20, { roughness: 0.7 });
@@ -2355,6 +2370,14 @@
     const n = 260, p = new Float32Array(n * 3), c = new Float32Array(n * 3); for (let i = 0; i < n; i++) p.set([(Math.random() - 0.5) * 18, Math.random() * 6, (Math.random() - 0.5) * 18], i * 3);
     const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(p, 3)); dg.setAttribute('color', new THREE.BufferAttribute(c, 3));
     AMB.dust = new THREE.Points(dg, new THREE.PointsMaterial({ size: 0.05, map: softTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); AMB.dust.frustumCulled = false; scene.add(AMB.dust);
+    // 足もとの薄い霧：ゆっくり流れる濃淡の層
+    {
+      const c = document.createElement('canvas'); c.width = c.height = 256; const g2 = c.getContext('2d'), im = g2.createImageData(256, 256), rr = rng(33), gr = []; for (let i = 0; i < 17 * 17; i++) gr.push(rr());
+      const sm = (t) => t * t * (3 - 2 * t), nz = (x, y) => { const xi = Math.floor(x) % 16, yi = Math.floor(y) % 16, fx = sm(x - Math.floor(x)), fy = sm(y - Math.floor(y)); const a = gr[yi * 17 + xi], b = gr[yi * 17 + xi + 1], c2 = gr[(yi + 1) * 17 + xi], d2 = gr[(yi + 1) * 17 + xi + 1]; return a + (b - a) * fx + (c2 - a) * fy + (a - b - c2 + d2) * fx * fy; };
+      for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { let v = 0, a = 0.55, f = 4; for (let o = 0; o < 4; o++) { v += nz((x / 256 * f) % 16, (y / 256 * f) % 16) * a; a *= 0.5; f *= 2; } const e = Math.sin(Math.PI * x / 255) * Math.sin(Math.PI * y / 255); const i = (y * 256 + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = 255; im.data[i + 3] = Math.max(0, Math.min(255, (v - 0.35) * 2.0 * 255 * Math.pow(e, 0.6))); }
+      g2.putImageData(im, 0, 0); const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
+      AMB.haze = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, color: 0xaab4cc })); AMB.haze.rotation.x = -Math.PI / 2; AMB.haze.renderOrder = 2; AMB.haze.frustumCulled = false; scene.add(AMB.haze);
+    }
   }
 
   // 遠くの物（空、月、星、山並み）は、カメラについて来る（どこまで歩いても近づかない）
@@ -5908,10 +5931,12 @@
   // 雰囲気：空と霧の色は、いる合目の色へゆっくり移る
   const _fc2 = new THREE.Color();
   // 雰囲気：空・霧・月と星・光・遠景・空気の動きは、いる合目の値へゆっくり移る（合目の境を歩いて越える間に、夜が少しずつ進む）
-  const ATM = { stars: 0.85, moonA: 1, drop: 0, cloud: -30, cloudA: 0, dawn: 0, mist: 0.12, leaves: 0, dust: 0, peakA: 1 };
+  const ATM = { stars: 0.85, moonA: 1, drop: 0, cloud: -30, cloudA: 0, dawn: 0, mist: 0.12, leaves: 0, dust: 0, peakA: 1, aurora: 0 };
+  const AURORA_BY = [0, 0.35, 0.3, 0, 0.7, 0.6, 0.3, 0.2, 0, 0.5, 0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7, 0.7, 0.8, 0.3, 0.7, 0.45, 0.45, 0.3, 0.4, 0.5, 0.4];
+  const auroraFor = (T, d) => (T.indoor || T.roof ? 0 : T.aurora !== undefined ? T.aurora : (AURORA_BY[stageOfD(d)] || 0));
   const _fc3 = new THREE.Color(), _fc4 = new THREE.Color();
   const FIX_KIND = (k) => FIXED.filter((q) => q.o.userData.kind === k).map((q) => q.o);
-  let STARS = null, MOONS = null, RINGS = null;
+  let STARS = null, MOONS = null, RINGS = null, AURORA = null;
   function updateAtmos(dt) {
     const d = S.started ? playerD() : S.originD, T = S.memory ? S.memory.M.theme : themeAt(d), k = 1 - Math.exp(-dt * (S.memory ? 6 : 1.2));
     scene.fog.color.lerp(_fc2.set(T.fog[0]), k); scene.fog.near = lerp(scene.fog.near, T.fog[1], k); scene.fog.far = lerp(scene.fog.far, T.fog[2], k);
@@ -5925,11 +5950,12 @@
     // 月の光と照り返し
     moon.color.lerp(_fc3.set(T.moon[0]).convertSRGBToLinear(), k); moon.intensity = lerp(moon.intensity, T.moon[1], k);
     hemi.color.lerp(_fc3.set(T.hemi[0]).convertSRGBToLinear(), k); hemi.groundColor.lerp(_fc4.set(T.hemi[1]).convertSRGBToLinear(), k); hemi.intensity = lerp(hemi.intensity, T.hemi[2], k);
-    const tgt = { stars: T.stars, moonA: T.moonA, drop: T.drop, cloud: T.cloud === null ? -30 : T.cloud, cloudA: T.cloud === null ? 0 : 0.85, dawn: T.dawn, mist: T.mist, leaves: T.amb === 'leaves' ? 1 : 0, dust: T.amb === 'dust' ? 1 : 0, peakA: T === THEMES[10] || T.noPeak ? 0 : clamp((T.fog[2] - 15) / 40, 0.12, 1) };
+    const tgt = { stars: T.stars, moonA: T.moonA, drop: T.drop, cloud: T.cloud === null ? -30 : T.cloud, cloudA: T.cloud === null ? 0 : 0.85, dawn: T.dawn, mist: T.mist, leaves: T.amb === 'leaves' ? 1 : 0, dust: T.amb === 'dust' ? 1 : 0, aurora: S.memory ? 0 : auroraFor(T, d), peakA: T === THEMES[10] || T.noPeak ? 0 : clamp((T.fog[2] - 15) / 40, 0.12, 1) };
     Object.keys(tgt).forEach((q) => { ATM[q] = lerp(ATM[q], tgt[q], k); });
     if (!STARS) { STARS = FIX_KIND('stars'); MOONS = FIX_KIND('moon'); MOONS.forEach((m) => { m.material.transparent = true; m.userData.op = m.material.opacity; }); }
     STARS.forEach((m) => { m.material.opacity = ATM.stars; m.visible = ATM.stars > 0.02; });
     MOONS.forEach((m) => { m.material.opacity = m.userData.op * ATM.moonA; });
+    if (!AURORA) AURORA = FIX_KIND('aurora'); AURORA.forEach((m) => { m.visible = ATM.aurora > 0.02; m.material.uniforms.uT.value = performance.now() * 0.001; m.material.uniforms.uA.value = ATM.aurora; });
     if (!RINGS) { RINGS = FIX_KIND('ring'); RINGS.forEach((m) => { m.material.transparent = true; }); }
     RINGS.forEach((m) => { m.material.opacity = clamp((T.noPeak ? 0.95 : ATM.peakA * 1.15), 0, 1); m.visible = (T.noRing || T.indoor) ? false : (T.noPeak ? true : ATM.peakA > 0.15); m.material.color.lerp(_fc3.set(T.ring || 0xffffff), k * 0.5); if (!T.ring) m.material.color.lerp(_fc3.set(0xffffff), k * 0.5); });
     AMB.leaves.material.color.lerp(_fc3.set(T.leaf || 0x5a7038).convertSRGBToLinear(), k); AMB.dust.material.color.lerp(_fc3.set(T.dustC || 0xffffff), k);
@@ -5959,6 +5985,7 @@
   const _m4 = new THREE.Matrix4(), _q4 = new THREE.Quaternion(), _e4 = new THREE.Euler(), _v4 = V(0, 0, 0), _s4 = V(1, 1, 1);
   function updateAmbient(dt) {
     const t = performance.now() / 1000, cx = camera.position.x, cz = camera.position.z, gy = S.p.y || 0, wx = WORLD_WIND.x, wz = WORLD_WIND.z;
+    if (AMB.haze) { const hz = AMB.haze; hz.visible = ATM.mist > 0.03 && !S.memory; hz.position.set(cx, gy + 0.32, cz); hz.material.opacity = clamp(ATM.mist * 2.2, 0, 0.55); hz.material.color.copy(scene.fog.color).lerp(_fc3.setRGB(0.8, 0.84, 0.92), 0.5); hz.material.map.offset.set(t * 0.012 + wx * 0.02, t * 0.007); }
     // 霧の帯：地面すれすれを、ゆっくり流れる薄い帯。顔の前を塞がない
     AMB.mist.forEach((m, i) => {
       const dx = m.position.x - cx, dz = m.position.z - cz;
@@ -6889,11 +6916,16 @@
 
   // ぬるぬる動かす：姿勢の目標を、時間の窓（τ）でならす。キーの切り替わりでカクつかず、速い所だけ素早く追う
   const PSM_P = { init: false }, PSM_E = { init: false };
+  // 二次の臨界減衰（スムースダンプ）：目標が急に変わっても、速度が連続して変わる。指数のなじませより、始まりと終わりが滑らか
+  const _smd = (x, v, t, om, dt) => { const k = om * dt, e = 1 / (1 + k + 0.48 * k * k + 0.235 * k * k * k), ch = x - t, tmp = (v + om * ch) * dt; return [t + (ch + tmp) * e, (v - om * tmp) * e]; };
+  const PF = ['hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift', 'freeW'];
   function smoothPose(sm, tg, dtMs, tau) {
-    if (!sm.init || dtMs > 200) { sm.init = true; sm.hand = tg.hand.clone(); sm.sword = tg.sword.clone(); sm.free = (tg.free || V(0, 1.2, 0.3)).clone(); ['hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift', 'freeW'].forEach((f) => { sm[f] = tg[f] || 0; }); return sm; }
-    const k = 1 - Math.exp(-Math.max(0, dtMs) / tau);
-    ['hipX', 'hipZ', 'crouch', 'pitch', 'yaw', 'roll', 'lift', 'freeW'].forEach((f) => { sm[f] += ((tg[f] || 0) - sm[f]) * k; });
-    sm.hand.lerp(tg.hand, k); sm.free.lerp(tg.free || sm.free, k); sm.sword.lerp(tg.sword, k).normalize();
+    if (!sm.init || dtMs > 200) { sm.init = true; sm.hand = tg.hand.clone(); sm.sword = tg.sword.clone(); sm.free = (tg.free || V(0, 1.2, 0.3)).clone(); sm.vel = { hand: V(0, 0, 0), sword: V(0, 0, 0), free: V(0, 0, 0), f: {} }; PF.forEach((f) => { sm[f] = tg[f] || 0; sm.vel.f[f] = 0; }); return sm; }
+    const dt = Math.max(0, dtMs) / 1000; if (dt <= 0) return sm;
+    const om = 2 / (tau * 0.0011);
+    PF.forEach((f) => { const r = _smd(sm[f], sm.vel.f[f], tg[f] || 0, om, dt); sm[f] = r[0]; sm.vel.f[f] = r[1]; });
+    [['hand', tg.hand], ['sword', tg.sword], ['free', tg.free || sm.free]].forEach(([nm, T2]) => { ['x', 'y', 'z'].forEach((ax) => { const r = _smd(sm[nm][ax], sm.vel[nm][ax], T2[ax], om, dt); sm[nm][ax] = r[0]; sm.vel[nm][ax] = r[1]; }); });
+    sm.sword.normalize();
     return sm;
   }
   function playerPoseNow() {
@@ -7042,7 +7074,7 @@
     enemy.bladeMat.emissive.set(perilOn ? 0x7a1010 : (S.phase === 2 ? 0x3a0c10 : 0x1a2230));
     const lt = (clashLightUntil - now) / 220;
     clashLight.intensity = lt > 0 ? clashLightPeak * lt : 0;
-    lanternLights.forEach((l, i) => { l.intensity = (l.userData.on || 0) * (1.25 + Math.sin(now * 0.007 + i) * 0.08 + Math.sin(now * 0.0173 + i * 2) * 0.05); });
+    lanternLights.forEach((l, i) => { l.intensity = (l.userData.on || 0) * (1.25 + Math.sin(now * 0.007 + i) * 0.08 + Math.sin(now * 0.0173 + i * 2) * 0.05 + Math.sin(now * 0.041 + i * 5.3) * Math.sin(now * 0.0113 + i) * 0.1); });   // 炎のゆらぎ（大きな揺れに、細かな揺れが重なる）
   }
 
   // ───────────────────────── カメラ ─────────────────────────
@@ -7079,6 +7111,8 @@
       const rx = -f.z, rz = f.x;
       camPosT.set(S.p.x - f.x * back + rx * 1.05, 3.2 + Math.max(0, f.d - 3) * 0.18, S.p.z - f.z * back + rz * 1.05);
       camLookT.set(S.p.x + f.x * f.d * 0.62, 1.15, S.p.z + f.z * f.d * 0.62);
+      // 緊張：相手の技が刃に近づくほど、わずかに寄り、視野が締まる（息を詰める）。技が終わるとゆっくり戻る
+      { const a2 = S.action; let tn = 0; if (S.mode === 'attack' && a2 && !a2.feint && !a2.resolved) tn = Math.pow(clamp((S.gt - a2.t0) / Math.max(1, a2.T - a2.t0), 0, 1), 2.2); S.tenSm = (S.tenSm || 0) + (tn - (S.tenSm || 0)) * Math.min(1, dt * (tn > (S.tenSm || 0) ? 7 : 3)); camPosT.x += f.x * 0.32 * S.tenSm; camPosT.z += f.z * 0.32 * S.tenSm; camPosT.y -= 0.1 * S.tenSm; }
       // 坂と石段：カメラは主人公の高さについて行き、行く手の高さを見る
       const by = S.p.y || 0; camPosT.y += by; camLookT.y += S.mode === 'travel' ? gyRoot(camLookT.x, camLookT.z) : by;
     }
@@ -7087,7 +7121,7 @@
     camPos.lerp(camPosT, k); camLook.lerp(camLookT, k);
     S.shake = Math.max(0, S.shake - dt * 0.5);
     const t = performance.now();
-    camera.position.set(camPos.x + Math.sin(t * 0.091) * S.shake, camPos.y + Math.sin(t * 0.077) * S.shake * 0.7, camPos.z + Math.cos(t * 0.083) * S.shake * 0.5);
+    camera.position.set(camPos.x + Math.sin(t * 0.00037) * 0.03 + Math.sin(t * 0.091) * S.shake, camPos.y + Math.sin(t * 0.077) * S.shake * 0.7, camPos.z + Math.cos(t * 0.083) * S.shake * 0.5);
     updateKick(dt);
     _cr.setFromMatrixColumn(camera.matrixWorld, 0); _cu.setFromMatrixColumn(camera.matrixWorld, 1);
     camera.position.addScaledVector(_cr, KICK.x * 0.08).addScaledVector(_cu, KICK.y * 0.05);
@@ -7098,7 +7132,7 @@
     placePano();
     S.fovKick = Math.max(0, S.fovKick - dt * 18);
     const base = camera.aspect < 1 ? 54 : 40;
-    const fov = base - S.fovKick;
+    const fov = base - S.fovKick - (S.tenSm || 0) * 2.4;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
   const _db = new THREE.Vector2();
@@ -7143,6 +7177,7 @@
     try { step(now); } catch (e) { if (!S.loopErr) { S.loopErr = true; console.error(e); } }
   }
   function step(now) {
+    WTIME.value = now * 0.001;
     if (S.paused) { last = now; return; }
     if (OVER.on) ovUpdate();
     const dtReal = Math.min(64, now - last);
