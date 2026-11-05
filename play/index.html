@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 6.8 · 11/05 15:19 · 0325695</span></span>
+  <span class="t-ver"><span id="ver">試作 6.9 · 11/05 15:52 · e63b126</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 6.8</span></div></div>
+  <span class="mv">試作 6.9</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -436,8 +436,8 @@
 
   // ───────────────────────── 調整値 ─────────────────────────
   const CFG = {
-    perfectGuard: 200,      // 下を入れてから、この時間内に刃が届けば「弾き」
-    spamGuard: 90,          // 連打すると弾きの時間が短くなる
+    perfectGuard: 290,      // 下を入れてから、この時間内に刃が届けば「弾き」（緩め）
+    spamGuard: 140,          // 連打すると弾きの時間が短くなる
     spamGap: 380,
     guardWin: 450,          // それ以降は「受け」
     perfectDodge: 180,      // 左右を入れてから、この時間内に刃が届けば「見切り」
@@ -5214,8 +5214,8 @@
     if (S.arm && a.T - S.arm.t >= -260 && a.T - S.arm.t <= 1000) return S.arm.kind;   // 神纏・神纏切りの窓：相手の技が始まってから、刃が届いた少しあとまで（かなり緩い）   // 居合の構えからの、神纏・神纏切り
     if (a.peril === 'pierce' && st >= -CFG.lateGrace && st <= CFG.stompWin) return 'stomp';
     if (v >= -CFG.lateGrace && v <= CFG.dodgeWin && !(S.dodgeCramped && HORIZ.has(a.move.key) && !a.move.ranged)) return v <= CFG.perfectDodge ? 'mikiri' : 'dodge';
-    if (g >= -CFG.lateGrace && g <= CFG.guardWin) return a.peril ? 'guardBreak' : (g <= S.guardPerfect ? 'parry' : (S.tsukiUntil > a.T ? 'hit' : 'block'));   // 居合は、狭い窓を外すと受けにもならない
-    if (gt < a.T + CFG.lateGrace) return null;
+    if (g >= -(CFG.lateGrace + 60) && g <= CFG.guardWin) return a.peril ? 'guardBreak' : (g <= S.guardPerfect ? 'parry' : (S.tsukiUntil > a.T ? 'hit' : 'block'));   // 居合は、狭い窓を外すと受けにもならない
+    if (gt < a.T + CFG.lateGrace + 60) return null;   // 弾きの遅れも、少し長く待つ
     return dist() > a.move.reach + 0.15 ? 'miss' : 'hit';
   }
 
@@ -6152,7 +6152,7 @@
     if (dir === 'U') { if (hasSkill('shippu')) shippuGo(); else startPA('iaiOut'); return; }
     if (dir === 'D') {
       if (!hasSkill('tsuki')) { startPA('iaiOut'); return; }
-      S.guardPerfect = 180; S.lastGuard = S.guardStart = tDown; S.tsukiUntil = tDown + 700;
+      S.guardPerfect = 280; S.lastGuard = S.guardStart = tDown; S.tsukiUntil = tDown + 700;
       S.playerLockUntil = S.gt + 120; startPA('tsuki'); noteNovel('技', '居合');
       return;
     }
