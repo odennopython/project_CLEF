@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 6.7 · 11/05 15:15 · c235b9e</span></span>
+  <span class="t-ver"><span id="ver">試作 6.8 · 11/05 15:19 · 0325695</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 6.7</span></div></div>
+  <span class="mv">試作 6.8</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -712,7 +712,7 @@
     dodge:   { dur: 380, keys: [[80, 'dodge', easeOut], [260, 'dodge', smooth], [380, 'guard', smooth]] },
     stomp:   { dur: 540, keys: [[120, 'stomp', easeOut], [300, 'hitDown', easeIn], [540, 'guard', smooth]] },
     hit:     { dur: 600, keys: [[80, 'hit', easeOut], [600, 'guard', smooth]] },
-    issen:   { dur: 2400, keys: [[120, 'issen', easeOut], [1700, 'issen', smooth], [2400, 'guard', smooth]] },   // 残心を保ち、最後にゆっくり構えへ戻す（一気に戻すと刀が跳ねる）
+    issen:   { dur: 2600, keys: [[150, 'issenCoil', easeOut], [330, 'issenRun', easeIn], [440, 'issenSlash', easeIn], [570, 'issenFollow', easeOut], [800, 'issenBrake', smooth], [1550, 'issenBrake', smooth], [1750, 'chiburi', easeOut], [1950, 'chiburi', smooth], [2600, 'guard', smooth]] },   // 残心を保ち、最後にゆっくり構えへ戻す（一気に戻すと刀が跳ねる）
     down:    { dur: 1e9, keys: [[500, 'kneel', easeOut], [1e9, 'kneel', smooth]] },
   };
   // ── 風の技（docs/46）：居合の構え（鯉口を切って低く待つ）と、そこから出す技、クナイの投げ ──
@@ -720,6 +720,12 @@
     iai:     PS({ hand: V(0.38, 0.84, 0.24), sword: N(0.3, -0.22, -0.92), crouch: 0.92, pitch: 0.36, yaw: 1.15, hipX: 0.12, hipZ: -0.14, roll: 0.06 }),   // 居合の構え：腰を深く落とし、柄に手を添え、刀は鞘のまま背へ引く
     iaiDraw: PS({ hand: V(-0.62, 1.1, 0.78), sword: N(-0.98, 0.04, 0.2), crouch: 0.4, pitch: 0.16, yaw: -1.5, hipZ: 0.28, hipX: -0.1 }),   // 抜きつけ：横一文字に抜き払う
     iaiThru: PS({ hand: V(-0.7, 1.0, 0.2), sword: N(-0.8, -0.1, -0.58), crouch: 0.4, pitch: 0.22, yaw: -1.9, hipZ: 0.24 }),
+    issenCoil:   PS({ hand: V(0.55, 0.85, -0.1), sword: N(0.7, -0.3, -0.65), crouch: 0.78, pitch: 0.32, yaw: 0.95, hipZ: -0.22, hipX: 0.1, roll: 0.1 }),   // 勝負の一閃・溜め：深く沈み、体をひねって刀を背へ引く
+    issenRun:    PS({ hand: V(0.32, 1.0, 0.45), sword: N(0.5, -0.1, 0.85), crouch: 0.52, pitch: 0.58, yaw: 0.55, hipZ: 0.22, roll: 0.16, lift: 0.1 }),   // 駆け：低く前のめりに
+    issenSlash:  PS({ hand: V(-0.5, 1.1, 0.8), sword: N(-1, 0.05, 0.2), crouch: 0.56, pitch: 0.38, yaw: -1.3, hipZ: 0.32, hipX: -0.12, roll: -0.1 }),   // すれ違いざま、横一文字
+    issenFollow: PS({ hand: V(-0.75, 1.0, 0.1), sword: N(-0.8, -0.1, -0.55), crouch: 0.64, pitch: 0.38, yaw: -1.95, hipZ: 0.26 }),   // 振り抜き：刀が背の側へ流れ、体が回り切る
+    issenBrake:  PS({ hand: V(-0.5, 1.0, 0.0), sword: N(-0.6, -0.4, -0.7), crouch: 0.96, pitch: 0.4, yaw: -1.7, hipZ: 0.1, hipX: -0.08, roll: -0.1 }),   // 止まる：深く腰を落とし、踏みとどまる（残心）
+    chiburi:     PS({ hand: V(-0.3, 1.3, 0.1), sword: N(-0.4, -0.8, -0.3), crouch: 0.62, pitch: 0.2, yaw: -1.2 }),   // 血振り：刀を振り払う
     kuDraw:  PS({ hand: V(0.3, 0.95, 0.1), sword: N(0.42, -0.1, -0.9), crouch: 0.34, pitch: 0.12, yaw: 0.2, hipZ: -0.04, freeW: 1, free: V(-0.02, 1.3, 0.24) }),
     throwW:  PS({ hand: V(0.32, 0.92, 0.06), sword: N(0.4, -0.12, -0.9), crouch: 0.44, pitch: -0.2, yaw: -1.4, hipZ: -0.32, hipX: -0.14, roll: 0.12, freeW: 1, free: V(-0.82, 1.96, -0.55) }),
     throwH:  PS({ hand: V(0.32, 0.92, 0.06), sword: N(0.4, -0.12, -0.9), crouch: 0.6, pitch: 0.36, yaw: 0.95, hipZ: 0.46, hipX: 0.16, roll: -0.1, freeW: 1, free: V(0.1, 1.4, 1.22) }),
@@ -5373,7 +5379,7 @@
     fxFlash(0.18, 0.18, 0.2); fxShock(enemy.chestWorld, 0.8); fxKick(0.006, 0.06, enemy.chestWorld);   // 画面を白く飛ばさない（斬り抜けの画を見せる）
     const finalCut = S.phase === 2 || (S.etype && !S.etype.boss);
     if (!finalCut) enemy.dropHat();
-    else S.pendingCut = S.gt + 330;   // 勝負の一閃：駆け抜けたあと、一拍おいて相手が斬り分かれる
+    else S.pendingCut = S.gt + 400;   // 勝負の一閃：駆け抜けたあと、一拍おいて相手が斬り分かれる
     snowBurst(S.e.x, S.e.z, 1.6);
     glowAt(enemy.chestWorld, 0.8, 160, 0xffffff);
     tA.copy(enemy.chestWorld);
@@ -5385,7 +5391,10 @@
     const f = dirPE(), sx = -f.z, sz = f.x, side = S.r() < 0.5 ? 1 : -1;
     const ex = S.e.x, ez = S.e.z, px = ex + f.x * 2.1, pz = ez + f.z * 2.1;
     S.passDir = V(f.x, 0, f.z);
-    tween(S.p, px, pz, 230, easeIn);
+    // 駆け抜ける：溜めてから、足を回して走り（足が滑らない）、ゆっくり減速して踏みとどまる
+    S.dashStart = S.gt + 150;
+    tween(S.p, px, pz, 470, (u) => 1 - Math.pow(1 - u, 2.4));
+    S.fxQ = [{ at: S.gt + 600, fn: () => { kickSnow(player.hipWorld, 1.7); snowBurst(S.p.x, S.p.z, 1.5); Sound.step(1); camKick(player.hipWorld, 0.5, 0.2); } }, { at: S.gt + 1780, fn: () => { Sound.chin(); } }];
     const port = camera.aspect < 1 ? 1.35 : 1;
     // 画を置く前に、地面と戦える範囲を確かめる（坂の地面の中、崖の外、岩場の外にカメラを置かない）。入れなければ寄せるか、反対側へ回す
     // 寄せすぎない：まず高さを上げ、反対側へ回り、道の向き（前後）へ回る。距離を縮めるのは最後
@@ -6386,6 +6395,7 @@
       if (u >= 1) { p.m.visible = false; PK.splice(i, 1); if (inFight() || S.mode === 'staggered') kunaiHit(); }
     }
     if (S.arm && gt - S.arm.t > 1600) S.arm = null;
+    if (S.fxQ && S.fxQ.length) S.fxQ = S.fxQ.filter((q) => (gt >= q.at ? (q.fn(), false) : true));
     { const kn = document.getElementById('kn'), want = hasSkill('hien'); if (kn.hidden === want) kn.hidden = !want; if (want) [...kn.children].forEach((e, i) => { const off = S.kunaiCool[i] > gt; if (e.classList.contains('off') !== off) e.classList.toggle('off', off); }); }
     if (S.iai && (!S.pa || S.pa.kind !== 'iai')) S.iai = false;
     if (S.iai) { FX.vig = Math.max(FX.vig, 0.32); if (Math.random() < dtGame / 140) { tC.copy(player.mid); glowAt(tC, 0.35, 160, 0xdfeaff); } }   // 構えている間：視界が締まり、刃が冷たく光る
@@ -6413,7 +6423,7 @@
     // クナイの補充を、足もとのかすかな赤い点で（文字や数字は出さない）
   }
   function resetSkillState() {
-    Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, rinka: null, kunaiCool: [0, 0, 0], shippuReady: 0, kunaiRel: null, kunaiDraw: null, pSpin: 0 }); STREAKS.forEach((q) => { q.on = false; q.g.visible = false; });
+    Object.assign(S, { iai: false, arm: null, tsukiUntil: 0, oniUntil: 0, rinka: null, kunaiCool: [0, 0, 0], shippuReady: 0, kunaiRel: null, kunaiDraw: null, pSpin: 0, fxQ: [], dashStart: 0 }); STREAKS.forEach((q) => { q.on = false; q.g.visible = false; });
     PK.forEach((p) => { p.m.visible = false; }); PK.length = 0;
     ONI_AURA.visible = false; AURA2.update(false, 0, 0); player.bladeMat.emissive.setHex(PB0); S.oniWas = false;
   }
@@ -6889,7 +6899,7 @@
     enemy.setWeapon(S.mode === 'attack' && act && act.move && act.move.key === 'BW' ? 'bow' : 'sword');
     enemy.apply(smoothPose(PSM_E, enemyPoseNow(), dtGame, eFast ? 22 : 38), S.e.x, S.e.z, S.e.yaw + (S.eSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.5); if (landing) kickSnow(at, 0.6); }, { fast: eFast, look: player.headWorld, gy: gyFeet, rootY: gyRoot(S.e.x, S.e.z), walk: S.mode === 'memArrive' });
     updateWaiting(dtGame);
-    player.apply(smoothPose(PSM_P, playerPoseNow(), dtGame, pFast ? 20 : 34), S.p.x, S.p.z, S.p.yaw + (S.pSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: S.mode === 'travel' || S.pSpin ? null : enemy.headWorld, walk: S.mode === 'travel', gy: gyFeet, rootY: S.p.y || 0 });
+    player.apply(smoothPose(PSM_P, playerPoseNow(), dtGame, pFast ? 20 : 34), S.p.x, S.p.z, S.p.yaw + (S.pSpin || 0), dtGame, (at, landing) => { Sound.step(landing ? 1 : 0.4); if (landing) kickSnow(at, 0.7); }, { fast: pFast, look: S.mode === 'travel' || S.pSpin ? null : enemy.headWorld, walk: S.mode === 'travel' || (S.dashStart && S.gt >= S.dashStart && S.gt < S.dashStart + 520), gy: gyFeet, rootY: S.p.y || 0 });
     Sound.blade(0, player.tip, dtGame); Sound.blade(1, enemy.tip, dtGame); Sound.body(player.hipWorld, dtGame);
     const ep = breathPeriod(S.B), pp = breathPeriod(S.P);
     const eb = Math.floor(S.gt / ep), pb = Math.floor(S.gt / pp);
