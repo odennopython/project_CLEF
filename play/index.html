@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 6.6 · 11/05 14:45 · 0a004d9</span></span>
+  <span class="t-ver"><span id="ver">試作 6.7 · 11/05 15:15 · c235b9e</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 6.6</span></div></div>
+  <span class="mv">試作 6.7</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -5205,7 +5205,7 @@
     // 指は置かれたが、向きがまだ決まっていない：少しだけ待つ
     if (S.touch && !S.touch.resolved && a.T - S.touch.tDown < 200 && gt < a.T + 140) return null;
     const g = a.T - S.guardStart, v = a.T - S.dodgeStart, st = a.T - S.stompStart;
-    if (S.arm && a.T - S.arm.t >= -(CFG.lateGrace + 55) && a.T - S.arm.t <= CFG.dodgeWin + 90) return S.arm.kind;   // 神纏・神纏切りの窓は、避けより少しだけ広い   // 居合の構えからの、神纏・神纏切り
+    if (S.arm && a.T - S.arm.t >= -260 && a.T - S.arm.t <= 1000) return S.arm.kind;   // 神纏・神纏切りの窓：相手の技が始まってから、刃が届いた少しあとまで（かなり緩い）   // 居合の構えからの、神纏・神纏切り
     if (a.peril === 'pierce' && st >= -CFG.lateGrace && st <= CFG.stompWin) return 'stomp';
     if (v >= -CFG.lateGrace && v <= CFG.dodgeWin && !(S.dodgeCramped && HORIZ.has(a.move.key) && !a.move.ranged)) return v <= CFG.perfectDodge ? 'mikiri' : 'dodge';
     if (g >= -CFG.lateGrace && g <= CFG.guardWin) return a.peril ? 'guardBreak' : (g <= S.guardPerfect ? 'parry' : (S.tsukiUntil > a.T ? 'hit' : 'block'));   // 居合は、狭い窓を外すと受けにもならない
@@ -6148,7 +6148,8 @@
       return;
     }
     if (dir === 'R' && hasSkill('kimen')) { S.arm = { kind: 'oni', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }
-    if (dir === 'L' && hasSkill('rinka') && S.gt < S.oniUntil) { S.arm = { kind: 'rinka', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }
+    if (dir === 'L' && hasSkill('rinka') && (S.gt < S.oniUntil || !hasSkill('kimen'))) { S.arm = { kind: 'rinka', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }
+    if (dir === 'L' && hasSkill('kimen')) { S.arm = { kind: 'oni', t: tDown }; S.playerLockUntil = S.gt + 160; startPA('armed'); return; }   // 神纏が切れているときの左は、まず神纏を出す
     startPA('iaiOut');   // 持っていない技、神纏のないときの神纏切り：構えを解く
   }
 
@@ -6182,7 +6183,7 @@
   // ── 神纏：相手の刃が届く直前に右へ。面を裏返し、赤い気をまとう（約9秒） ──
   function kimenOn(a) {
     a.resolved = true; a.missed = true; S.queue = []; S.arm = null;
-    S.oniUntil = S.gt + 9000;
+    S.oniUntil = S.gt + 12000;
     S.stats.mikiri++; addChain();
     startPA('kimen'); S.playerLockUntil = S.gt + 260;
     Sound.at(player.headWorld); Sound.oni(); Sound.mikiri();
@@ -6384,7 +6385,7 @@
       { const sp = p.m.children[0] && p.m.children[0].userData.spin; if (sp) sp.rotation.z = (gt - p.t0) * 0.045; }
       if (u >= 1) { p.m.visible = false; PK.splice(i, 1); if (inFight() || S.mode === 'staggered') kunaiHit(); }
     }
-    if (S.arm && gt - S.arm.t > 1300) S.arm = null;
+    if (S.arm && gt - S.arm.t > 1600) S.arm = null;
     { const kn = document.getElementById('kn'), want = hasSkill('hien'); if (kn.hidden === want) kn.hidden = !want; if (want) [...kn.children].forEach((e, i) => { const off = S.kunaiCool[i] > gt; if (e.classList.contains('off') !== off) e.classList.toggle('off', off); }); }
     if (S.iai && (!S.pa || S.pa.kind !== 'iai')) S.iai = false;
     if (S.iai) { FX.vig = Math.max(FX.vig, 0.32); if (Math.random() < dtGame / 140) { tC.copy(player.mid); glowAt(tC, 0.35, 160, 0xdfeaff); } }   // 構えている間：視界が締まり、刃が冷たく光る
