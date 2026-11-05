@@ -334,7 +334,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 7.1</span></span>
+  <span class="t-ver"><span id="ver">試作 7.2</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -342,7 +342,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 7.1</span></div></div>
+  <span class="mv">試作 7.2</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -3984,7 +3984,7 @@
     const gl2 = renderer.capabilities.isWebGL2;
     const MS = gl2 && THREE.WebGLMultisampleRenderTarget;
     const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: gl2 ? THREE.HalfFloatType : THREE.UnsignedByteType };
-    let main = null, bA = null, bB = null, bC = null, bD = null;
+    let main = null, bA = null, bB = null, bC = null, bD = null, light = false;
     const rays = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uC: { value: new THREE.Vector2(0.5, 1) }, uK: { value: 1 } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }', fragmentShader: 'uniform sampler2D tDiffuse; uniform vec2 uC; uniform float uK; varying vec2 vUv; void main(){ vec2 d = (uC - vUv) * 0.85 / 22.0; vec2 uv = vUv; vec3 acc = vec3(0.0); float w = 1.0; for (int i = 0; i < 22; i++) { uv += d; acc += texture2D(tDiffuse, uv).rgb * w; w *= 0.92; } gl_FragColor = vec4(acc / 22.0 * uK, 1.0); }', depthTest: false, depthWrite: false });
     const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
     const bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uThresh: { value: 0.82 } }, vertexShader: VS,
@@ -4054,15 +4054,15 @@
       blur.uniforms.tDiffuse.value = bA.texture; blur.uniforms.uDir.value.set(1 / blur.userData.bw, 0); pass(blur, bB);
       blur.uniforms.tDiffuse.value = bB.texture; blur.uniforms.uDir.value.set(0, 1 / blur.userData.bh); pass(blur, bA);
       // 奥行きのぼけ用：場面を小さくして、ぼかす（二回）
-      blur.uniforms.tDiffuse.value = main.texture; blur.uniforms.uDir.value.set(0, 0); pass(blur, bC);
-      for (let r = 0; r < 2; r++) { blur.uniforms.tDiffuse.value = bC.texture; blur.uniforms.uDir.value.set(1.6 / blur.userData.bw, 0); pass(blur, bD); blur.uniforms.tDiffuse.value = bD.texture; blur.uniforms.uDir.value.set(0, 1.6 / blur.userData.bh); pass(blur, bC); }
+      if (!light) { blur.uniforms.tDiffuse.value = main.texture; blur.uniforms.uDir.value.set(0, 0); pass(blur, bC); }
+      for (let r = 0; r < (light ? 0 : 2); r++) { blur.uniforms.tDiffuse.value = bC.texture; blur.uniforms.uDir.value.set(1.6 / blur.userData.bw, 0); pass(blur, bD); blur.uniforms.tDiffuse.value = bD.texture; blur.uniforms.uDir.value.set(0, 1.6 / blur.userData.bh); pass(blur, bC); }
       // 月の光の筋：月の方向へ、明るい所を引き伸ばす
       const T0 = S.memory ? null : themeAt(S.originD); let rayK = 0;
-      if (T0 && !T0.indoor && !T0.roof && ATM.moonA > 0.2) { _pv.copy(camera.position).addScaledVector(MOON_DIR, 70).project(camera); if (_pv.z < 1) { const mu = (_pv.x + 1) / 2, mv = (_pv.y + 1) / 2, edge = Math.max(Math.abs(_pv.x), Math.abs(_pv.y)); rays.uniforms.uC.value.set(mu, mv); rayK = clamp(1.25 - edge, 0, 1) * ATM.moonA * 0.5; } }
+      if (!light && T0 && !T0.indoor && !T0.roof && ATM.moonA > 0.2) { _pv.copy(camera.position).addScaledVector(MOON_DIR, 70).project(camera); if (_pv.z < 1) { const mu = (_pv.x + 1) / 2, mv = (_pv.y + 1) / 2, edge = Math.max(Math.abs(_pv.x), Math.abs(_pv.y)); rays.uniforms.uC.value.set(mu, mv); rayK = clamp(1.25 - edge, 0, 1) * ATM.moonA * 0.5; } }
       if (rayK > 0.01) { rays.uniforms.tDiffuse.value = bA.texture; pass(rays, bD); }
       const u = comp.uniforms, now = performance.now();
       u.tBlur.value = bC.texture; u.tRays.value = bD.texture; u.uRays.value = rayK > 0.01 ? rayK : 0; u.uTime.value = now * 0.001;
-      u.uGradeS.value.copy(FX.gS); u.uGradeH.value.copy(FX.gH); u.uSat.value = FX.sat; u.uCon.value = FX.con; u.uExp.value = FX.exp; u.uDof.value = S.memory ? 0.6 : 1;
+      u.uGradeS.value.copy(FX.gS); u.uGradeH.value.copy(FX.gH); u.uSat.value = FX.sat; u.uCon.value = FX.con; u.uExp.value = FX.exp; u.uDof.value = light ? 0 : S.memory ? 0.6 : 1;
       const st = (now - FX.shock.t0) / FX.shock.dur;
       u.uShock.value.set(FX.shock.c.x, FX.shock.c.y, st < 1 ? easeOut(st) * 0.55 : 0, st < 1 ? FX.shock.amp * (1 - st) : 0);
       u.uAberr.value = FX.aberr; u.uZoom.value = FX.zoom; u.uZoomC.value.copy(FX.zoomC);
@@ -4070,7 +4070,7 @@
       u.tScene.value = main.texture; u.tBloom.value = bA.texture;
       pass(comp, null);
     }
-    return { size, render, set enabled(v) { enabled = v; } };
+    return { size, render, set enabled(v) { enabled = v; }, set light(v) { light = v; }, get light() { return light; } };
   })();
   // 刃と刃が噛み合う点：二本の刀の中ほどの、さらに中間。胸から頭の高さに収める。
   function clashPoint(out) {
@@ -7161,8 +7161,22 @@
     requestAnimationFrame(frame);
     try { step(now); } catch (e) { if (!S.loopErr) { S.loopErr = true; console.error(e); } }
   }
+  // 自動で軽くする：コマ間隔が長く（約40コマ/秒を切る）続いたら、段階的に重い表現を減らす（滑らかさは、見た目より先に守る）
+  const QUAL = { ema: 16.7, last: 0, level: 0, since: 0 };
+  function adaptQuality(now) {
+    if (QUAL.last) QUAL.ema += (clamp(now - QUAL.last, 4, 120) - QUAL.ema) * 0.04;
+    QUAL.last = now; QUAL.since++;
+    if (!S.started || S.paused || document.hidden || OVER.on || /[?&]hq/.test(location.search)) return;   // ?hq：自動で軽くしない（試験用）
+    if (QUAL.since > 150 && QUAL.level < 3 && QUAL.ema > 25) {
+      QUAL.level++; QUAL.since = 0;
+      if (QUAL.level === 1) Post.light = true;                                   // 奥行きのぼけと月の筋を止める
+      else if (QUAL.level === 2) { renderer.setPixelRatio(1); resize(); }        // 描く細かさを下げる
+      else { renderer.setPixelRatio(0.85); resize(); }                            // さらに下げる（影は三コマに一度）
+      try { console.info('quality level', QUAL.level, 'frame ms', QUAL.ema.toFixed(1)); } catch (e) { /* なくてよい */ }
+    }
+  }
   function step(now) {
-    WTIME.value = now * 0.001;
+    WTIME.value = now * 0.001; adaptQuality(now);
     if (S.paused) { last = now; return; }
     if (OVER.on) ovUpdate();
     const dtReal = Math.min(64, now - last);
@@ -7195,7 +7209,7 @@
     guard('effects', () => updateEffects(dtReal * Math.max(0.15, scale)));
     guard('camera', () => updateCamera(dtReal));
     const tl1 = performance.now();
-    S.frameNo = (S.frameNo || 0) + 1; if (S.frameNo % 2 === 0) renderer.shadowMap.needsUpdate = true;
+    S.frameNo = (S.frameNo || 0) + 1; if (S.frameNo % (QUAL.level >= 3 ? 3 : 2) === 0) renderer.shadowMap.needsUpdate = true;
     Post.render();
     PERF.logic = PERF.logic * 0.95 + (tl1 - tl0) * 0.05; PERF.render = PERF.render * 0.95 + (performance.now() - tl1) * 0.05;
     if (!logEl.hidden && (now | 0) % 6 === 0) renderLog();
@@ -7730,6 +7744,7 @@
   window.__kaeshi = {
     get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, W: S.W, wStage: S.wStage, gt: S.gt, d: dist(), chain: S.chain, pa: S.pa && S.pa.kind, counter: S.gt < S.counterUntil, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0, O: S.action.O } }; },
     setSpeed(v) { S.speed = v; },
+    quality() { return { level: QUAL.level, ms: +QUAL.ema.toFixed(1) }; },
     setAuto(v) { S.auto = v; },
     force(token) { S.queue = []; S.action = null; startAction(token); },
     forcePattern(list) { S.action = null; S.queue = list.slice(1); startAction(list[0]); },
