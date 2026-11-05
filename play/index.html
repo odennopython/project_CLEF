@@ -349,7 +349,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 6.9 · 11/05 15:52 · e63b126</span></span>
+  <span class="t-ver"><span id="ver">試作 7.0 · 11/05 16:26 · cd27240</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -357,7 +357,7 @@
   <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 6.9</span></div></div>
+  <span class="mv">試作 7.0</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -1112,8 +1112,34 @@
   const heightAt = (d, lat) => pathH(d, 0) + relH(d, lat);
   // 地面の質感：きらめく雪
   const sparkleTex = (() => { const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d'); const R = rng(4); x.fillStyle = '#ffffff'; x.fillRect(0, 0, n, n); for (let i = 0; i < 2200; i++) { const v = 200 + Math.floor(R() * 55); x.fillStyle = `rgba(${v - 10},${v - 4},${v},${0.2 + R() * 0.3})`; x.fillRect(R() * n, R() * n, 1 + R() * 2, 1 + R() * 2); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
+
+  // ───────── 質感の底上げ（docs/48）：どの面も平らな一色に見えないよう、物の表面に細かな濃淡・微細な凹凸・雪のきらめきを、シェーダーで足す ─────────
+  // 物の座標（形の中の位置）で作るので、世界をずらしても模様が泳がない
+  function addWorldDetail(mat, o) {
+    if (!renderer.capabilities.isWebGL2) return mat;
+    o = Object.assign({ scale: 1.1, bump: 0.5, albedo: 0.22, sparkle: 0 }, o || {});
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uDS = { value: o.scale }; sh.uniforms.uDB = { value: o.bump }; sh.uniforms.uDA = { value: o.albedo }; sh.uniforms.uDSp = { value: o.sparkle };
+      sh.vertexShader = 'varying vec3 vDL;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vDL = transformed;');
+      sh.fragmentShader = `varying vec3 vDL; uniform float uDS, uDB, uDA, uDSp;
+        float dh31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+        float dn(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(dh31(i), dh31(i + vec3(1,0,0)), f.x), mix(dh31(i + vec3(0,1,0)), dh31(i + vec3(1,1,0)), f.x), f.y), mix(mix(dh31(i + vec3(0,0,1)), dh31(i + vec3(1,0,1)), f.x), mix(dh31(i + vec3(0,1,1)), dh31(i + vec3(1,1,1)), f.x), f.y), f.z); }
+        ` + sh.fragmentShader
+        .replace('#include <color_fragment>', '#include <color_fragment>\n  float dn0 = dn(vDL * uDS); diffuseColor.rgb *= 1.0 - uDA + uDA * 2.0 * dn0;')
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { float hh = dn(vDL * uDS * 3.3) * 0.65 + dn(vDL * uDS * 7.9) * 0.35;
+    vec3 q0 = dFdx(-vViewPosition), q1 = dFdy(-vViewPosition); vec3 R1 = cross(q1, normal), R2 = cross(normal, q0); float fDet = dot(q0, R1) * (float(gl_FrontFacing) * 2.0 - 1.0);
+    vec3 vGrad = sign(fDet) * (dFdx(hh) * R1 + dFdy(hh) * R2); normal = normalize(abs(fDet) * normal - uDB * 0.35 * vGrad); }`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  if (uDSp > 0.0) { float gg = dh31(floor(vDL * 52.0)); float tw = step(0.9925, gg) * (0.45 + 0.55 * sin(dot(vViewPosition, vec3(6.0, 4.0, 2.5)) + gg * 60.0)); totalEmissiveRadiance += vec3(0.5, 0.68, 1.0) * max(tw, 0.0) * uDSp; }`);
+    };
+    mat.customProgramCacheKey = () => 'wd' + o.scale + ':' + o.bump + ':' + o.albedo + ':' + o.sparkle;
+    mat.needsUpdate = true; return mat;
+  }
   const GROUND_MAT = toon(0xffffff, { vertexColors: true, map: sparkleTex, roughness: 0.92 });
   const ICE_MAT = toon(0xffffff, { vertexColors: true, roughness: 0.6, metalness: 0, envMapIntensity: 1.25 });
+  addWorldDetail(GROUND_MAT, { scale: 0.45, bump: 0.42, albedo: 0.16, sparkle: 0.9 }); addWorldDetail(ICE_MAT, { scale: 0.9, bump: 0.5, albedo: 0.15, sparkle: 0.5 });
   function buildGround(s) {
     const T = THEMES[s], d0 = stageStart(s), N = STAGE_LEN, C = 52;
     const lats = []; for (let j = 0; j <= C; j++) { const t = j / C * 2 - 1; lats.push(Math.sign(t) * 54 * Math.pow(Math.abs(t), 1.8)); }
@@ -1294,7 +1320,7 @@
       PROP.swordKasa = mergeColored([sw, kasaS]);
     }
   }
-  const PROP_MAT = toon(0xffffff, { vertexColors: true, roughness: 0.88 });
+  const PROP_MAT = toon(0xffffff, { vertexColors: true, roughness: 0.88 }); addWorldDetail(PROP_MAT, { scale: 2.4, bump: 0.7, albedo: 0.26 });
   const PROP_ICE = toon(0xffffff, { vertexColors: true, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.88, envMapIntensity: 1.4 });
   const PROP_STEEL = toon(0xffffff, { vertexColors: true, roughness: 0.5, metalness: 0.2, envMapIntensity: 1.0 });
   const ICE_PLAIN = toon(0x8fb8e0, { roughness: 0.32, metalness: 0.05, transparent: true, opacity: 0.85, envMapIntensity: 1.3 });
@@ -1302,6 +1328,7 @@
   const WORLD_WIND = V(0, 0, 0);   // 吹雪の風（羽織と雪を流す）
   // ── 建物と目印 ──
   const STONE = toon(0x4a4c58), SNOWM = toon(0x8590a8), WOOD = toon(0x3a2a20, { roughness: 0.85 }), DARKWOOD = toon(0x241a15), VERMIL = toon(0x8c2a24, { roughness: 0.7 }), PAPER = new THREE.MeshBasicMaterial({ color: 0xffc37e }), ROPE = toon(0x8a7556);
+  [STONE, SNOWM, WOOD, DARKWOOD, VERMIL].forEach((m, k) => addWorldDetail(m, { scale: k === 0 ? 3.0 : k === 1 ? 2.2 : 4.0, bump: k === 0 ? 1.2 : 0.7, albedo: k === 1 ? 0.12 : 0.3 }));
   const PAPERW = toon(0xe6e2d8, { side: THREE.DoubleSide, roughness: 0.9 }), CLOTH = toon(0x22232c, { side: THREE.DoubleSide }), STRAW = toon(0xa88d52), BRONZE = toon(0x4a3d2c, { metalness: 0.6, roughness: 0.45 }), FELT = toon(0x9b1e1c, { roughness: 0.95 }), FOXW = toon(0xdcdad2, { roughness: 0.7 }), BARK = toon(0x2c2018, { roughness: 0.95 }), IRON = toon(0x5a5e66, { metalness: 0.8, roughness: 0.4 }), EMBER = new THREE.MeshBasicMaterial({ color: 0xff7a2a }), DARK = new THREE.MeshBasicMaterial({ color: 0x07080c });
   const BIB = toon(0x9a2620, { roughness: 0.9 });
   const glowSprite = (col, op, sc) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(col, col.replace(/[\d.]+\)$/, '0)')), transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.set(sc, sc, 1); return s; };
@@ -1856,6 +1883,7 @@
 
   // ───────── 新しい世界の情景（docs/46）：作りは白峰と同じ。物の組み合わせを替えて、別の場所にする ─────────
   const SAND = toon(0x6a5e48, { roughness: 0.95 }), WATER_MAT = toon(0x0a2038, { roughness: 0.3, metalness: 0.1, envMapIntensity: 0.5, transparent: true, opacity: 0.95 }), BOATWOOD = toon(0x3a2a22, { roughness: 0.9 });
+  [SAND, BOATWOOD].forEach((m) => addWorldDetail(m, { scale: 3, bump: 0.8, albedo: 0.28 })); addWorldDetail(WATER_MAT, { scale: 0.5, bump: 0.35, albedo: 0.05 });
   function makeBoat() {
     const g = new THREE.Group();
     const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.34, 3.6, 5, 1, false, 0, Math.PI), BOATWOOD); hull.rotation.set(Math.PI / 2, 0, Math.PI / 2); hull.scale.set(1, 1, 0.55); hull.position.y = 0.2; g.add(hull);
@@ -2508,7 +2536,7 @@
   diffuseColor.rgb *= 1.0 + 0.06 * (dH - 0.3) * dFade;` + (pal ? PAL_GLSL : ''))
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { vec3 sp = -vViewPosition; vec3 sx = dFdx(sp), sy = dFdy(sp);
-    float hh = dH * dAmp * dFade;
+    float hh = dH * dAmp * dFade * 3.2 + ((dId > 2.5 && dId < 9.5) ? (dNoise(vOP * 9.0) * 0.6 + dNoise(vOP * 21.0) * 0.4) * 0.0042 : 0.0);   // 糸の目に加え、布のゆるいしわ
     vec2 dh = vec2(dFdx(hh), dFdy(hh));
     vec3 R1 = cross(sy, normal), R2 = cross(normal, sx);
     float det = dot(sx, R1);
@@ -3942,23 +3970,27 @@
 
   // ───────────────────────── 後処理（画面全体のエフェクト） ─────────────────────────
   // 光のにじみ、衝撃波の揺らぎ、色のにじみ、中心へ向かう速度のぼかし、色を抜く、視界の端の暗さ
-  const FX = { shock: { t0: -1e9, c: new THREE.Vector2(0.5, 0.5), dur: 420, amp: 0 }, aberr: 0, zoom: 0, zoomC: new THREE.Vector2(0.5, 0.5), desat: 0, flash: new THREE.Color(0, 0, 0), vig: 0.35 };
+  const FX = { shock: { t0: -1e9, c: new THREE.Vector2(0.5, 0.5), dur: 420, amp: 0 }, aberr: 0, zoom: 0, zoomC: new THREE.Vector2(0.5, 0.5), desat: 0, flash: new THREE.Color(0, 0, 0), vig: 0.35, gS: new THREE.Vector3(0.93, 1, 1.1), gH: new THREE.Vector3(1.07, 1, 0.93), sat: 1.1, con: 1.07, exp: 1.0 };
+  const MOON_DIR = V(-0.55, 0.42, -0.72).normalize(), _pv = V(0, 0, 0);
   const Post = (() => {
     const gl2 = renderer.capabilities.isWebGL2;
     const MS = gl2 && THREE.WebGLMultisampleRenderTarget;
     const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: gl2 ? THREE.HalfFloatType : THREE.UnsignedByteType };
-    let main = null, bA = null, bB = null;
+    let main = null, bA = null, bB = null, bC = null, bD = null;
+    const rays = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uC: { value: new THREE.Vector2(0.5, 1) }, uK: { value: 1 } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }', fragmentShader: 'uniform sampler2D tDiffuse; uniform vec2 uC; uniform float uK; varying vec2 vUv; void main(){ vec2 d = (uC - vUv) * 0.85 / 22.0; vec2 uv = vUv; vec3 acc = vec3(0.0); float w = 1.0; for (int i = 0; i < 22; i++) { uv += d; acc += texture2D(tDiffuse, uv).rgb * w; w *= 0.92; } gl_FragColor = vec4(acc / 22.0 * uK, 1.0); }', depthTest: false, depthWrite: false });
     const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
     const bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uThresh: { value: 0.82 } }, vertexShader: VS,
       fragmentShader: 'uniform sampler2D tDiffuse; uniform float uThresh; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(uThresh, uThresh + 0.35, l), 1.0); }', depthTest: false, depthWrite: false });
     const blur = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2(1, 0) } }, vertexShader: VS,
       fragmentShader: 'uniform sampler2D tDiffuse; uniform vec2 uDir; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb * 0.227; c += (texture2D(tDiffuse, vUv + uDir * 1.385).rgb + texture2D(tDiffuse, vUv - uDir * 1.385).rgb) * 0.316; c += (texture2D(tDiffuse, vUv + uDir * 3.231).rgb + texture2D(tDiffuse, vUv - uDir * 3.231).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }', depthTest: false, depthWrite: false });
     const comp = new THREE.ShaderMaterial({
-      uniforms: { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uShock: { value: new THREE.Vector4(0.5, 0.5, 0, 0) }, uAberr: { value: 0 }, uZoom: { value: 0 }, uZoomC: { value: new THREE.Vector2(0.5, 0.5) }, uDesat: { value: 0 }, uFlash: { value: new THREE.Vector3() }, uVig: { value: 0.35 }, uBloom: { value: 0.9 }, uCold: { value: 0 } },
+      uniforms: { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uShock: { value: new THREE.Vector4(0.5, 0.5, 0, 0) }, uAberr: { value: 0 }, uZoom: { value: 0 }, uZoomC: { value: new THREE.Vector2(0.5, 0.5) }, uDesat: { value: 0 }, uFlash: { value: new THREE.Vector3() }, uVig: { value: 0.35 }, uBloom: { value: 0.9 }, uCold: { value: 0 }, tBlur: { value: null }, tRays: { value: null }, uGradeS: { value: new THREE.Vector3(0.93, 1, 1.1) }, uGradeH: { value: new THREE.Vector3(1.07, 1, 0.93) }, uSat: { value: 1.1 }, uCon: { value: 1.07 }, uRays: { value: 0 }, uDof: { value: 1 }, uTime: { value: 0 }, uExp: { value: 1.0 } },
       vertexShader: VS, depthTest: false, depthWrite: false,
       fragmentShader: `
         uniform sampler2D tScene, tBloom; uniform vec2 uRes, uZoomC; uniform vec4 uShock;
-        uniform float uAberr, uZoom, uDesat, uVig, uBloom, uCold; uniform vec3 uFlash; varying vec2 vUv;
+        uniform float uAberr, uZoom, uDesat, uVig, uBloom, uCold, uSat, uCon, uRays, uDof, uTime, uExp; uniform vec3 uFlash, uGradeS, uGradeH; uniform sampler2D tBlur, tRays; varying vec2 vUv;
+        vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+        float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
         vec3 toSRGB(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
         void main(){
           vec2 uv = vUv;
@@ -3976,14 +4008,21 @@
             col += vec3(texture2D(tScene, suv + ca).r, texture2D(tScene, suv).g, texture2D(tScene, suv - ca).b);
           }
           col /= n;
+          { float dofT = smoothstep(0.70, 0.98, vUv.y) * 0.9 + smoothstep(0.16, 0.0, vUv.y) * 0.5; col = mix(col, texture2D(tBlur, uv).rgb, clamp(dofT * uDof, 0.0, 0.92)); }   // 奥行きのぼけ：画面の上＝遠景、下の端＝手前
           col += texture2D(tBloom, uv).rgb * uBloom;
+          col += texture2D(tRays, uv).rgb * uRays;
           float l = dot(col, vec3(0.299, 0.587, 0.114));
           col = mix(col, vec3(l) * vec3(0.86, 0.95, 1.12), uDesat);
           col = mix(col, col * vec3(0.8, 0.92, 1.18), uCold);
           col += uFlash;
           float v = smoothstep(0.95, 0.2, length((vUv - 0.5) * vec2(1.0, 1.15)));
           col *= mix(1.0, v, uVig);
-          gl_FragColor = vec4(toSRGB(col), 1.0);
+          vec3 c = toSRGB(aces(col * uExp));
+          float lu = dot(c, vec3(0.299, 0.587, 0.114));
+          c *= mix(uGradeS, uGradeH, smoothstep(0.15, 0.75, lu));   // 影は冷たく、明るい所は暖かく（世界ごとに変える）
+          c = mix(vec3(lu), c, uSat); c = (c - 0.5) * uCon + 0.5;
+          c += (hash21(vUv * uRes + fract(uTime)) - 0.5) * 0.02;   // 細かな粒（階調の段を消し、画に厚みを出す）
+          gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
         }` });
     const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), comp);
@@ -3991,11 +4030,11 @@
     const qScene = new THREE.Scene(); qScene.add(quad);
     let enabled = true;
     function size(w, h) {
-      [main, bA, bB].forEach((t) => t && t.dispose());
+      [main, bA, bB, bC, bD].forEach((t) => t && t.dispose());
       main = MS ? new THREE.WebGLMultisampleRenderTarget(w, h, opts) : new THREE.WebGLRenderTarget(w, h, opts);
       if (MS) main.samples = 4;
       const bw = Math.max(1, Math.floor(w / 4)), bh = Math.max(1, Math.floor(h / 4));
-      bA = new THREE.WebGLRenderTarget(bw, bh, opts); bB = new THREE.WebGLRenderTarget(bw, bh, opts);
+      bA = new THREE.WebGLRenderTarget(bw, bh, opts); bB = new THREE.WebGLRenderTarget(bw, bh, opts); bC = new THREE.WebGLRenderTarget(bw, bh, opts); bD = new THREE.WebGLRenderTarget(bw, bh, opts);
       comp.uniforms.uRes.value.set(w, h);
       blur.userData = { bw, bh };
     }
@@ -4006,7 +4045,16 @@
       bright.uniforms.tDiffuse.value = main.texture; pass(bright, bA);
       blur.uniforms.tDiffuse.value = bA.texture; blur.uniforms.uDir.value.set(1 / blur.userData.bw, 0); pass(blur, bB);
       blur.uniforms.tDiffuse.value = bB.texture; blur.uniforms.uDir.value.set(0, 1 / blur.userData.bh); pass(blur, bA);
+      // 奥行きのぼけ用：場面を小さくして、ぼかす（二回）
+      blur.uniforms.tDiffuse.value = main.texture; blur.uniforms.uDir.value.set(0, 0); pass(blur, bC);
+      for (let r = 0; r < 2; r++) { blur.uniforms.tDiffuse.value = bC.texture; blur.uniforms.uDir.value.set(1.6 / blur.userData.bw, 0); pass(blur, bD); blur.uniforms.tDiffuse.value = bD.texture; blur.uniforms.uDir.value.set(0, 1.6 / blur.userData.bh); pass(blur, bC); }
+      // 月の光の筋：月の方向へ、明るい所を引き伸ばす
+      const T0 = S.memory ? null : themeAt(S.originD); let rayK = 0;
+      if (T0 && !T0.indoor && !T0.roof && ATM.moonA > 0.2) { _pv.copy(camera.position).addScaledVector(MOON_DIR, 70).project(camera); if (_pv.z < 1) { const mu = (_pv.x + 1) / 2, mv = (_pv.y + 1) / 2, edge = Math.max(Math.abs(_pv.x), Math.abs(_pv.y)); rays.uniforms.uC.value.set(mu, mv); rayK = clamp(1.25 - edge, 0, 1) * ATM.moonA * 0.5; } }
+      if (rayK > 0.01) { rays.uniforms.tDiffuse.value = bA.texture; pass(rays, bD); }
       const u = comp.uniforms, now = performance.now();
+      u.tBlur.value = bC.texture; u.tRays.value = bD.texture; u.uRays.value = rayK > 0.01 ? rayK : 0; u.uTime.value = now * 0.001;
+      u.uGradeS.value.copy(FX.gS); u.uGradeH.value.copy(FX.gH); u.uSat.value = FX.sat; u.uCon.value = FX.con; u.uExp.value = FX.exp; u.uDof.value = S.memory ? 0.6 : 1;
       const st = (now - FX.shock.t0) / FX.shock.dur;
       u.uShock.value.set(FX.shock.c.x, FX.shock.c.y, st < 1 ? easeOut(st) * 0.55 : 0, st < 1 ? FX.shock.amp * (1 - st) : 0);
       u.uAberr.value = FX.aberr; u.uZoom.value = FX.zoom; u.uZoomC.value.copy(FX.zoomC);
@@ -5867,6 +5915,11 @@
   function updateAtmos(dt) {
     const d = S.started ? playerD() : S.originD, T = S.memory ? S.memory.M.theme : themeAt(d), k = 1 - Math.exp(-dt * (S.memory ? 6 : 1.2));
     scene.fog.color.lerp(_fc2.set(T.fog[0]), k); scene.fog.near = lerp(scene.fog.near, T.fog[1], k); scene.fog.far = lerp(scene.fog.far, T.fog[2], k);
+    { // 色の調整（世界ごと）：影の色、明るい所の色、彩度、締まり、明るさ
+      const w = S.memory ? 0 : worldOf(stageOfD(d)), G = T.indoor || T.roof ? [[1.0, 0.96, 0.92], [1.08, 1.0, 0.9], 1.0, 1.08, 0.96] : S.memory ? [[0.9, 0.98, 1.14], [1.0, 1.0, 1.0], 0.9, 1.1, 1.0] :
+        [null, [[0.9, 1.0, 1.12], [1.08, 1.0, 0.92], 1.1, 1.08, 1.0], [[0.98, 0.93, 1.04], [1.1, 1.0, 0.9], 1.06, 1.08, 1.0], [[0.95, 0.94, 1.1], [1.12, 1.0, 0.88], 1.12, 1.08, 1.0], [[0.86, 1.02, 1.14], [1.0, 1.06, 1.06], 1.1, 1.1, 1.0], [[0.94, 0.97, 1.1], [1.14, 1.04, 0.86], 1.1, 1.08, 1.02], [[0.96, 0.98, 1.06], [1.12, 1.04, 0.9], 1.12, 1.06, 1.0]][Math.max(1, w)] || [[0.93, 1, 1.1], [1.07, 1, 0.93], 1.1, 1.07, 1.0];
+      const kg = 1 - Math.exp(-dt * 1.5); FX.gS.x = lerp(FX.gS.x, G[0][0], kg); FX.gS.y = lerp(FX.gS.y, G[0][1], kg); FX.gS.z = lerp(FX.gS.z, G[0][2], kg); FX.gH.x = lerp(FX.gH.x, G[1][0], kg); FX.gH.y = lerp(FX.gH.y, G[1][1], kg); FX.gH.z = lerp(FX.gH.z, G[1][2], kg); FX.sat = lerp(FX.sat, G[2], kg); FX.con = lerp(FX.con, G[3], kg); FX.exp = lerp(FX.exp, G[4], kg);
+    }
     scene.background.copy(scene.fog.color);
     ['uTop', 'uMid', 'uHor'].forEach((u, i) => { const c = T.sky[i]; SKY_U[u].value.r = lerp(SKY_U[u].value.r, c[0], k); SKY_U[u].value.g = lerp(SKY_U[u].value.g, c[1], k); SKY_U[u].value.b = lerp(SKY_U[u].value.b, c[2], k); });
     // 月の光と照り返し
