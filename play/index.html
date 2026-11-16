@@ -378,7 +378,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 7.5 · 11/16 17:12 · 71f6a33</span></span>
+  <span class="t-ver"><span id="ver">試作 7.5 · 11/16 17:14 · 041757f</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -7836,6 +7836,7 @@
     shatterCount() { return Shatter.count; },
     soundDump(n, i) { return Sound.dump(n, i); },
     tips() { return { p: player.tip.toArray(), e: enemy.tip.toArray(), gt: S.gt }; },
+    charStats() { const f = (r) => { const o = { meshes: 0, tris: 0, verts: 0, bones: 0, mats: new Set(), texPx: 0, texN: 0, inst: 0 }; const seen = new Set(); r.traverse((m) => { if (m.isSkinnedMesh && m.skeleton) o.bones = Math.max(o.bones, m.skeleton.bones.length); if (!m.isMesh) return; o.meshes++; const g = m.geometry; o.verts += g.attributes.position.count; o.tris += (g.index ? g.index.count : g.attributes.position.count) / 3; (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => { o.mats.add(x.uuid); ['map', 'normalMap', 'roughnessMap'].forEach((k) => { const t = x[k]; if (t && t.image && !seen.has(t.uuid)) { seen.add(t.uuid); o.texN++; o.texPx += (t.image.width || 0) * (t.image.height || 0); } }); }); }); o.mats = o.mats.size; return o; }; return { player: f(player.root), enemy: f(enemy.root) }; },
     renderInfo() { return { calls: SCENE_INFO.calls, tris: SCENE_INFO.tris, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
     lookTest(fk, id, salt) { const t = ROSTER.find((q) => q.id === id) || ROSTER[0]; applyEnemyType(Object.assign({}, t, { look: fk === 'kitsune' ? KITSUNE.look : fk === 'boss' ? BOSS.look : factionLook(fk, t, salt || 0) }), enemy); enemy.present(true); },
     defeatNow() { S.action = null; S.queue = []; defeat(); },
