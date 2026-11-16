@@ -318,7 +318,7 @@
   #stageCard.show { animation: stageIn 3.2s ease forwards; }
   @keyframes stageIn { 0% { opacity: 0; } 25% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 
-  .t-stage { font-family: var(--display); font-size: 11px; letter-spacing: 0.4em; color: rgba(214, 220, 232, 0.35); }
+  .t-stage { position: absolute; bottom: 10vh; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: 11px; letter-spacing: 0.4em; color: rgba(214, 220, 232, 0.35); }
   .t-dev { all: unset; position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); font-size: 10px; letter-spacing: 0.2em; color: rgba(214, 220, 232, 0.22); padding: 6px; cursor: pointer; z-index: 21; }
   #devPanel { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(4, 6, 12, 0.88); padding: 16px; overflow-y: auto; }
   #devPanel[hidden] { display: none !important; }
@@ -330,6 +330,32 @@
   .dvb { display: flex; gap: 10px; margin-top: 6px; }
   .dvb button { font: inherit; padding: 8px 18px; border-radius: 999px; border: 0; background: #d6dce8; color: #0a0f1c; cursor: pointer; }
   .dvb button.ghost { background: transparent; color: #9aa6ba; border: 1px solid rgba(154, 166, 186, 0.4); }
+
+  /* ───────── 見た目の作り直し（docs/50）：テンプレートめいた中央寄せ・丸ボタン・小さく薄い文字をやめる ───────── */
+  #start { background: linear-gradient(180deg, rgba(4, 6, 12, 0.18), rgba(4, 6, 12, 0.5) 55%, rgba(4, 6, 12, 0.9)); }
+  #startBtn { display: block; }
+  .t-title { position: absolute; right: 12vw; top: 13vh; writing-mode: vertical-rl; text-orientation: upright; font-size: clamp(50px, 14vw, 86px); letter-spacing: 0.32em; line-height: 1; padding: 0; font-weight: 600; white-space: nowrap; color: #f3eee2; text-shadow: 0 2px 28px rgba(0, 0, 0, 0.7); }
+  .t-rule { position: absolute; right: calc(12vw + clamp(54px, 15.5vw, 92px) + 14px); top: 13vh; width: 1px; height: 40vh; background: linear-gradient(rgba(206, 56, 46, 0), rgba(206, 56, 46, 0.9), rgba(206, 56, 46, 0)); }
+  .t-title { writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; gap: 0.12em; letter-spacing: 0; text-orientation: mixed; }
+  .t-title b { font-weight: 600; display: block; line-height: 1; }
+  .t-title b.no { font-size: 0.62em; margin: 0.05em 0; }
+  .t-keys { display: none; }
+  .t-tap { position: absolute; bottom: 15vh; left: 0; right: 0; text-align: center; margin: 0; padding: 0; font-size: 13px; color: rgba(236, 230, 214, 0.75); letter-spacing: 0.5em; }
+  .t-seal { position: absolute; right: calc(12vw + 10px); top: calc(13vh + clamp(54px, 15.5vw, 92px) * 4.9); width: 30px; height: 30px; display: grid; place-items: center; background: #b3261e; color: #f6e8d8; font-family: var(--display); font-size: 16px; border-radius: 3px; opacity: 0; animation: tIn 2s 2.2s ease forwards; transform: rotate(-4deg); }
+  .t-ver { color: rgba(236, 230, 214, 0.5); font-size: 11px; }
+  #menu { background: linear-gradient(180deg, rgba(4, 6, 12, 0.6), rgba(4, 6, 12, 0.92)); place-items: center start; padding-left: 11vw; }
+  #menu .mz { justify-items: stretch; gap: 0; width: min(78vw, 340px); }
+  #menu h2 { text-align: left; letter-spacing: 0.3em; padding: 0 0 14px; font-size: 28px; margin: 0 0 12px; border-bottom: 1px solid rgba(206, 56, 46, 0.85); }
+  #menu button { border: 0; border-bottom: 1px solid rgba(214, 220, 232, 0.14); border-radius: 0; padding: 17px 4px 15px; text-align: left; min-width: 0; letter-spacing: 0.22em; font-size: 20px; }
+  #menu button small { margin-top: 6px; font-size: 11.5px; color: rgba(226, 222, 210, 0.66); letter-spacing: 0.06em; }
+  #menu button:active { background: rgba(206, 56, 46, 0.14); }
+  #menu button.ghost { font-size: 13px; padding: 14px 4px; opacity: 0.6; border-bottom: 0; }
+  #menu .mv { margin-top: 20px; color: rgba(226, 222, 210, 0.4); font-size: 11px; }
+  #skillGet .sg-n { white-space: nowrap; text-shadow: 0 0 16px rgba(255, 70, 40, 0.55), 0 2px 0 rgba(0, 0, 0, 0.5); }
+  .gz .ga { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; color: rgba(255, 255, 255, 0.3); font-style: normal; }
+  #logBtn, #copyBtn, #teleBox { display: none !important; }
+  body.dev #logBtn, body.dev #copyBtn { display: inline-block !important; }
+  body.dev #teleBox:not([hidden]) { display: block !important; }
 </style>
 
 <div id="stage" aria-label="対戦の画面"></div>
@@ -342,22 +368,22 @@
 
 <div id="start">
   <button id="startBtn" type="button" aria-label="はじめる">
-    <span class="t-title">風の伝説</span>
+    <span class="t-title"><b>風</b><b class="no">の</b><b>伝</b><b>説</b></span><span class="t-seal">風</span>
     <span class="t-rule" aria-hidden="true"></span>
     <span class="t-keys">上 斬る　　下 弾く　　左右 避ける</span>
     <span class="t-tap">触れて始める</span>
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 7.2 · 11/05 16:56 · 0f1e79e</span></span>
+  <span class="t-ver"><span id="ver">試作 7.3 · 11/16 16:31 · b212853</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
   <button id="mnCont" type="button">つづきから<small id="mnContS"></small></button>
-  <button id="mnNew" type="button">最初の山から<small>手に入れた技と風纏は残ります</small></button>
+  <button id="mnNew" type="button">最初の山から<small>技と地図は、そのまま</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 7.2</span></div></div>
+  <span class="mv">試作 7.3</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -4031,7 +4057,7 @@
             col += vec3(texture2D(tScene, suv + ca).r, texture2D(tScene, suv).g, texture2D(tScene, suv - ca).b);
           }
           col /= n;
-          { float dofT = smoothstep(0.70, 0.98, vUv.y) * 0.9 + smoothstep(0.16, 0.0, vUv.y) * 0.5; col = mix(col, texture2D(tBlur, uv).rgb, clamp(dofT * uDof, 0.0, 0.92)); }   // 奥行きのぼけ：画面の上＝遠景、下の端＝手前
+          { float dofT = smoothstep(0.72, 1.0, vUv.y) * 0.7 + smoothstep(0.12, 0.0, vUv.y) * 0.4; col = mix(col, texture2D(tBlur, uv).rgb, clamp(dofT * uDof, 0.0, 0.92)); }   // 奥行きのぼけ：画面の上＝遠景、下の端＝手前
           col += texture2D(tBloom, uv).rgb * uBloom;
           col += texture2D(tRays, uv).rgb * uRays;
           float l = dot(col, vec3(0.299, 0.587, 0.114));
@@ -4099,8 +4125,9 @@
   function fxKick(aberr, zoom, world) { FX.aberr = Math.max(FX.aberr, aberr); FX.zoom = Math.max(FX.zoom, zoom); if (world) toUv(world, FX.zoomC); }
   function fxFlash(r, g, b) { FX.flash.setRGB(Math.max(FX.flash.r, r), Math.max(FX.flash.g, g), Math.max(FX.flash.b, b)); }
   function updateFX(dt) {
-    FX.aberr = Math.max(0, FX.aberr - dt * 0.06);
-    FX.zoom = Math.max(0, FX.zoom - dt * 0.9);
+    if (!S.started) { FX.aberr = 0; FX.zoom = 0; S.fovKick = 0; }
+    FX.aberr = Math.max(0, FX.aberr - dt * (S.started ? 0.06 : 1));
+    FX.zoom = Math.max(0, FX.zoom - dt * (S.started ? 0.9 : 6));
     FX.flash.multiplyScalar(Math.max(0, 1 - dt * 7));
     const slow = performance.now() < S.slowUntil && S.slowScale < 0.5;
     // 見切りの間は、色が抜けて冷たくなる。自分が追い詰められると、視界の端が暗く、色が抜ける。
@@ -5985,7 +6012,7 @@
   const _m4 = new THREE.Matrix4(), _q4 = new THREE.Quaternion(), _e4 = new THREE.Euler(), _v4 = V(0, 0, 0), _s4 = V(1, 1, 1);
   function updateAmbient(dt) {
     const t = performance.now() / 1000, cx = camera.position.x, cz = camera.position.z, gy = S.p.y || 0, wx = WORLD_WIND.x, wz = WORLD_WIND.z;
-    if (AMB.haze) { const hz = AMB.haze; hz.visible = ATM.mist > 0.03 && !S.memory; hz.position.set(cx, gy + 0.32, cz); hz.material.opacity = clamp(ATM.mist * 2.2, 0, 0.55); hz.material.color.copy(scene.fog.color).lerp(_fc3.setRGB(0.8, 0.84, 0.92), 0.5); hz.material.map.offset.set(t * 0.012 + wx * 0.02, t * 0.007); }
+    if (AMB.haze) { const hz = AMB.haze; hz.visible = ATM.mist > 0.03 && !S.memory; hz.position.set(cx, gy + 0.32, cz); hz.material.opacity = clamp(ATM.mist * 1.1, 0, 0.2); hz.material.color.copy(scene.fog.color).lerp(_fc3.setRGB(0.8, 0.84, 0.92), 0.5); hz.material.map.offset.set(t * 0.012 + wx * 0.02, t * 0.007); }
     // 霧の帯：地面すれすれを、ゆっくり流れる薄い帯。顔の前を塞がない
     AMB.mist.forEach((m, i) => {
       const dx = m.position.x - cx, dz = m.position.z - cz;
@@ -7236,7 +7263,8 @@
   const tutEl = document.getElementById('tut');
   const seenTut = () => { try { return JSON.parse(localStorage.getItem('kaze.tut') || '[]'); } catch (e) { return []; } };
   const markTut = (ids) => { try { const a = new Set(seenTut()); ids.forEach((i) => a.add(i)); localStorage.setItem('kaze.tut', JSON.stringify([...a])); } catch (e) { /* 保存できなくても遊べる */ } };
-  const gzHTML = (cls) => `<span class="gz ${cls}"><i class="fg"></i><i class="rg"></i></span>`;
+  const gzArrow = (cls) => (/up/.test(cls) ? '↑' : /down/.test(cls) ? '↓' : /lr/.test(cls) ? '↔' : /left/.test(cls) ? '←' : /right/.test(cls) ? '→' : /tap2/.test(cls) ? '••' : '');
+  const gzHTML = (cls) => `<span class="gz ${cls}"><i class="ga">${gzArrow(cls)}</i><i class="fg"></i><i class="rg"></i></span>`;
   const BASE_TUT = [{ g: 'up', t: '斬る', s: '上へはじく' }, { g: 'down', t: '弾く', s: '刃が届く直前' }, { g: 'lr left', t: '避ける', s: '左右へはじく' }];
   const SKILL_TUT = (k) => {
     const d = SKILLS[k];
@@ -7247,7 +7275,7 @@
   let tutTimer = 0;
   function showTut(items, ms, ids) {
     tutEl.innerHTML = items.map((i) => `<span class="tt">${gzHTML(i.g)}<span>${i.t}</span><small>${i.s}</small></span>`).join('');
-    tutEl.classList.add('on'); clearTimeout(tutTimer);
+    tutEl.classList.add('on'); clearTimeout(tutTimer); { const h = document.getElementById('hint'); if (h) h.hidden = true; }
     tutTimer = setTimeout(hideTut, ms || 12000);
     if (ids) markTut(ids);
   }
@@ -7265,7 +7293,7 @@
     const d = SKILLS[key] || GETS[key], t = d === GETS[key] ? { g: GETS[key].g } : SKILL_TUT(key);
     document.querySelector('#skillGet .sg-k').textContent = d.kicker || '技を受け継いだ';
     hideTut();
-    document.getElementById('sgName').textContent = d.name;
+    document.getElementById('sgName').textContent = d.name; document.getElementById('sgName').style.fontSize = Math.min(104, 280 / d.name.length) + 'px';
     document.getElementById('sgYomi').textContent = d.yomi;
     document.getElementById('sgGz').innerHTML = gzHTML(t.g);
     document.getElementById('sgHow').textContent = d.how;
@@ -7513,6 +7541,7 @@
   // ── メインメニュー：つづきから／最初の山から／風纏（地図）／開発 ──
   const menuEl = document.getElementById('menu');
   function showMenu() {
+    FX.zoom = 0; FX.aberr = 0; S.fovKick = 0; S.tenSm = 0;
     S.started = false; S.mode = 'idle'; S.paused = false; S.uiBlock = null; S.endless = null; S.dev = null;
     clearTimeout(S.endTimer); hideTut();
     ['pause', 'end', 'map', 'skillGet', 'devPanel'].forEach((id) => { document.getElementById(id).hidden = true; });
@@ -7700,7 +7729,7 @@
       if (mode === 'stage') S.devStart = +$('dvStart').value;
       else if (mode === 'enemy') S.devRoad = [findT($('dvEnemy').value)];
       else { const n = +$('dvCount').value, pool = ROSTER.filter((t) => t.rank === RANK_OF[$('dvRank').value]); S.devRoad = [Array.from({ length: n }, () => pick(pool))]; if (n === 1) S.devRoad = [S.devRoad[0][0]]; }
-      S.dev = { god: $('dvGod').checked, skills: false, skillSet: DVK.filter((k) => $('dvK_' + k).checked), intrude: false }; S.endless = S.stage === 31 ? { floor: 1 } : null;
+      document.body.classList.add('dev'); S.dev = { god: $('dvGod').checked, skills: false, skillSet: DVK.filter((k) => $('dvK_' + k).checked), intrude: false }; S.endless = S.stage === 31 ? { floor: 1 } : null;
       $('devPanel').hidden = true; menuEl.hidden = true;
       warmUp(); Sound.init(); startEl.hidden = true; logBtn.hidden = false; pauseBtn.hidden = false; S.newRoad = true;
       begin(1);
@@ -7759,7 +7788,8 @@
   window.__kaeshi = {
     get state() { return { mode: S.mode, phase: S.phase, B: S.B, P: S.P, W: S.W, wStage: S.wStage, gt: S.gt, d: dist(), chain: S.chain, pa: S.pa && S.pa.kind, counter: S.gt < S.counterUntil, stats: { ...S.stats }, action: S.action && { name: S.action.move.name, feint: S.action.feint, peril: S.action.peril, T: S.action.T, t0: S.action.t0, O: S.action.O } }; },
     setSpeed(v) { S.speed = v; },
-    quality() { return { level: QUAL.level, ms: +QUAL.ema.toFixed(1) }; },
+    fx() { return { zoom: FX.zoom, aberr: FX.aberr, vig: FX.vig, desat: FX.desat, shock: FX.shock.amp, fov: camera.fov, fovKick: S.fovKick, ten: S.tenSm }; },
+        quality() { return { level: QUAL.level, ms: +QUAL.ema.toFixed(1) }; },
     setAuto(v) { S.auto = v; },
     force(token) { S.queue = []; S.action = null; startAction(token); },
     forcePattern(list) { S.action = null; S.queue = list.slice(1); startAction(list[0]); },
