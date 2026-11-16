@@ -58,6 +58,16 @@ function basisFrom(dir, side) {
 }
 
 // ───────── 骨（素の姿勢＝腕を少し開いて下ろした姿勢） ─────────
+function handFrame(J, s) {
+  const dir = J['dir' + s], down = v(0, -1, 0), hang = norm(sub(down, mul(dir, dot(down, dir)))), fwd = norm(cross(dir, hang));
+  return { dir, hang, fwd };
+}
+const FINGER_PATH = [[0.0, 0.0], [0.022, 0.012], [0.036, 0.03], [0.03, 0.046]];   // 指の輪の中心：(手の向き方向, 前方向)。model_characters.js と共通
+function fingerBase(J, s, f) {
+  const { dir, hang, fwd } = handFrame(J, s);
+  return add(add(J['WR' + s], mul(dir, 0.045)), add(mul(fwd, 0.03), mul(hang, (f - 1.5) * 0.02)));
+}
+function fingerPt(J, s, f, k) { const { dir, fwd } = handFrame(J, s); return add(add(fingerBase(J, s, f), mul(dir, FINGER_PATH[k][0])), mul(fwd, FINGER_PATH[k][1])); }
 function skeleton(sw) {
   const H = v(0, 1.115, 0), W = add(H, v(0, 0.10, 0)), C = add(W, v(0, 0.24, 0)), N = add(C, v(0, 0.39, 0)), HD = add(N, v(0, 0.15, 0));
   const armAng = 35 * Math.PI / 180;
@@ -79,9 +89,24 @@ function skeleton(sw) {
     ['thighL', 0, J.PL, J.KL], ['shinL', 14, J.KL, J.AL], ['footL', 15, J.AL, add(J.AL, v(0, -0.04, 0.16))],
     ['skirt', 0, J.H, add(J.H, v(0, -0.8, 0))],   // 袴の裾：腰について行くが、重さで常に下へ垂れる
   ];
+  // 追加の骨：BONE の番号順に並べる。位置は関節の位置
+  const jointAt = { elbowR: J.ER, elbowL: J.EL, kneeR: J.KR, kneeL: J.KL, shoulderR: J.SR, shoulderL: J.SL, hipJR: J.PR, hipJL: J.PL, wristR: J.WRR, wristL: J.WRL, ankleR: J.AR, ankleL: J.AL, neckB: J.N, toeR: add(J.AR, v(0, -0.06, 0.09)), toeL: add(J.AL, v(0, -0.06, 0.09)) };
+  EXTRA.forEach(([name, parent]) => {
+    let at = jointAt[name];
+    const m = /^finger([RL])(\d)([abc])$/.exec(name), t = /^thumb([RL])([ab])$/.exec(name);
+    if (m) at = fingerPt(J, m[1], +m[2], 'abc'.indexOf(m[3]));
+    if (t) { const { dir, fwd } = handFrame(J, t[1]); at = add(add(J['WR' + t[1]], mul(dir, t[2] === 'a' ? 0.04 : 0.0555)), mul(fwd, t[2] === 'a' ? 0.035 : 0.043)); }
+    bones.push([name, BONE[parent], at, add(at, v(0, 0.04, 0))]);
+  });
   return { J, bones };
 }
+// 追加の骨（試作 7.7）：関節の継ぎ目をなじませる「中間の骨」、指、足の指。既存の骨の番号は変えない。
+const BLEND = [['elbowR', 'upperArmR'], ['elbowL', 'upperArmL'], ['kneeR', 'thighR'], ['kneeL', 'thighL'], ['shoulderR', 'chest'], ['shoulderL', 'chest'], ['hipJR', 'hips'], ['hipJL', 'hips'], ['wristR', 'foreArmR'], ['wristL', 'foreArmL'], ['ankleR', 'shinR'], ['ankleL', 'shinL'], ['neckB', 'chest']];
+const FING = []; ['R', 'L'].forEach((sd) => { for (let f = 0; f < 4; f++) ['a', 'b', 'c'].forEach((k, q) => FING.push(['finger' + sd + f + k, q === 0 ? 'hand' + sd : 'finger' + sd + f + ['a', 'b', 'c'][q - 1]])); FING.push(['thumb' + sd + 'a', 'hand' + sd], ['thumb' + sd + 'b', 'thumb' + sd + 'a']); });
+const TOES = [['toeR', 'footR'], ['toeL', 'footL']];
+const EXTRA = [...BLEND, ...FING, ...TOES];
 const BONE = { hips: 0, waist: 1, chest: 2, neck: 3, head: 4, upperArmR: 5, foreArmR: 6, handR: 7, upperArmL: 8, foreArmL: 9, handL: 10, thighR: 11, shinR: 12, footR: 13, thighL: 14, shinL: 15, footL: 16, skirt: 17 };
+EXTRA.forEach(([n], i) => { BONE[n] = 18 + i; });
 
 // ───────── 人物の彫刻（docs/23-visual-v2.md） ─────────
 // アニメ調（ゼルダの伝説のような、丸くすっきりした形と、はっきりした色の面）。ただし細部まで作り込む。
@@ -451,7 +476,7 @@ function pack(kind, cell, region) {
   };
 }
 
-module.exports = { skeleton, BONE, PALETTE, pack, sculpt, MAT_ID };
+module.exports = { skeleton, BLEND, handFrame, fingerBase, fingerPt, FINGER_PATH, BONE, PALETTE, pack, sculpt, MAT_ID };
 
 // 直接動かしたとき：以前の方式（体も頭も焼き出す）。今は tools/model_characters.js が、頭だけをここで焼き出し、体は箱からの造形で作る
 if (require.main === module) {

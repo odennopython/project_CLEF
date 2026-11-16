@@ -11,7 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { skeleton, BONE, PALETTE, pack, MAT_ID } = require('./bake_characters.js');
+const { skeleton, BLEND, handFrame, fingerBase, fingerPt, FINGER_PATH, BONE, PALETTE, pack, MAT_ID } = require('./bake_characters.js');
 
 // ───────── ベクトル ─────────
 const v = (x, y, z) => [x, y, z];
@@ -420,19 +420,35 @@ function build(kind) {
       [0.02, 0.045, 0.07, 0.095].forEach((t, k) => merge(M, solidLoft([t - 0.008, t, t + 0.008].map((tt, q) => ringPts(add(WR, mul(dir, tt + 0.01)), fwd, hang, 0.037 + (q === 1 ? 0.003 : 0), 0.045 + (q === 1 ? 0.003 : 0), 10, (th) => 1 / Math.pow(Math.pow(Math.abs(Math.sin(th)), 3) + Math.pow(Math.abs(Math.cos(th)), 3), 1 / 3))), (r, i, p) => A('guard', W(hd, 1)), {})));
     }
     merge(M, roundBox(add(WR, mul(dir, 0.06)), fwd, dir, hang, 0.034, 0.055, 0.042, (p) => A(hM, W(hd, 1))));
-    merge(M, solidLoft([0.0, 0.03, 0.05].map((t, k) => ringPts(add(add(WR, mul(dir, 0.04 + t * 0.5)), mul(fwd, 0.035 + t * 0.4)), dir, hang, 0.014 - k * 0.002, 0.013 - k * 0.002, 6)), (r, i, p) => A(hM, W(hd, 1)), {}));
-    // 指：握った拳の四本。指の付け根の関節の盛り上がり、曲がった中節、指先の巻き込み。指と指の間に溝ができる
+    merge(M, solidLoft([0.0, 0.03, 0.05].map((t, k) => ringPts(add(add(WR, mul(dir, 0.04 + t * 0.5)), mul(fwd, 0.035 + t * 0.4)), dir, hang, 0.014 - k * 0.002, 0.013 - k * 0.002, 6)), (r, i, p) => A(hM, r === 0 ? W('thumb' + s + 'a', 1) : r === 1 ? W('thumb' + s + 'a', 0.5, 'thumb' + s + 'b', 0.5) : W('thumb' + s + 'b', 1)), {}));
+    // 指：握った拳の四本。骨は指ごとに三本（付け根・中節・指先）。親指は二本
     [0, 1, 2, 3].forEach((f) => {
-      const hh = (f - 1.5) * 0.02, sz = 1 - Math.abs(f - 1.5) * 0.08;
-      const base = add(add(WR, mul(dir, 0.045)), add(mul(fwd, 0.03), mul(hang, hh)));
-      const seg = [[0.0, 0.0, 0.0, 0.013], [0.022, 0.012, 0.0, 0.0115], [0.036, 0.03, 0.0, 0.0105], [0.03, 0.046, 0.0, 0.0095]];
-      merge(M, solidLoft(seg.map(([dd, ff, hv, r]) => ringPts(add(add(base, mul(dir, dd)), mul(fwd, ff)), hang, dir, r * sz, r * sz * 1.05, 7)), (r, i, p) => A(hM, W(hd, 1)), {}));
+      const sz = 1 - Math.abs(f - 1.5) * 0.08, names = ['a', 'b', 'c'].map((k) => 'finger' + s + f + k), rad = [0.013, 0.0115, 0.0105, 0.0095];
+      const wf = (r) => (r === 0 ? W(names[0], 1) : r === 1 ? W(names[0], 0.5, names[1], 0.5) : r === 2 ? W(names[1], 0.5, names[2], 0.5) : W(names[2], 1));
+      merge(M, solidLoft(FINGER_PATH.map(([dd, ff], k) => ringPts(add(add(fingerBase(J, s, f), mul(dir, dd)), mul(fwd, ff)), hang, dir, rad[k] * sz, rad[k] * sz * 1.05, 7)), (r, i, p) => A(hM, wf(r)), {}));
     });
-
   });
 
   // 2回細分
   let S2 = subdivide(subdivide(M));
+  // 関節の継ぎ目：関節の近くの点は、上の骨と下の骨の「中間の向き」の骨にも半分つける（継ぎ目の折れ・つぶれを防ぐ）
+  const atOf = {}; bones.forEach(([n, , at]) => { atOf[n] = at; });
+  const JR = { elbow: 0.1, knee: 0.12, shoulder: 0.12, hipJ: 0.13, wrist: 0.065, ankle: 0.085, neckB: 0.09 };
+  const PAIRS = { elbowR: ['upperArmR', 'foreArmR'], elbowL: ['upperArmL', 'foreArmL'], kneeR: ['thighR', 'shinR'], kneeL: ['thighL', 'shinL'], shoulderR: ['chest', 'upperArmR'], shoulderL: ['chest', 'upperArmL'], hipJR: ['hips', 'thighR'], hipJL: ['hips', 'thighL'], wristR: ['foreArmR', 'handR'], wristL: ['foreArmL', 'handL'], ankleR: ['shinR', 'footR'], ankleL: ['shinL', 'footL'], neckB: ['chest', 'neck'] };
+  S2.V.forEach((x) => {
+    BLEND.forEach(([bn]) => {
+      const [a, b] = PAIRS[bn], ia = BONE[a], ib = BONE[b], ic = BONE[bn], wa = x.w[ia] || 0, wb = x.w[ib] || 0, sm = wa + wb;
+      if (sm < 0.5) return;
+      const r = JR[bn.replace(/[RL]$/, '')], t = 1 - smooth(0, r, len(sub(x.p, atOf[bn]))), bw = 0.55 * t;
+      if (bw <= 0.01) return;
+      x.w[ia] = wa * (1 - bw); x.w[ib] = wb * (1 - bw); x.w[ic] = (x.w[ic] || 0) + sm * bw;
+    });
+    ['R', 'L'].forEach((sd) => {   // 足の指：つま先側の点は、足の指の骨へ
+      const f = BONE['foot' + sd], wf = x.w[f] || 0; if (wf < 0.5) return;
+      const A0 = atOf['foot' + sd], t = smooth(0.085, 0.14, x.p[2] - A0[2]); if (t <= 0.01) return;
+      x.w[f] = wf * (1 - t); x.w[BONE['toe' + sd]] = wf * t;
+    });
+  });
   return { mesh: S2, bones };
 }
 
