@@ -363,7 +363,7 @@
     <span class="t-stage" id="tStage"></span>
   </button>
   <button id="devBtn" type="button" class="t-dev" hidden>開発</button>
-  <span class="t-ver"><span id="ver">試作 7.7</span></span>
+  <span class="t-ver"><span id="ver">試作 7.8</span></span>
 </div>
 
 <div id="menu" hidden><div class="mz"><h2>風の伝説</h2>
@@ -371,7 +371,7 @@
   <button id="mnNew" type="button">最初の山から<small>技と地図は、そのまま</small></button>
   <button id="mnMap" type="button">地図<small id="mnMapS"></small></button>
   <button id="mnDev" type="button" class="ghost">開発</button>
-  <span class="mv">試作 7.7</span></div></div>
+  <span class="mv">試作 7.8</span></div></div>
 
 <div id="devPanel" hidden>
   <div class="dv">
@@ -414,6 +414,7 @@
 <div id="pause" hidden><div class="pz"><h3>休止</h3>
   <button id="pzResume" type="button">続ける</button>
   <button id="pzMap" type="button" class="ghost" hidden>地図を開く</button>
+  <button id="pzMusic" type="button" class="ghost">音楽　入</button>
   <button id="pzRetry" type="button" class="ghost">この山小屋から出直す</button>
   <button id="pzMenu" type="button" class="ghost">メインメニューへ</button>
   <p>戦いの中では、地図には戻れません。出直すと、倒れたときと同じ山小屋からになります。</p></div></div>
@@ -3197,7 +3198,7 @@
       chips.push({ m: pl.m, v: V((Math.random() - 0.5) * 2.5, 2.2 + Math.random(), (Math.random() - 0.5) * 2.5), spin: V(Math.random() * 10, Math.random() * 10, Math.random() * 10), rest: false });
     }
     function setLocal(bone, target, parentQ) { qInv.copy(parentQ).invert(); bone.quaternion.copy(qInv).multiply(target); }
-    // 追加の骨：関節の「中間の向き」の骨、指、足の指（試作 7.7）
+    // 追加の骨：関節の「中間の向き」の骨、指、足の指（試作 7.8）
     const exQ = [0, 1].map(() => ({ up: new THREE.Quaternion(), fore: new THREE.Quaternion(), hand: new THREE.Quaternion(), thigh: new THREE.Quaternion(), shin: new THREE.Quaternion(), foot: new THREE.Quaternion() }));
     const qMidT = new THREE.Quaternion(), qHeadT = new THREE.Quaternion(), qFing = new THREE.Quaternion(), qToe = new THREE.Quaternion();
     const setMid = (bone, qa, qb, parentQ) => { if (!bone) return; qMidT.copy(qa).slerp(qb, 0.5); setLocal(bone, qMidT, parentQ); };
@@ -4420,7 +4421,7 @@
       next();
     }
     function init() {
-      if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+      if (ctx) { if (ctx.state === 'suspended') ctx.resume(); try { Music.init(); } catch (e) {} return; }
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       ctx = new AC();
@@ -4431,6 +4432,7 @@
       verbIn = ctx.createGain();
       windGain = ctx.createGain(); windGain.gain.value = 1;   // 風の層は鳴らさない（以前の演出の呼び出しのため残す）
       synthAll();
+      setTimeout(() => { try { Music.init(); } catch (e) {} }, 0);
     }
     const now = () => ctx.currentTime;
     function play(list, gain, verb, delay, rate) {
@@ -4447,6 +4449,7 @@
     }
     const api = {
       init,
+      get ctx() { return ctx; }, get master() { return master; },
       get ready() { return ready; },
       dump(name, i) { const b = B[name] && B[name][i || 0]; return b ? { sr: b.sampleRate, data: Array.from(b.getChannelData(0)) } : null; },
       // 次に鳴らす音の左右の位置（画面の左なら左から聞こえる）
@@ -4456,6 +4459,7 @@
       body() {},
       // 弾き：澄んだ「キン」。刃の当たる場所が変わるので、続けて弾くほど少しずつ高く明るくなる。3連続からは長く伸びる「キィーン」
       kin(chain) {
+        try { Music.accent('parry', chain); } catch (e) {}
         const c = Math.min(chain, 8), hard = chain >= 3;
         play(hard ? B.parryHard : B.parry, hard ? 1.0 : 0.85, hard ? 0.55 : 0.4, 0, 1 + c * 0.035);
         if (hard) play(B.glint, 0.25, 0.4, 0.06, 1 + c * 0.04);   // 余韻にもう一本、細い刃鳴り
@@ -4467,9 +4471,9 @@
       clashLow() { play(B.clashLow, 0.9, 0.35); },
       clash() { api.clashLow(); },
       // 斬れた：鈍い低音と、刃が抜けたあとの短く小さな刃鳴り
-      cut(big) { play(big ? B.thudBig : B.thud, big ? 0.85 : 0.6, 0.05); play(B.glint, big ? 0.3 : 0.18, 0.3, 0.02, big ? 1.1 : 1.25); },
+      cut(big) { try { Music.accent(big ? 'kill' : 'cut'); } catch (e) {} play(big ? B.thudBig : B.thud, big ? 0.85 : 0.6, 0.05); play(B.glint, big ? 0.3 : 0.18, 0.3, 0.02, big ? 1.1 : 1.25); },
       rip() {},
-      hit() { play(B.thudBig, 0.9, 0.1); },
+      hit() { try { Music.accent('hurt'); } catch (e) {} play(B.thudBig, 0.9, 0.1); },
       whiff() {}, dodge() {}, crunch() {}, step() {}, swing() {}, breath() {}, grunt() {}, gasp() {},
       // 見切り（突きを踏む）：雪に押しつけられた刀の、こもった「ゴィン」
       mikiri() { play(B.stompMetal, 0.75, 0.25); },
@@ -4496,10 +4500,138 @@
       // 一閃：静寂のあと、一つだけ長く澄んだ響きと、鈍い低音
       issen() {
         if (!ctx) return;
+        try { Music.accent('issen'); } catch (e) {}
         setTimeout(() => { play(B.parryHard, 0.95, 0.7, 0, 0.8); play(B.thudBig, 0.8, 0.2, 0.02); }, 260);
       },
     };
     return api;
+  })();
+
+
+  // ───────────────────────── 音楽 ─────────────────────────
+  // すべてコードで合成する（録音も借り物の曲も使わない）。都節（みやこぶし）の音階 D・E♭・G・A・B♭ を使い、
+  // 低いドローン＋尺八のような息の旋律＋琴のような爪弾き＋太鼓で作る。場面（歩く／睨み合い／斬り合い／主／勝ち／負け）で、
+  // 拍の速さ・太鼓の密度・旋律の有無が変わる。弾きや斬りの瞬間に、その拍へ合わせて音を足す。
+  const Music = (() => {
+    let ctx = null, bus = null, wet = null, droneG = null, droneF = null, started = false, timer = null;
+    let muted = false; try { muted = localStorage.getItem('kaze.music') === '0'; } catch (e) {}
+    let mood = 'title', moodAt = 0, nextT = 0, step = 0, duck = 1, lastLead = 0, intensity = 0;
+    const ROOT = 50, SCALE = [0, 1, 5, 7, 8];   // D3 を根音。都節：根・短2度・完全4度・完全5度・短6度
+    const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const note = (deg, oct) => ROOT + SCALE[((deg % 5) + 5) % 5] + 12 * (oct + Math.floor(deg / 5));
+    const MOODS = {
+      title:   { bpm: 46, drone: 0.5, lead: 0.55, koto: 0.3, taiko: 0, shime: 0 },
+      calm:    { bpm: 52, drone: 0.42, lead: 0.4, koto: 0.35, taiko: 0.1, shime: 0 },
+      pause:   { bpm: 46, drone: 0.3, lead: 0.0, koto: 0.1, taiko: 0, shime: 0 },
+      stalk:   { bpm: 60, drone: 0.55, lead: 0.0, koto: 0.18, taiko: 0.45, shime: 0 },
+      duel:    { bpm: 86, drone: 0.6, lead: 0.0, koto: 0.4, taiko: 0.75, shime: 0.5 },
+      boss:    { bpm: 94, drone: 0.72, lead: 0.0, koto: 0.5, taiko: 1.0, shime: 0.8 },
+      victory: { bpm: 44, drone: 0.4, lead: 0.9, koto: 0.5, taiko: 0, shime: 0 },
+      defeat:  { bpm: 40, drone: 0.25, lead: 0.0, koto: 0, taiko: 0, shime: 0 },
+    };
+    let noiseBuf = null;
+    function init() {
+      if (started || !Sound.ctx) return; ctx = Sound.ctx; started = true;
+      bus = ctx.createGain(); bus.gain.value = muted ? 0 : 0.42;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = 0.02; comp.release.value = 0.3;
+      bus.connect(comp); comp.connect(Sound.master);
+      // 残響：指数に減衰する雑音の響き（広い堂の空気）
+      const len = Math.floor(ctx.sampleRate * 2.6), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+      const conv = ctx.createConvolver(); conv.buffer = ir; wet = ctx.createGain(); wet.gain.value = 0.45; wet.connect(conv); conv.connect(bus);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); { const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      // ドローン：根音と五度を、ゆっくり揺れる低域だけで
+      droneG = ctx.createGain(); droneG.gain.value = 0; droneF = ctx.createBiquadFilter(); droneF.type = 'lowpass'; droneF.frequency.value = 260; droneF.Q.value = 0.7;
+      [[note(0, -2), 'sawtooth', 0.5, -4], [note(0, -2), 'triangle', 0.7, 5], [note(3, -2), 'triangle', 0.35, 0], [note(0, -3), 'sine', 0.9, 0]].forEach(([m, type, g, det]) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = hz(m); o.detune.value = det; const gg = ctx.createGain(); gg.gain.value = g * 0.5; o.connect(gg); gg.connect(droneF); o.start(); });
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07; const lg = ctx.createGain(); lg.gain.value = 90; lfo.connect(lg); lg.connect(droneF.frequency); lfo.start();
+      droneF.connect(droneG); droneG.connect(bus); droneG.connect(wet);
+      nextT = ctx.currentTime + 0.3; step = 0;
+      timer = setInterval(tick, 90);
+    }
+    // ── 声 ──
+    const out = (n, verb) => { n.connect(bus); if (verb) { const v = ctx.createGain(); v.gain.value = verb; n.connect(v); v.connect(wet); } };
+    function taiko(t, vel) {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.16);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9 * vel, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      o.connect(g); out(g, 0.35); o.start(t); o.stop(t + 0.6);
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520; const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.5 * vel, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); n.connect(f); f.connect(ng); out(ng, 0.2); n.start(t, Math.random() * 0.5); n.stop(t + 0.12);
+    }
+    function shime(t, vel) {   // 高く乾いた締太鼓
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2100; f.Q.value = 1.4; const g = ctx.createGain();
+      g.gain.setValueAtTime(0.32 * vel, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07); n.connect(f); f.connect(g); out(g, 0.15); n.start(t, Math.random() * 0.5); n.stop(t + 0.1);
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'triangle'; o.frequency.value = 480; og.gain.setValueAtTime(0.16 * vel, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(og); out(og, 0.1); o.start(t); o.stop(t + 0.1);
+    }
+    function pluck(t, m, vel, dec) {   // 琴の爪弾き：鋭い立ち上がりと、少し下がる響き
+      const f = hz(m), o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+      o.type = 'triangle'; o2.type = 'sine'; o.frequency.setValueAtTime(f * 1.012, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.05); o2.frequency.value = f * 2.003;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.34 * vel, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + (dec || 1.4));
+      g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.12 * vel, t + 0.003); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g); o2.connect(g2); out(g, 0.5); out(g2, 0.3); o.start(t); o2.start(t); o.stop(t + (dec || 1.4) + 0.1); o2.stop(t + 0.5);
+    }
+    function lead(t, m, dur, vel) {   // 尺八：息を含む柔らかな音。下から入り、揺れが後から深くなる
+      const f = hz(m), o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(f * Math.pow(2, -60 / 1200), t); o.frequency.exponentialRampToValueAtTime(f, t + 0.28);
+      const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 5.2; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.006, t + dur * 0.7); vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur + 1);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.2 * vel, t + 0.4); g.gain.setValueAtTime(0.2 * vel, t + Math.max(0.4, dur - 0.5)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.7);
+      o.connect(g); out(g, 0.8); o.start(t); o.stop(t + dur + 0.9);
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 2; bp.Q.value = 7; const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.0001, t); ng.gain.linearRampToValueAtTime(0.085 * vel, t + 0.3); ng.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.5); n.connect(bp); bp.connect(ng); out(ng, 0.6); n.start(t); n.stop(t + dur + 0.6);
+    }
+    // ── 進行 ──
+    let phrase = [0, 2, 3], phraseI = 0;
+    function newPhrase() { const a = [[0, 2, 3, 2], [3, 2, 0, -2], [4, 3, 2, 0], [0, 1, 0, -2], [2, 3, 4, 3]]; phrase = a[Math.floor(Math.random() * a.length)]; phraseI = 0; }
+    function schedule(t, st) {
+      const M = MOODS[mood] || MOODS.calm, e = intensity;   // e：斬り合いの熱（0〜1）。弾きや斬りで上がり、ゆっくり下がる
+      // 太鼓：睨み合いは心臓のように、斬り合いは八分の型で
+      if (M.taiko > 0) {
+        const pat = M.bpm > 80 ? [1, 0, 0.5, 1, 0, 0.6, 0.5, 0] : [1, 0, 0, 0, 0.7, 0, 0, 0];
+        const v = pat[st % 8]; if (v) taiko(t, v * (0.5 + 0.5 * M.taiko) * (0.8 + 0.3 * e));
+        if (M.shime > 0 && st % 2 === 1 && Math.random() < M.shime) shime(t, 0.5 + 0.5 * e);
+      } else if (M.taiko === 0 && mood === 'title' && st % 64 === 0) taiko(t, 0.45);
+      // 琴：確率で、音階の音を一つ（睨み合いでは低く、疎らに）
+      if (Math.random() < M.koto * (st % 4 === 0 ? 0.9 : 0.35)) { const deg = M.bpm > 80 ? Math.floor(Math.random() * 6) + 2 : Math.floor(Math.random() * 5); pluck(t, note(deg, M.bpm > 80 ? 0 : -1), 0.5 + Math.random() * 0.4, M.bpm > 80 ? 0.9 : 1.8); }
+      // 尺八：歩きや静けさのとき、長い一息
+      if (M.lead > 0 && t > lastLead + 5.5 && st % 8 === 0 && Math.random() < M.lead) {
+        const m = note(phrase[phraseI % phrase.length], 0); phraseI++; if (phraseI >= phrase.length + 1) newPhrase();
+        const dur = 2.4 + Math.random() * 2.6; lead(t, m, dur, 0.9); lastLead = t + dur;
+      }
+    }
+    function tick() {
+      if (!ctx || ctx.state !== 'running') return;
+      const M = MOODS[mood] || MOODS.calm, spb = 60 / M.bpm / 2;   // 八分音符
+      while (nextT < ctx.currentTime + 0.25) { schedule(nextT, step); step++; nextT += spb; }
+      intensity = Math.max(0, intensity - 0.0035);
+      const k = duck * (muted ? 0 : 1);
+      droneG.gain.setTargetAtTime(M.drone * 0.55 * k, ctx.currentTime, 0.8);
+      bus.gain.setTargetAtTime(muted ? 0 : 0.42 * duck, ctx.currentTime, 0.2);
+      duck += (1 - duck) * 0.1;
+    }
+    function setMood(m) { if (mood === m) return; mood = m; moodAt = performance.now(); if (ctx && m === 'victory') { lead(ctx.currentTime + 0.2, note(0, 0), 5, 1); lastLead = ctx.currentTime + 6; } if (m === 'defeat' && ctx) { taiko(ctx.currentTime + 0.05, 1); duck = 0.25; } }
+    function accent(kind, chain) {
+      if (!ctx || ctx.state !== 'running' || muted) return; const t = ctx.currentTime + 0.005;
+      if (kind === 'parry') { intensity = Math.min(1, intensity + 0.12); const c = Math.min(chain || 0, 6); pluck(t, note(2 + (c % 3), 1), 0.7, 0.8); shime(t, 0.8); if (c >= 3) pluck(t + 0.06, note(4, 1), 0.6, 1.1); }
+      else if (kind === 'cut') { intensity = Math.min(1, intensity + 0.2); taiko(t, 0.8); }
+      else if (kind === 'kill') { intensity = 1; taiko(t, 1); taiko(t + 0.18, 0.9); duck = 0.5; }
+      else if (kind === 'hurt') { intensity = Math.min(1, intensity + 0.25); taiko(t, 1); duck = 0.35; }
+      else if (kind === 'issen') { duck = 0.2; setTimeout(() => { if (ctx) { taiko(ctx.currentTime + 0.02, 1); pluck(ctx.currentTime + 0.02, note(0, 1), 0.9, 2.2); } }, 280); }
+    }
+    // 場面から気分を決める（毎コマ呼ぶ）
+    function update() {
+      if (!started) return;
+      let m;
+      if (!S.started) m = 'title';
+      else if (S.paused) m = 'pause';
+      else if (S.mode === 'defeat' || S.mode === 'falling') m = 'defeat';
+      else if (S.mode === 'victory') m = 'victory';
+      else if (S.mode === 'attack' || S.mode === 'broken') m = S.etype && S.etype.boss ? 'boss' : 'duel';
+      else if (S.mode === 'stalk' || S.mode === 'waiting') m = S.etype && S.etype.boss ? 'boss' : 'stalk';
+      else m = 'calm';
+      if (m !== mood && performance.now() - moodAt < 1800 && m !== 'defeat' && m !== 'victory') return;   // 気分が行き来して落ち着かないように、少なくとも1.8秒は保つ
+      setMood(m);
+    }
+    function setMuted(v) { muted = !!v; try { localStorage.setItem('kaze.music', muted ? '0' : '1'); } catch (e) {} if (bus && ctx) bus.gain.setTargetAtTime(muted ? 0 : 0.42, ctx.currentTime, 0.1); }
+    return { init, update, accent, setMuted, get muted() { return muted; }, get mood() { return mood; } };
   })();
 
   // ───────────────────────── 状態 ─────────────────────────
@@ -7280,6 +7412,7 @@
     // どこかで例外が起きても、次のコマは必ず描く（ループが止まると、画面が固まる）
     requestAnimationFrame(frame);
     try { step(now); } catch (e) { if (!S.loopErr) { S.loopErr = true; console.error(e); } }
+    try { Music.update(); } catch (e) {}
   }
   // 自動で軽くする：コマ間隔が長く（約40コマ/秒を切る）続いたら、段階的に重い表現を減らす（滑らかさは、見た目より先に守る）
   const QUAL = { ema: 16.7, last: 0, level: 0, since: 0 };
@@ -7658,6 +7791,7 @@
   function doResume() { pauseEl.hidden = true; S.paused = false; }
   pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); doPause(); });
   document.getElementById('pzResume').addEventListener('click', doResume);
+  { const mb = document.getElementById('pzMusic'), sync = () => { mb.textContent = Music.muted ? '音楽　切' : '音楽　入'; }; sync(); mb.addEventListener('click', () => { Music.setMuted(!Music.muted); sync(); }); }
   document.getElementById('pzMap').addEventListener('click', () => { pauseEl.hidden = true; openMap(); });
   document.getElementById('pzMenu').addEventListener('click', () => { showMenu(); });   // 戦いの途中でも戻れる。ただしその合目は山小屋からになる（出直すのと同じ。逃げ得はない）
   document.getElementById('pzRetry').addEventListener('click', () => { pauseEl.hidden = true; S.paused = false; if (S.endless) S.endless.floor = 1; S.newRoad = true; resetSkillState(); begin(1); });   // 出直す＝倒れたときと同じ（その合目の山小屋から）
@@ -7910,6 +8044,8 @@
     soundDump(n, i) { return Sound.dump(n, i); },
     tips() { return { p: player.tip.toArray(), e: enemy.tip.toArray(), gt: S.gt }; },
     wearPNG() { const t = makeWearTex(), N = 1024, cv = document.createElement('canvas'); cv.width = N; cv.height = N; const g = cv.getContext('2d'), im = g.createImageData(N, N); for (let i = 0; i < N * N; i++) { im.data[i * 4] = t.image.data[i * 4]; im.data[i * 4 + 1] = t.image.data[i * 4 + 1]; im.data[i * 4 + 2] = t.image.data[i * 4 + 2]; im.data[i * 4 + 3] = 255; } g.putImageData(im, 0, 0); return cv.toDataURL('image/png'); },
+    music() { return { mood: Music.mood, muted: Music.muted, state: Sound.ctx ? Sound.ctx.state : null }; },
+    musicRec(sec) { return new Promise((res) => { const c = Sound.ctx, d = c.createMediaStreamDestination(); Sound.master.connect(d); const rec = new MediaRecorder(d.stream), ch = []; rec.ondataavailable = (e) => ch.push(e.data); rec.onstop = async () => { const b = await new Blob(ch).arrayBuffer(); res(Array.from(new Uint8Array(b)).length ? btoa(String.fromCharCode(...new Uint8Array(b).subarray(0, 4000000))) : ''); }; rec.start(); setTimeout(() => rec.stop(), sec * 1000); }); },
     charStats() { const f = (r) => { const o = { meshes: 0, tris: 0, verts: 0, bones: 0, mats: new Set(), texPx: 0, texN: 0, inst: 0 }; const seen = new Set(); r.traverse((m) => { if (m.isSkinnedMesh && m.skeleton) o.bones = Math.max(o.bones, m.skeleton.bones.length); if (!m.isMesh) return; let vis = true; for (let q = m; q; q = q.parent) if (!q.visible) { vis = false; break; } if (!vis || m.material.side === THREE.BackSide) return; o.meshes++; const g = m.geometry; o.verts += g.attributes.position.count; o.tris += (g.index ? g.index.count : g.attributes.position.count) / 3; (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => { o.mats.add(x.uuid); ['map', 'normalMap', 'roughnessMap'].forEach((k) => { const t = x[k]; if (t && t.image && !seen.has(t.uuid)) { seen.add(t.uuid); o.texN++; o.texPx += (t.image.width || 0) * (t.image.height || 0); } }); }); }); o.mats = o.mats.size; return o; }; return { player: f(player.root), enemy: f(enemy.root) }; },
     renderInfo() { return { calls: SCENE_INFO.calls, tris: SCENE_INFO.tris, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; },
     lookTest(fk, id, salt) { const t = ROSTER.find((q) => q.id === id) || ROSTER[0]; applyEnemyType(Object.assign({}, t, { look: fk === 'kitsune' ? KITSUNE.look : fk === 'boss' ? BOSS.look : factionLook(fk, t, salt || 0) }), enemy); enemy.present(true); },

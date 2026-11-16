@@ -31,6 +31,10 @@
 | [47-fresh-stages.md](47-fresh-stages.md) | 新鮮に感じるステージとは（変化の五つの軸、逆U字、空間の形を必ず変える）。紅蓮寺・城・水月の作り直し |
 | [48-asset-pipeline.md](48-asset-pipeline.md) | 画の質を上げる作り方（提案）：参照動画・コンセプト画・生成3Dを置き、コードは動かす側に。第一段は一合目の最初の開けと主人公 |
 | [49-art-bible.md](49-art-bible.md) | 画の指針（アートバイブル）：光・色・形・質感・動き・禁止・確かめ方。Claude Code Game Studios を読んで採用した点／しなかった点 |
+| [50-ai-tells-audit.md](50-ai-tells-audit.md) | 「生成AI丸出し」の洗い出しと対処（字体・タイトル・UI・造形のバグ）
+| [51-gap-vs-aaa.md](51-gap-vs-aaa.md) | 商業作品との差の実測（三角形・骨・画像）と実施記録 7.6/7.7
+| [52-sekiro-visual-target.md](52-sekiro-visual-target.md) | Sekiro を基準にした視覚目標仕様（10分類、受け入れ検査、二次情報の注意）
+| [53-sekiro-design-target.md](53-sekiro-design-target.md) | Sekiro を基準にした戦闘・進行の目標仕様と、オーナーの過去の指示との食い違い
 | [44-attention-design.md](44-attention-design.md) | 注意が続く設計：飽きる仕組み七つと裏返し、「刀の記憶」（雪山以外の土地・集める・目的・強い相手を一つに）、流儀、物語のひねり（風を放つ）、雲上の回廊（エンドレス）、全体構成（提案・判断待ち） |
 | [43-monotony-and-structure.md](43-monotony-and-structure.md) | 単調さの分解（敵の動き・戦い・構成・物語）、勢力ごとの動きの癖、合目ごとの並び、文字を使わない二つの筋（先を行く者・白狐の影）、十合目（東風・野分・颪）、固有名詞、20倍の長さの構成案（判断待ち）（試作 4.9） |
 | [42-world-and-characters.md](42-world-and-characters.md) | 世界と登場人物：設定の上位方針（見た目は法則の手がかり、言葉で語らない）、白峰と風の伝説、山の掟と面の色、七つの勢力、見た目の文法、名のある者（試作 4.8） |
