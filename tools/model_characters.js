@@ -230,10 +230,10 @@ function build(kind) {
   {
     const sec = [[1.14, 0.135, 0.105], [1.3, 0.14, 0.1], [1.45, 0.158, 0.112], [1.6, 0.168, 0.118], [1.71, 0.155, 0.108], [1.79, 0.075, 0.068], [1.83, 0.046, 0.044]];
     const rings = sec.map(([y, rx, rz]) => ringPts(v(0, y, 0.005), X, Z, rx * sw, rz, 12));
-    merge(M, solidLoft(rings, (r, i, p) => A('skin', spineW(p[1])), { openEnd: true }));
+    merge(M, solidLoft(rings, (r, i, p) => A(big ? 'skin' : 'juban', spineW(p[1])), { openEnd: true }));
   }
   // ── 首（頭の面と重なる） ──
-  merge(M, solidLoft([1.8, 1.86, 1.92].map((y, k) => ringPts(v(0, y, 0.004), X, Z, 0.043 - k * 0.002, 0.041, 10)), (r, i, p) => A('skin', p[1] < 1.85 ? blendW(W('chest', 1), W('neck', 1), 0.6) : W('neck', 1)), { openEnd: true }));
+  merge(M, solidLoft([1.8, 1.86, 1.92].map((y, k) => ringPts(v(0, y, 0.004), X, Z, 0.043 - k * 0.002, 0.041, 10)), (r, i, p) => A(big ? 'skin' : 'eri', p[1] < 1.85 ? blendW(W('chest', 1), W('neck', 1), 0.6) : W('neck', 1)), { openEnd: true }));
 
   if (!big) {
     // ── 主人公の着物：炭色の布の殻。前は細く重なり、胸の上でV字に大きく開く ──
@@ -254,6 +254,14 @@ function build(kind) {
       const rings = sec.map(([y, rx, rz, g]) => ringPts(v(0, y, -0.006), X, Z, rx, rz, 17, (th) => 1 + 0.025 * tri(th * 7) * (y < 1.6 ? 1 : 0) * (Math.cos(th) < 0.3 ? 1 : 0.3), g, 2 * Math.PI - g, true));
       const fxAt = (y) => clamp((1.32 - y) / 0.33, 0, 1) * 0.75;
       merge(M, shellLoft(rings, 0.012, (r, i, p) => A('haori', spineW(p[1]), { fx: fxAt(p[1]) }), (r, i, p) => A('lining', spineW(p[1]), { fx: fxAt(p[1]) }), { open: true }));
+    }
+    // 羽織の裾の縁取り：灰青の細い帯が裾を一周し、背の中央に縫い目が通る
+    {
+      const g = 0.62, fxAt = (y) => clamp((1.32 - y) / 0.33, 0, 1) * 0.75;
+      const hem = [[0.985, 0.256, 0.196], [1.01, 0.252, 0.193], [1.04, 0.246, 0.188]];
+      merge(M, solidLoft(hem.map(([y, rx, rz], q) => ringPts(v(0, y, -0.006), X, Z, rx + (q === 1 ? 0.004 : 0), rz + (q === 1 ? 0.004 : 0), 17, (th) => 1 + 0.025 * tri(th * 7) * (Math.cos(th) < 0.3 ? 1 : 0.3), g, 2 * Math.PI - g, true)), (r, i, p) => A('haoriEri', spineW(p[1]), { fx: fxAt(p[1]) }), { openStart: false }));
+      const seam = [1.0, 1.15, 1.3, 1.45, 1.6, 1.72].map((y, k) => v(0, y, -0.006 - (0.152 + 0.01 * Math.sin(k)) - 0.004));
+      merge(M, solidLoft(seam.map((c) => ringPts(c, X, Y, 0.0035, 0.0035, 6)), (r, i, p) => A('haoriEri', spineW(p[1]), { fx: fxAt(p[1]) }), {}));
     }
     // ── 黒い帯（この上に、実行時に紫の縄を巻く） ──
     merge(M, solidLoft([1.165, 1.2, 1.24].map((y) => ringPts(v(0, y, 0), X, Z, 0.17, 0.14, 12)), (r, i, p) => A('sash', W('hips', 1)), { openStart: true, openEnd: true }));
@@ -285,6 +293,36 @@ function build(kind) {
       // 胸板
       merge(M, roundBox(v(0, 1.635, 0.118), X, Y, Z, 0.135, 0.05, 0.022, (p) => A('armor', W('chest', 1))));
       merge(M, solidLoft([1.12, 1.15, 1.18].map((y) => ringPts(v(0, y, 0), X, Z, 0.2 * sw, 0.155, 12)), (r, i, p) => A('sash', W('hips', 1)), { openStart: true, openEnd: true }));
+      // 草摺：腰から下がる漆の板。二段に重なり、一枚ごとに溝が入る。前は長く、後ろは短い。縦に紅の縅の紐が通る
+      const NK = 12, NC = NK * 3;
+      [[1.19, 0.93, 0.262, 0.212, 0.0], [1.04, 0.78, 0.292, 0.238, 0.5]].forEach(([y0, y1, rx0, rz0, tier], ti) => {
+        const rings = [];
+        const NR = 3;
+        for (let r = 0; r < NR; r++) {
+          const t = r / (NR - 1), y = lerp(y0, y1, t), flare = 1 + 0.12 * t;
+          const ring = [];
+          for (let i = 0; i < NC; i++) {
+            const th = i / NC * Math.PI * 2, ca = Math.cos(th);
+            const front = clamp((ca + 0.45) / 0.9, 0, 1);   // 後ろは短い
+            const yy = y - (1 - front) * 0.1 * t;
+            const groove = i % 3 === 0 ? 1 : 0;   // 板の継ぎ目の溝
+            const k = flare * (1 - 0.018 * groove);
+            ring.push(v(Math.sin(th) * rx0 * sw * k, yy, Math.cos(th) * rz0 * k + 0.008));
+          }
+          rings.push(ring);
+        }
+        const wAt = (y) => blendW(W('hips', 1), W('skirt', 1), clamp((1.19 - y) / 0.35, 0, 1) * 0.75);
+        merge(M, shellLoft(rings, 0.011, (r, i, p) => A('armor', wAt(p[1]), { fx: 0.12 + 0.25 * (1 - (p[1] - y1) / (y0 - y1)) }), (r, i, p) => A('lapel', wAt(p[1])), { sharpCols: Array.from({ length: NK }, (_, k) => k * 3) }));
+        // 縦の紐：板の中心の列に細い帯
+        for (let k = 0; k < NK; k++) {
+          const th = (k * 3 + 1.5) / NC * Math.PI * 2, ca = Math.cos(th), sa = Math.sin(th);
+          const rings2 = [0, 1, 2, 3].map((q) => { const t = q / 3, y = lerp(y0, y1, t) - (1 - clamp((ca + 0.45) / 0.9, 0, 1)) * 0.1 * t, fl = 1 + 0.12 * t; const c = v(sa * (rx0 * sw * fl + 0.006), y, ca * (rz0 * fl + 0.006) + 0.008); const out = norm(v(sa / (rx0 * sw), 0, ca / rz0)); return ringPts(c, norm(cross(Y, out)), out, 0.0045, 0.0025, 6); });
+          merge(M, solidLoft(rings2, (r, i, p) => A('lapel', wAt(p[1]), { fx: 0.12 + 0.25 * (1 - (p[1] - y1) / (y0 - y1)) }), {}));
+        }
+      });
+      // 胸の飾り紐：胸板の前で結んだ房が垂れる
+      merge(M, roundBox(v(0, 1.585, 0.145), X, Y, Z, 0.018, 0.018, 0.012, (p) => A('lapel', W('chest', 1))));
+      [-1, 1].forEach((sg2) => merge(M, solidLoft([0, 1, 2, 3].map((k) => ringPts(v(sg2 * (0.016 + k * 0.006), 1.57 - k * 0.05, 0.142 - k * 0.002), X, Z, 0.006, 0.004, 6)), (r, i, p) => A('lapel', W('chest', 1)), {})));
     }
   }
 
@@ -367,7 +405,13 @@ function build(kind) {
       const sl = [0.03, 0.14, 0.25, 0.32].map((t, k) => ringPts(add(add(S, mul(dir, t)), mul(hang, 0.02 * k)), fwd, hang, 0.075 + k * 0.006, 0.085 + k * 0.01, 12));
       merge(M, shellLoft(sl, 0.008, (r, i, p) => A('kimono', armW(p), { fx: 0.3 }), (r, i, p) => A('lapel', armW(p), { fx: 0.3 }), { closedStart: true }));
       merge(M, solidLoft([0.0, 0.1, 0.27].map((t) => ringPts(add(E, mul(dir, t)), fwd, hang, 0.05 - t * 0.03, 0.05 - t * 0.03, 10)), (r, i, p) => A('kimono', armW(p)), {}));
-      [0.05, 0.12, 0.19].forEach((t, k) => merge(M, roundBox(add(add(E, mul(dir, t + 0.02)), mul(fwd, 0.0)), fwd, dir, hang, 0.052 - k * 0.004, 0.03, 0.05 - k * 0.004, (p) => A('armor', W(fa, 1)))));
+      {
+        const tk = [0.02, 0.1, 0.2, 0.285], rk = (t) => 0.057 - t * 0.062;
+        merge(M, solidLoft(tk.map((t) => ringPts(add(E, mul(dir, t)), fwd, hang, rk(t), rk(t) * 0.92, 12)), (r, i, p) => A('armor', armW(p)), { openStart: false }));
+        // 縁の段：三つの板の合わせ目（少し張り出す）と、手首の縁
+        [0.07, 0.15, 0.23].forEach((t, k) => merge(M, solidLoft([-0.016, 0, 0.016].map((dt, q) => ringPts(add(E, mul(dir, t + dt)), fwd, hang, rk(t) + (q === 1 ? 0.011 : 0.004), (rk(t) + (q === 1 ? 0.011 : 0.004)) * 0.92, 12)), (r, i, p) => A('armor', armW(p)), {})));
+        merge(M, solidLoft([0.27, 0.285, 0.3].map((t, q) => ringPts(add(E, mul(dir, t)), fwd, hang, 0.046 + (q === 1 ? 0.004 : 0), 0.043 + (q === 1 ? 0.004 : 0), 10)), (r, i, p) => A('lapel', W(fa, 1)), {}));
+      }
     }
     // 手：柄を握った拳（丸い箱）と親指
     const hM = big ? 'glove' : 'guard';   // 主人公の手は布を巻いた手甲
