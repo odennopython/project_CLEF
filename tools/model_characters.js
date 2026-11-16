@@ -321,8 +321,8 @@ function build(kind) {
         }
       });
       // 胸の飾り紐：胸板の前で結んだ房が垂れる
-      merge(M, roundBox(v(0, 1.585, 0.145), X, Y, Z, 0.018, 0.018, 0.012, (p) => A('lapel', W('chest', 1))));
-      [-1, 1].forEach((sg2) => merge(M, solidLoft([0, 1, 2, 3].map((k) => ringPts(v(sg2 * (0.016 + k * 0.006), 1.57 - k * 0.05, 0.142 - k * 0.002), X, Z, 0.006, 0.004, 6)), (r, i, p) => A('lapel', W('chest', 1)), {})));
+      merge(M, roundBox(v(0, 1.585, 0.145), X, Y, Z, 0.018, 0.018, 0.012, (p) => A('sash', W('chest', 1))));
+      [-1, 1].forEach((sg2) => merge(M, solidLoft([0, 1, 2, 3].map((k) => ringPts(v(sg2 * (0.016 + k * 0.006), 1.57 - k * 0.05, 0.142 - k * 0.002), X, Z, 0.006, 0.004, 6)), (r, i, p) => A('sash', W('chest', 1)), {})));
     }
   }
 
@@ -402,15 +402,15 @@ function build(kind) {
       merge(M, solidLoft(tg.map((t, k) => ringPts(add(E, mul(dir, t)), fwd, hang, (0.046 - t * 0.04) * (k % 2 ? 1.06 : 1), (0.046 - t * 0.04) * (k % 2 ? 1.06 : 1), 10)), (r, i, p) => A('guard', armW(p)), {}));
     } else {
       // 相手：袖は肘の上で絞り、前腕は黒漆の籠手（板を三段）
-      const sl = [0.03, 0.14, 0.25, 0.32].map((t, k) => ringPts(add(add(S, mul(dir, t)), mul(hang, 0.02 * k)), fwd, hang, 0.075 + k * 0.006, 0.085 + k * 0.01, 12));
-      merge(M, shellLoft(sl, 0.008, (r, i, p) => A('kimono', armW(p), { fx: 0.3 }), (r, i, p) => A('lapel', armW(p), { fx: 0.3 }), { closedStart: true }));
+      const sl = [0.03, 0.14, 0.25, 0.32].map((t, k) => ringPts(add(add(S, mul(dir, t)), mul(hang, 0.02 * k)), fwd, hang, 0.058 + k * 0.004, 0.066 + k * 0.006, 12));
+      merge(M, shellLoft(sl, 0.008, (r, i, p) => A('kimono', armW(p), { fx: 0.3 }), (r, i, p) => A('kimono', armW(p), { fx: 0.3 }), { closedStart: true }));
       merge(M, solidLoft([0.0, 0.1, 0.27].map((t) => ringPts(add(E, mul(dir, t)), fwd, hang, 0.05 - t * 0.03, 0.05 - t * 0.03, 10)), (r, i, p) => A('kimono', armW(p)), {}));
       {
         const tk = [0.02, 0.1, 0.2, 0.285], rk = (t) => 0.057 - t * 0.062;
         merge(M, solidLoft(tk.map((t) => ringPts(add(E, mul(dir, t)), fwd, hang, rk(t), rk(t) * 0.92, 12)), (r, i, p) => A('armor', armW(p)), { openStart: false }));
         // 縁の段：三つの板の合わせ目（少し張り出す）と、手首の縁
         [0.07, 0.15, 0.23].forEach((t, k) => merge(M, solidLoft([-0.016, 0, 0.016].map((dt, q) => ringPts(add(E, mul(dir, t + dt)), fwd, hang, rk(t) + (q === 1 ? 0.011 : 0.004), (rk(t) + (q === 1 ? 0.011 : 0.004)) * 0.92, 12)), (r, i, p) => A('armor', armW(p)), {})));
-        merge(M, solidLoft([0.27, 0.285, 0.3].map((t, q) => ringPts(add(E, mul(dir, t)), fwd, hang, 0.046 + (q === 1 ? 0.004 : 0), 0.043 + (q === 1 ? 0.004 : 0), 10)), (r, i, p) => A('lapel', W(fa, 1)), {}));
+        merge(M, solidLoft([0.27, 0.285, 0.3].map((t, q) => ringPts(add(E, mul(dir, t)), fwd, hang, 0.046 + (q === 1 ? 0.004 : 0), 0.043 + (q === 1 ? 0.004 : 0), 10)), (r, i, p) => A('armor', W(fa, 1)), {}));
       }
     }
     // 手：柄を握った拳（丸い箱）と親指
@@ -421,6 +421,14 @@ function build(kind) {
     }
     merge(M, roundBox(add(WR, mul(dir, 0.06)), fwd, dir, hang, 0.034, 0.055, 0.042, (p) => A(hM, W(hd, 1))));
     merge(M, solidLoft([0.0, 0.03, 0.05].map((t, k) => ringPts(add(add(WR, mul(dir, 0.04 + t * 0.5)), mul(fwd, 0.035 + t * 0.4)), dir, hang, 0.014 - k * 0.002, 0.013 - k * 0.002, 6)), (r, i, p) => A(hM, W(hd, 1)), {}));
+    // 指：握った拳の四本。指の付け根の関節の盛り上がり、曲がった中節、指先の巻き込み。指と指の間に溝ができる
+    [0, 1, 2, 3].forEach((f) => {
+      const hh = (f - 1.5) * 0.02, sz = 1 - Math.abs(f - 1.5) * 0.08;
+      const base = add(add(WR, mul(dir, 0.045)), add(mul(fwd, 0.03), mul(hang, hh)));
+      const seg = [[0.0, 0.0, 0.0, 0.013], [0.022, 0.012, 0.0, 0.0115], [0.036, 0.03, 0.0, 0.0105], [0.03, 0.046, 0.0, 0.0095]];
+      merge(M, solidLoft(seg.map(([dd, ff, hv, r]) => ringPts(add(add(base, mul(dir, dd)), mul(fwd, ff)), hang, dir, r * sz, r * sz * 1.05, 7)), (r, i, p) => A(hM, W(hd, 1)), {}));
+    });
+
   });
 
   // 2回細分
@@ -485,7 +493,7 @@ function packRaw(B) {
 }
 
 if (require.main === module) {
-  const HEAD_CELL = 0.0034;
+  const HEAD_CELL = 0.0042;
   const data = { player: exportMesh('player'), playerHead: pack('player', HEAD_CELL, 'head'), enemy: exportMesh('enemy'), enemyHead: pack('enemy', HEAD_CELL, 'head') };
   const js = 'window.CLEF_CHARS = ' + JSON.stringify(data) + ';';
   const target = path.join(__dirname, '..', 'prototype', 'kaeshi', 'index.html');
